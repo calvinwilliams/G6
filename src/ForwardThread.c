@@ -23,7 +23,7 @@
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL ); \
 	DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
 	_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
-	SetForwardSessionUnused2( penv , p_forward_session , p_forward_session->p_reverse_forward_session );
+	SetForwardSessionUnused2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
 
 static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
 {
@@ -99,6 +99,7 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 		/* 一次全发完 */
 		InfoLog( __FILE__ , __LINE__ , "transfer #%d# [%d]bytes to #%d#" , p_forward_session->sock , len , p_forward_session->p_reverse_forward_session->sock );
 		p_forward_session->io_buffer_len = 0 ;
+DebugLog( __FILE__ , __LINE__ , "OnForwardInput - 111" );
 	}
 	else
 	{
@@ -185,29 +186,6 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 	return 0;
 }
 
-#if 0
-static int OnHeartBeatInput( struct ServerEnv *penv , struct ForwardSession *p_forward_session , int forward_epoll_fd )
-{
-	/* 接收通讯数据 */
-	p_forward_session->io_buffer_offsetpos = 0 ;
-	p_forward_session->io_buffer_len = recv( p_forward_session->sock , p_forward_session->io_buffer , IO_BUFFER_SIZE , 0 ) ;
-	if( p_forward_session->io_buffer_len == 0 )
-	{
-		/* 对端断开连接 */
-		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock );
-		return -1;
-	}
-	else if( p_forward_session->io_buffer_len == -1 )
-	{
-		/* 通讯接收出错 */
-		ErrorLog( __FILE__ , __LINE__ , "recv #%d# failed , errno[%d]" , p_forward_session->sock , errno );
-		return -1;
-	}
-	
-	return 0;
-}
-#endif
-
 void *ForwardThread( unsigned long forward_thread_index )
 {
 	struct ServerEnv	*penv = g_penv ;
@@ -258,6 +236,8 @@ void *ForwardThread( unsigned long forward_thread_index )
 				ErrorLog( __FILE__ , __LINE__ , "forward session TIMEOUT" );
 				DISCONNECT_PAIR
 			}
+			
+			continue;
 		}
 		
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
@@ -294,42 +274,9 @@ void *ForwardThread( unsigned long forward_thread_index )
 					}
 				}
 			}
-#if 0
-			else if( p_forward_session->type == FORWARD_SESSION_TYPE_HEARTBEAT )
-			{
-				DebugLog( __FILE__ , __LINE__ , "heartbeat session event" );
-				
-				UpdateTimeoutNode( penv , p_forward_session , time(NULL) + penv->timeout );
-				
-				if( p_event->events & EPOLLIN ) /* 输入事件 */
-				{
-					nret = OnHeartBeatInput( penv , p_forward_session , forward_epoll_fd ) ;
-					if( nret )
-					{
-						struct ServerNetAddress		*p_server_addr = NULL ;
-						ErrorLog( __FILE__ , __LINE__ , "OnHeartBeatInput failed[%d]" , nret );
-						p_server_addr = p_forward_session->p_forward_rule->server_addr_array + p_forward_session->server_index ;
-						p_server_addr->server_unable = 1 ;
-						p_server_addr->timestamp_to = UINTMAX_MAX ;
-						DISCONNECT
-					}
-				}
-				else
-				{
-					struct ServerNetAddress		*p_server_addr = NULL ;
-					ErrorLog( __FILE__ , __LINE__ , "heartbeat session EPOLLERR" );
-					p_server_addr = p_forward_session->p_forward_rule->server_addr_array + p_forward_session->server_index ;
-					p_server_addr->server_unable = 1 ;
-					p_server_addr->timestamp_to = UINTMAX_MAX ;
-					DISCONNECT
-				}
-			}
-#endif
 			else
 			{
 				DebugLog( __FILE__ , __LINE__ , "forward session event" );
-				
-				UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , time(NULL) + penv->timeout );
 				
 				if( p_event->events & EPOLLIN ) /* 输入事件 */
 				{
@@ -357,7 +304,10 @@ void *ForwardThread( unsigned long forward_thread_index )
 				{
 					ErrorLog( __FILE__ , __LINE__ , "forward session EPOLLERR" );
 					DISCONNECT_PAIR
+					continue;
 				}
+				
+				UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , time(NULL) + penv->timeout );
 			}
 		}
 	}

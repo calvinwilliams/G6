@@ -542,14 +542,43 @@ void SetForwardSessionUnused2( struct ServerEnv *penv , struct ForwardSession *p
 	return;
 }
 
-int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
+static void _RemoveTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
+{
+DebugLog( __FILE__ , __LINE__ , "_RemoveTimeoutTreeNode[%p] - 111" , p_forward_session );
+	rb_erase( & (p_forward_session->timeout_rbnode) , & (penv->timeout_rbtree) );
+	return;
+}
+
+void RemoveTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
+{
+	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
+	
+	_RemoveTimeoutTreeNode( penv , p_forward_session );
+	
+	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
+	
+	return;
+}
+
+void RemoveTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 )
+{
+	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
+	
+	_RemoveTimeoutTreeNode( penv , p_forward_session );
+	_RemoveTimeoutTreeNode( penv , p_forward_session2 );
+	
+	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
+	
+	return;
+}
+
+static int _AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
 {
         struct rb_node		**pp_new_node = NULL ;
         struct rb_node		*p_parent = NULL ;
         struct ForwardSession	*p = NULL ;
-
-	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 	
+DebugLog( __FILE__ , __LINE__ , "_AddTimeoutTreeNode[%p] - 111" , p_forward_session );
 	pp_new_node = & (penv->timeout_rbtree.rb_node) ;
         while( *pp_new_node )
         {
@@ -564,8 +593,22 @@ int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forwar
                         pp_new_node = &((*pp_new_node)->rb_left) ;
         }
 	
-        rb_link_node( &(p_forward_session->timeout_rbnode) , p_parent , pp_new_node );
-        rb_insert_color( &(p_forward_session->timeout_rbnode) , &(penv->timeout_rbtree) );
+DebugLog( __FILE__ , __LINE__ , "_AddTimeoutTreeNode - 444" );
+        rb_link_node( & (p_forward_session->timeout_rbnode) , p_parent , pp_new_node );
+DebugLog( __FILE__ , __LINE__ , "_AddTimeoutTreeNode - 555" );
+        rb_insert_color( & (p_forward_session->timeout_rbnode) , &(penv->timeout_rbtree) );
+DebugLog( __FILE__ , __LINE__ , "_AddTimeoutTreeNode - 666" );
+	
+	return 0;
+}
+
+int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
+{
+	int		nret = 0 ;
+	
+	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
+	
+	nret = _AddTimeoutTreeNode( penv , p_forward_session ) ;
 	
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 	
@@ -576,41 +619,70 @@ int AddTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forwa
 {
 	int		nret = 0 ;
 	
-	nret = AddTimeoutTreeNode( penv , p_forward_session ) ;
-	if( nret )
-		return nret;
+	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 	
-	nret = AddTimeoutTreeNode( penv , p_forward_session2 ) ;
+	nret = _AddTimeoutTreeNode( penv , p_forward_session ) ;
 	if( nret )
 	{
-		RemoveTimeoutTreeNode( penv , p_forward_session );
+		pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 		return nret;
 	}
+	
+	nret = _AddTimeoutTreeNode( penv , p_forward_session2 ) ;
+	if( nret )
+	{
+		_RemoveTimeoutTreeNode( penv , p_forward_session );
+		pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
+		return nret;
+	}
+	
+	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 	
 	return 0;
 }
 
-void RemoveTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
+static int _UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout )
 {
-	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
+	int		nret = 0 ;
 	
-	rb_erase( &(p_forward_session->timeout_rbnode) , & (penv->timeout_rbtree) );
+	_RemoveTimeoutTreeNode( penv , p_forward_session );
+	p_forward_session->timeout_timestamp = timeout ;
+	nret = _AddTimeoutTreeNode( penv , p_forward_session ) ;
 	
-	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
-	
-	return;
+	return nret;
 }
 
-void RemoveTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 )
+int UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout )
 {
+	int		nret = 0 ;
+	
 	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 	
-	rb_erase( &(p_forward_session->timeout_rbnode) , & (penv->timeout_rbtree) );
-	rb_erase( &(p_forward_session2->timeout_rbnode) , & (penv->timeout_rbtree) );
+	nret = _UpdateTimeoutNode( penv , p_forward_session , timeout ) ;
 	
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 	
-	return;
+	return 0;
+}
+
+int UpdateTimeoutNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 , unsigned int timeout )
+{
+	int		nret = 0 ;
+	
+	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
+	
+	nret = _UpdateTimeoutNode( penv , p_forward_session , timeout ) ;
+	if( nret )
+	{
+		pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
+		return nret;
+	}
+	
+	nret = _UpdateTimeoutNode( penv , p_forward_session2 , timeout ) ;
+	
+	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
+	
+	return nret;
 }
 
 int GetLastestTimeout( struct ServerEnv *penv )
@@ -621,7 +693,7 @@ int GetLastestTimeout( struct ServerEnv *penv )
 	
 	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 	
-	p_node = rb_first( & (penv->timeout_rbtree) ); 
+	p_node = rb_first( & (penv->timeout_rbtree) );
 	if (p_node == NULL)
 	{
 		pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
@@ -636,33 +708,6 @@ int GetLastestTimeout( struct ServerEnv *penv )
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 	
 	return timeout*1000;
-}
-
-int UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout )
-{
-	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
-	
-	p_forward_session->timeout_timestamp = timeout ;
-	rb_insert_color( &(p_forward_session->timeout_rbnode) , &(penv->timeout_rbtree) );
-	
-	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
-	
-	return 0;
-}
-
-int UpdateTimeoutNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 , unsigned int timeout )
-{
-	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
-	
-	p_forward_session->timeout_timestamp = timeout ;
-	rb_insert_color( &(p_forward_session->timeout_rbnode) , &(penv->timeout_rbtree) );
-	
-	p_forward_session2->timeout_timestamp = timeout ;
-	rb_insert_color( &(p_forward_session2->timeout_rbnode) , &(penv->timeout_rbtree) );
-	
-	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
-	
-	return 0;
 }
 
 struct ForwardSession *GetExpireTimeoutNode( struct ServerEnv *penv )

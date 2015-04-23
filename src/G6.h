@@ -354,13 +354,13 @@ struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv );
 void SetForwardSessionUnused( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
 void SetForwardSessionUnused2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
 
-int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
-int AddTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
 void RemoveTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
 void RemoveTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
-int GetLastestTimeout( struct ServerEnv *penv );
+int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
+int AddTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
 int UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout );
 int UpdateTimeoutNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 , unsigned int timeout );
+int GetLastestTimeout( struct ServerEnv *penv );
 struct ForwardSession *GetExpireTimeoutNode( struct ServerEnv *penv );
 
 int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int );

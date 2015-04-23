@@ -311,8 +311,6 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		p_reverse_forward_session->timeout_timestamp = time(NULL) + penv->timeout ;
 		p_reverse_forward_session->p_reverse_forward_session->timeout_timestamp = time(NULL) + penv->timeout ;
 		
-		AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_reverse_forward_session->p_reverse_forward_session );
-		
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL );
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->p_reverse_forward_session->sock , NULL );
 		
@@ -327,6 +325,10 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		event.data.ptr = p_reverse_forward_session->p_reverse_forward_session ;
 		event.events = EPOLLIN | EPOLLERR ;
 		epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_MOD , p_reverse_forward_session->p_reverse_forward_session->sock , & event );
+		
+DebugLog( __FILE__ , __LINE__ , "TryToConnectServer - 111 - AddTimeoutTreeNode2" );
+		AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_reverse_forward_session->p_reverse_forward_session );
+DebugLog( __FILE__ , __LINE__ , "TryToConnectServer - 222 - AddTimeoutTreeNode2" );
 		
 		nret = write( penv->forward_request_pipe[forward_thread_index].fds[1] , "L" , 1 ) ;
 	}
@@ -601,8 +603,6 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	p_forward_session->timeout_timestamp = time(NULL) + penv->timeout ;
 	p_forward_session->p_reverse_forward_session->timeout_timestamp = time(NULL) + penv->timeout ;
 	
-	AddTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session );
-	
 	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 	
@@ -617,6 +617,10 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	event.data.ptr = p_forward_session->p_reverse_forward_session ;
 	event.events = EPOLLIN | EPOLLERR ;
 	epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_ADD , p_forward_session->p_reverse_forward_session->sock , & event );
+	
+DebugLog( __FILE__ , __LINE__ , "OnConnectingServer - 111 - AddTimeoutTreeNode2" );
+	AddTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session );
+DebugLog( __FILE__ , __LINE__ , "OnConnectingServer - 222 - AddTimeoutTreeNode2" );
 	
 	write( penv->forward_request_pipe[forward_thread_index].fds[1] , " " , 1 );
 	
