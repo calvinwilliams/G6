@@ -4,13 +4,11 @@
 	RemoveTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER ) \
 	{ \
-DebugLog( __FILE__ , __LINE__ , "222 - 111 - p_forward_session[%p]#%d# p_reverse_forward_session[%p]" , p_forward_session , p_forward_session->sock , p_forward_session->p_reverse_forward_session ); \
 		RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr ); \
 		SERVER_CONNECTION_COUNT_DECREASE(penv,p_forward_session->p_reverse_forward_session->p_forward_rule->server_addr_array[p_forward_session->p_reverse_forward_session->server_index],1) \
 	} \
 	else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT ) \
 	{ \
-DebugLog( __FILE__ , __LINE__ , "222 - 222 - p_forward_session[%p] p_reverse_forward_session[%p]" , p_forward_session , p_forward_session->p_reverse_forward_session ); \
 		RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_forward_session->p_reverse_forward_session->netaddr.sockaddr.sin_addr.s_addr ); \
 		SERVER_CONNECTION_COUNT_DECREASE(penv,p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index],1) \
 	} \

@@ -642,17 +642,21 @@ static int _AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionSta
 	unsigned int		ip_connection_index ;
 	struct IpConnection	*p_ip_connection = NULL ;
 	
-DebugLog( __FILE__ , __LINE__ , "p_ip_connection_stat->ip_count[%u] ->connection_count[%u] ip_connection_stat_size[%i]" , p_ip_connection_stat->ip_count , p_ip_connection_stat->connection_count , p_ip_connection_stat->ip_connection_stat_size );
 	ip_connection_index = ip_int % (p_ip_connection_stat->ip_connection_stat_size) ;
 	p_ip_connection = p_ip_connection_stat->ip_connection_array+ip_connection_index ;
 	for( n = 0 ; n < p_ip_connection_stat->ip_connection_stat_size ; n++ )
 	{
-DebugLog( __FILE__ , __LINE__ , "n[%u] used_flag[%d] p_ip_connection->ip_int[%u] ip_int[%u]" , n , p_ip_connection->used_flag , p_ip_connection->ip_int , ip_int );
 		if( p_ip_connection->used_flag == 0 )
 		{
 			if( p_ip_connection_stat->max_ip > 0 && p_ip_connection_stat->ip_count+1 > p_ip_connection_stat->max_ip )
 			{
-				ErrorLog( __FILE__ , __LINE__ , "ip count limit" );
+				ErrorLog( __FILE__ , __LINE__ , "too many ip" );
+				return -1;
+			}
+			
+			if( p_ip_connection_stat->max_connections_per_ip > 0 && p_ip_connection->connection_count+1 > p_ip_connection_stat->max_connections_per_ip )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "too many connections per ip" );
 				return -1;
 			}
 			
@@ -670,13 +674,16 @@ DebugLog( __FILE__ , __LINE__ , "n[%u] used_flag[%d] p_ip_connection->ip_int[%u]
 		{
 			if( p_ip_connection_stat->max_connections_per_ip > 0 && p_ip_connection->connection_count+1 > p_ip_connection_stat->max_connections_per_ip )
 			{
-				ErrorLog( __FILE__ , __LINE__ , "connections_per_ip count limit" );
+				ErrorLog( __FILE__ , __LINE__ , "too many connections per ip" );
 				return -1;
 			}
 			
 			p_ip_connection->connection_count++;
 			
 			p_ip_connection_stat->connection_count++;
+			
+			pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
+			return 0;
 		}
 		
 		ip_connection_index++;
@@ -706,7 +713,7 @@ int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_
 	
 	if( p_ip_connection_stat->max_connections > 0 && p_ip_connection_stat->connection_count+1 > p_ip_connection_stat->max_connections )
 	{
-		ErrorLog( __FILE__ , __LINE__ , "connections count limit" );
+		ErrorLog( __FILE__ , __LINE__ , "too many connections" );
 		pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
 		return -1;
 	}
@@ -733,7 +740,7 @@ int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_
 		}
 		memset( new_ip_connection_stat.ip_connection_array , 0x00 , sizeof(struct IpConnection) * new_ip_connection_stat.ip_connection_stat_size );
 		
-		for( connection_index = 0 , p_ip_connection = p_ip_connection_stat->ip_connection_array ; connection_index < p_ip_connection_stat->connection_count ; connection_index++ , p_ip_connection++ )
+		for( connection_index = 0 , p_ip_connection = p_ip_connection_stat->ip_connection_array ; connection_index < p_ip_connection_stat->ip_connection_stat_size ; connection_index++ , p_ip_connection++ )
 		{
 			if( p_ip_connection->used_flag == 1 )
 			{

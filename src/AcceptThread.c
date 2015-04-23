@@ -402,7 +402,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 			ErrorLog( __FILE__ , __LINE__ , "AddIpConnectionStat failed[%d]" , nret );
 			DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
 			_CLOSESOCKET( sock );
-			return 0;
+			continue;
 		}
 		
 		/* 设置socket选项 */		
@@ -416,7 +416,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 			ErrorLog( __FILE__ , __LINE__ , "MatchClientAddr failed[%d] , rule_id[%s]" , nret , p_listen_session->p_forward_rule->rule_id );
 			DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
 			_CLOSESOCKET( sock );
-			return 0;
+			continue;
 		}
 		
 		if( STRCMP( p_listen_session->p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_G ) )
@@ -428,7 +428,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 				ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed" );
 				DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
 				_CLOSESOCKET( sock );
-				return 0;
+				continue;
 			}
 			
 			/* 登记epoll池 */
@@ -456,7 +456,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 				ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed" );
 				DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
 				_CLOSESOCKET( sock );
-				return 0;
+				continue;
 			}
 			
 			p_reverse_forward_session = GetForwardSessionUnused( penv ) ;
@@ -466,7 +466,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 				DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
 				_CLOSESOCKET( sock );
 				SetForwardSessionUnused( penv , p_forward_session );
-				return 0;
+				continue;
 			}
 			
 			/* 登记epoll池 */
@@ -496,7 +496,7 @@ DebugLog( __FILE__ , __LINE__ , "111 - p_forward_session[%p]#%d# p_reverse_forwa
 				DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
 				_CLOSESOCKET( p_forward_session->sock );
 				SetForwardSessionUnused2( penv , p_forward_session , p_reverse_forward_session );
-				return 0;
+				continue;
 			}
 		}
 	}
