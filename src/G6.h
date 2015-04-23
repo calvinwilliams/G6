@@ -151,6 +151,27 @@
 
 #define G6_LISTEN_SOCKFDS			"G6_LISTEN_SOCKFDS"
 
+/* IP-CONNECTION统计信息结构 */
+struct IpConnection
+{
+	char		used_flag ; /* 使用标志 */
+	uint32_t	ip_int ; /* IP地址 */
+	unsigned int	connection_count ; /* 连接数量 */
+} ;
+
+#define DEFAULT_IP_CONNECTION_ARRAY_SIZE	2
+
+struct IpConnectionStat
+{
+	unsigned int			max_ip ; /* 最大IP数量 */
+	unsigned int			max_connections ; /* 最大CONNECTION数量 */
+	unsigned int			max_connections_per_ip ; /* 每个IP最大连接数量 */
+	struct IpConnection		*ip_connection_array ; /* IP-CONNECTION统计数组 */
+	unsigned int			ip_count ; /* 当前IP数量 */
+	unsigned int			connection_count ; /* 当前CONNECTION数量 */
+	unsigned int			ip_connection_stat_size ; /* 最大IP-CONNECTION数量 */
+} ;
+
 /* 网络地址信息结构 */
 struct NetAddress
 {
@@ -167,6 +188,8 @@ struct NetAddress
 struct ClientNetAddress
 {
 	struct NetAddress	netaddr ; /* 网络地址结构 */
+	
+	struct IpConnectionStat	ip_connection_stat ; /* IP-CONNECTION统计信息，也用于连接限制 */
 } ;
 
 /* 转发端信息结构 */
@@ -174,6 +197,8 @@ struct ForwardNetAddress
 {
 	struct NetAddress	netaddr ; /* 网络地址结构 */
 	int			sock ; /* sock描述字 */
+	
+	unsigned int		timeout ; /* 超时周期 */
 } ;
 
 /* 服务端信息结构 */
@@ -200,6 +225,8 @@ struct ServerNetAddress
 	
 	time_t			rtt ; /* 最近读时间戳 */
 	time_t			wtt ; /* 最近写时间戳 */
+	
+	struct IpConnectionStat	ip_connection_stat ; /* IP-CONNECTION统计信息，也用于连接限制 */
 } ;
 
 /* 转发规则结构 */
@@ -208,15 +235,20 @@ struct ForwardRule
 	char				rule_id[ RULE_ID_MAXLEN + 1 ] ; /* 规则ID */
 	char				load_balance_algorithm[ LOAD_BALANCE_ALGORITHM_MAXLEN + 1 ] ; /* 负载均衡算法 */
 	
+	struct IpConnectionStat		client_ip_connection_stat ; /* IP-CONNECTION统计信息，也用于连接限制 */
+	
 	struct ClientNetAddress		*client_addr_array ; /* 客户端地址结构 */
 	unsigned int			client_addr_size ; /* 客户端规则配置最大数量 */
 	unsigned int			client_addr_count ; /* 客户端规则配置数量 */
+	
+	unsigned int			forward_timeout ; /* 超时周期 */
 	
 	struct ForwardNetAddress	*forward_addr_array ; /* 转发端地址结构 */
 	unsigned int			forward_addr_size ; /* 转发端规则配置最大数量 */
 	unsigned int			forward_addr_count ; /* 转发端规则配置数量 */
 	
-	unsigned int			server_heartbeat ;
+	unsigned int			server_heartbeat ; /* 心跳周期 */
+	struct IpConnectionStat		server_ip_connection_stat ; /* IP-CONNECTION统计信息，也用于连接限制 */
 	
 	struct ServerNetAddress		*server_addr_array ; /* 服务端地址结构 */
 	unsigned int			server_addr_size ; /* 服务端规则配置最大数量 */
@@ -266,26 +298,6 @@ struct PipeFds
 	int				fds[ 2 ] ;
 } ;
 
-struct IpConnection
-{
-	char		used_flag ; /* 使用标志 */
-	uint32_t	ip_int ; /* IP地址 */
-	unsigned int	connection_count ; /* 连接数量 */
-} ;
-
-#define DEFAULT_IP_CONNECTION_ARRAY_SIZE	2
-
-struct IpConnectionStat
-{
-	unsigned int			max_ip ; /* 最大IP数量 */
-	unsigned int			max_connections ; /* 最大CONNECTION数量 */
-	unsigned int			max_connections_per_ip ; /* 每个IP最大连接数量 */
-	struct IpConnection		*ip_connection_array ; /* IP-CONNECTION统计数组 */
-	unsigned int			ip_count ; /* 当前IP数量 */
-	unsigned int			connection_count ; /* 当前CONNECTION数量 */
-	unsigned int			ip_connection_stat_size ; /* 最大IP-CONNECTION数量 */
-} ;
-
 #define INIT_TIME \
 	UpdateTimeNow( & g_time_tv , g_date_and_time ); \
 
@@ -306,9 +318,9 @@ struct ServerEnv
 	struct ForwardNetAddress	*old_forward_addr_array ; /* 用于平滑升级的老进程侦听端口信息 */
 	unsigned int			old_forward_addr_count ;
 	
-	unsigned int			timeout ;
+	unsigned int			timeout ; /* 超时周期 */
 	struct rb_root			timeout_rbtree ; /* 超时 红黑树 */
-	
+	unsigned int			heartbeat ; /* 心跳周期 */
 	struct IpConnectionStat		ip_connection_stat ; /* IP-CONNECTION统计信息，也用于连接限制 */
 	
 	struct ForwardRule		*forward_rule_array ; /* 转发规则数组 */
@@ -358,6 +370,8 @@ int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchChar
 int InitEnvirment( struct ServerEnv *penv );
 int InitEnvirment2( struct ServerEnv *penv );
 void CleanEnvirment( struct ServerEnv *penv );
+
+int InitIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat );
 
 int SaveListenSockets( struct ServerEnv *penv );
 int LoadOldListenSockets( struct ServerEnv *penv );

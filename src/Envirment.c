@@ -133,21 +133,12 @@ int InitEnvirment( struct ServerEnv *penv )
 
 int InitEnvirment2( struct ServerEnv *penv )
 {
+	int		nret = 0 ;
+	
 	/* 创建IP-CONNECTION统计数组 */
-	if( penv->ip_connection_stat.max_ip > 0 || penv->ip_connection_stat.max_connections > 0 || penv->ip_connection_stat.max_connections_per_ip > 0 )
-	{
-		penv->ip_connection_stat.ip_connection_stat_size = DEFAULT_IP_CONNECTION_ARRAY_SIZE ;
-		penv->ip_connection_stat.ip_connection_array = (struct IpConnection *)malloc( sizeof(struct IpConnection) * penv->ip_connection_stat.ip_connection_stat_size ) ;
-		if( penv->ip_connection_stat.ip_connection_array == NULL )
-		{
-			ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
-			return -1;
-		}
-		memset( penv->ip_connection_stat.ip_connection_array , 0x00 , sizeof(struct IpConnection) * penv->ip_connection_stat.ip_connection_stat_size );
-		
-		penv->ip_connection_stat.ip_count = 0 ;
-		penv->ip_connection_stat.connection_count = 0 ;
-	}
+	nret = InitIpConnectionStat( penv , & penv->ip_connection_stat );
+	if( nret )
+		return nret;
 	
 	return 0;
 }
@@ -210,6 +201,26 @@ void CleanEnvirment( struct ServerEnv *penv )
 	pthread_mutex_destroy( & (penv->time_cache_mutex) );
 	
 	return;
+}
+
+int InitIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat )
+{
+	if( penv->ip_connection_stat.max_ip > 0 || penv->ip_connection_stat.max_connections > 0 || penv->ip_connection_stat.max_connections_per_ip > 0 )
+	{
+		penv->ip_connection_stat.ip_connection_stat_size = DEFAULT_IP_CONNECTION_ARRAY_SIZE ;
+		penv->ip_connection_stat.ip_connection_array = (struct IpConnection *)malloc( sizeof(struct IpConnection) * penv->ip_connection_stat.ip_connection_stat_size ) ;
+		if( penv->ip_connection_stat.ip_connection_array == NULL )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
+			return -1;
+		}
+		memset( penv->ip_connection_stat.ip_connection_array , 0x00 , sizeof(struct IpConnection) * penv->ip_connection_stat.ip_connection_stat_size );
+		
+		penv->ip_connection_stat.ip_count = 0 ;
+		penv->ip_connection_stat.connection_count = 0 ;
+	}
+	
+	return 0;
 }
 
 int SaveListenSockets( struct ServerEnv *penv )
