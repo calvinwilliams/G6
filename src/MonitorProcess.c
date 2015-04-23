@@ -25,12 +25,13 @@ static void sig_set_flag( int sig_no )
 	return;
 }
 
-static void sig_proc()
+static void sig_proc( struct ServerEnv *penv )
 {
 	int		nret = 0 ;
 	
 	if( g_SIGUSR1_flag == 1 )
 	{
+		/* 通知所有线程关闭日志文件描述字，后续会自动打开 */
 		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe L ..." );
 		nret = write( g_penv->accept_request_pipe.fds[1] , "L" , 1 ) ;
 		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe L done[%d]" , nret );
@@ -39,11 +40,24 @@ static void sig_proc()
 	}
 	else if( g_SIGUSR2_flag == 1 )
 	{
-		pid_t		pid ;
-		char		command ;
 		
-		int		nret = 0 ;
+		struct ForwardSession	*forward_session_array = NULL ;
 		
+		pid_t			pid ;
+		char			command ;
+		
+		int			nret = 0 ;
+		
+		/* 测试剩余内存 */
+		forward_session_array = (struct ForwardSession *)malloc( sizeof(struct ForwardSession) * penv->cmd_para.forward_session_size ) ;
+		if( forward_session_array == NULL )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "malloc failed , momery not enough , errno[%d]" , errno );
+			return;
+		}
+		free( forward_session_array );
+		
+		/* 保存侦听socket到环境变量里 */
 		nret = SaveListenSockets( g_penv ) ;
 		if( nret )
 		{
@@ -51,6 +65,7 @@ static void sig_proc()
 			return;
 		}
 		
+		/* 通知所有线程关闭侦听socket */
 		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q ..." );
 		nret = write( g_penv->accept_request_pipe.fds[1] , "Q" , 1 ) ;
 		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q done[%d]" , nret );
@@ -59,6 +74,7 @@ static void sig_proc()
 		nret = read( g_penv->accept_response_pipe.fds[0] , & command , 1 ) ;
 		InfoLog( __FILE__ , __LINE__ , "read accept_response_pipe done[%d][%c]" , nret , command );
 		
+		/* 创建子进程，用新程序映像覆盖代码段 */
 		pid = fork() ;
 		if( pid == -1 )
 		{
@@ -71,6 +87,7 @@ static void sig_proc()
 			exit(9);
 		}
 		
+		/* 设置退出标志 */
 		g_SIGUSR2_flag = 0 ;
 		g_exit_flag = 1 ;
 		DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
@@ -81,6 +98,7 @@ static void sig_proc()
 		
 		int		nret = 0 ;
 		
+		/* 通知所有线程关闭侦听socket */
 		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q ..." );
 		nret = write( g_penv->accept_request_pipe.fds[1] , "Q" , 1 ) ;
 		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q done[%d]" , nret );
@@ -89,6 +107,7 @@ static void sig_proc()
 		nret = read( g_penv->accept_response_pipe.fds[0] , & command , 1 ) ;
 		InfoLog( __FILE__ , __LINE__ , "read accept_response_pipe done[%d][%c]" , nret , command );
 		
+		/* 设置退出标志 */
 		g_SIGTERM_flag = 0 ;
 		g_exit_flag = 1 ;
 		DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
@@ -134,7 +153,7 @@ int MonitorProcess( struct ServerEnv *penv )
 		{
 			if( errno == EINTR )
 			{
-				sig_proc();
+				sig_proc( penv );
 				goto _FORK;
 			}
 			
@@ -174,7 +193,7 @@ int MonitorProcess( struct ServerEnv *penv )
 		{
 			if( errno == EINTR )
 			{
-				sig_proc();
+				sig_proc( penv );
 				goto _WAITPID;
 			}
 			
