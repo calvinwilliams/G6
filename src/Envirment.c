@@ -38,6 +38,7 @@ int InitEnvirment( struct ServerEnv *penv )
 		ErrorLog( __FILE__ , __LINE__ , "epoll_create failed , errno[%d]" , errno );
 		return -1;
 	}
+	SetCloseExec( penv->accept_epoll_fd );
 	
 	memset( & event , 0x00 , sizeof(event) );
 	event.data.ptr = NULL ;
@@ -90,6 +91,7 @@ int InitEnvirment( struct ServerEnv *penv )
 			ErrorLog( __FILE__ , __LINE__ , "epoll_create failed , errno[%d]" , errno );
 			return -1;
 		}
+		SetCloseExec( penv->forward_epoll_fd_array[forward_thread_index] );
 		
 		memset( & event , 0x00 , sizeof(event) );
 		event.data.ptr = NULL ;

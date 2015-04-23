@@ -12,6 +12,7 @@ int WorkerProcess( struct ServerEnv *penv )
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess ---" );
 	
 	signal( SIGTERM , SIG_IGN );
+	signal( SIGUSR1 , SIG_IGN );
 	signal( SIGUSR2 , SIG_IGN );
 	
 	/* 创建转发子线程 */
@@ -36,8 +37,6 @@ int WorkerProcess( struct ServerEnv *penv )
 		}
 		else
 		{
-			close( penv->forward_request_pipe[forward_thread_index].fds[0] );
-			close( penv->forward_response_pipe[forward_thread_index].fds[1] );
 			InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_create [%lu]" , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
 		}
 	}
@@ -46,7 +45,7 @@ int WorkerProcess( struct ServerEnv *penv )
 	
 	for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
 	{
-		close( penv->forward_request_pipe[forward_thread_index].fds[1] );
+		write( penv->forward_request_pipe[forward_thread_index].fds[1] , "Q" , 1 );
 		read( penv->forward_response_pipe[forward_thread_index].fds[0] , & command , 1 );
 		
 		InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_join [%lu] ..." , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );

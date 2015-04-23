@@ -197,9 +197,6 @@ void *ForwardThread( struct ServerEnv *penv )
 	forward_epoll_fd = penv->forward_epoll_fd_array[forward_thread_index] ;
 	{ int *tmp = penv->forward_thread_index ; penv->forward_thread_index = NULL ; free( tmp ); }
 	
-	close( penv->forward_request_pipe[forward_thread_index].fds[1] );
-	close( penv->forward_response_pipe[forward_thread_index].fds[0] );
-	
 	/* 设置日志输出文件 */
 	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
 	SetLogLevel( penv->cmd_para.log_level );
@@ -228,9 +225,14 @@ void *ForwardThread( struct ServerEnv *penv )
 				}
 				else if( nret == 0 )
 				{
-					InfoLog( __FILE__ , __LINE__ , "read request pipe close" );
+					ErrorLog( __FILE__ , __LINE__ , "read request pipe close" );
+					exit(0);
+				}
+				else
+				{
+					InfoLog( __FILE__ , __LINE__ , "read request pipe %c" , command );
 					
-					close( penv->forward_response_pipe[forward_thread_index].fds[1] );
+					write( penv->forward_response_pipe[forward_thread_index].fds[1] , "Q" , 1 );
 				}
 			}
 			else

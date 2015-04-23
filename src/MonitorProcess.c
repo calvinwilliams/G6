@@ -20,7 +20,7 @@ static void sig_proc( int sig_no )
 			return;
 		}
 		
-		close( g_penv->accept_request_pipe.fds[1] );
+		write( g_penv->accept_request_pipe.fds[1] , "Q" , 1 );
 		read( g_penv->accept_response_pipe.fds[0] , & command , 1 );
 		
 		pid = fork() ;
@@ -42,8 +42,8 @@ static void sig_proc( int sig_no )
 	{
 		char			command ;
 		
-		close( g_penv->accept_request_pipe.fds[1] );
-		read( g_penv->accept_request_pipe.fds[0] , & command , 1 );
+		write( g_penv->accept_request_pipe.fds[1] , "Q" , 1 );
+		read( g_penv->accept_response_pipe.fds[0] , & command , 1 );
 		
 		g_exit_flag = 1 ;
 		DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
@@ -68,6 +68,7 @@ int MonitorProcess( struct ServerEnv *penv )
 	signal( SIGPIPE , SIG_IGN );
 	g_penv = penv ;
 	signal( SIGTERM , sig_proc );
+	signal( SIGUSR1 , SIG_IGN );
 	signal( SIGUSR2 , sig_proc );
 	
 	/* 主工作循环 */
@@ -84,10 +85,6 @@ int MonitorProcess( struct ServerEnv *penv )
 				goto _FORK;
 			
 			ErrorLog( __FILE__ , __LINE__ , "fork failed , errno[%d]" , errno );
-			close( penv->accept_request_pipe.fds[0] );
-			close( penv->accept_request_pipe.fds[1] );
-			close( penv->accept_response_pipe.fds[0] );
-			close( penv->accept_response_pipe.fds[1] );
 			return -1;
 		}
 		else if( penv->pid == 0 )
@@ -105,27 +102,21 @@ int MonitorProcess( struct ServerEnv *penv )
 		}
 		else
 		{
-			int			forward_thread_index ;
-			
 			InfoLog( __FILE__ , __LINE__ , "parent : [%ld]fork[%ld]" , getpid() , penv->pid );
 			
 			close( penv->accept_request_pipe.fds[0] );
 			close( penv->accept_response_pipe.fds[1] );
-			
-			for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
-			{
-				close( penv->forward_request_pipe[forward_thread_index].fds[0] );
-				close( penv->forward_request_pipe[forward_thread_index].fds[1] );
-				close( penv->forward_response_pipe[forward_thread_index].fds[0] );
-				close( penv->forward_response_pipe[forward_thread_index].fds[1] );
-			}
 		}
 		
 		/* 监控子进程结束 */
+#include <signal.h>
+{
+int nret=(int)signal( SIGUSR2 , sig_proc );
 		_WAITPID :
-DebugLog( __FILE__ , __LINE__ , "111" );
+DebugLog( __FILE__ , __LINE__ , "111 - nret[%d] SIG_ERR[%d] sig_proc[%p]" , nret , SIG_ERR , sig_proc );
 		pid = waitpid( -1 , & status , 0 );
 DebugLog( __FILE__ , __LINE__ , "222" );
+}
 		if( pid == -1 )
 		{
 			if( errno == EINTR )
