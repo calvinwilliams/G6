@@ -445,11 +445,11 @@ _GOTO_CREATE_LISTENER :
 			
 			if( penv->old_forward_addr_array && old_forward_addr_index < penv->old_forward_addr_count )
 			{
-				InfoLog( __FILE__ , __LINE__ , "reuse listener sock[%s:%d][%d]" , p_forward_addr->netaddr.ip , p_forward_addr->netaddr.port.port_int , p_forward_addr->sock );
+				InfoLog( __FILE__ , __LINE__ , "reuse listener sock[%s:%d]#%d#" , p_forward_addr->netaddr.ip , p_forward_addr->netaddr.port.port_int , p_forward_addr->sock );
 			}
 			else
 			{
-				InfoLog( __FILE__ , __LINE__ , "add listener sock[%s:%d][%d]" , p_forward_addr->netaddr.ip , p_forward_addr->netaddr.port.port_int , p_forward_addr->sock );
+				InfoLog( __FILE__ , __LINE__ , "add listener sock[%s:%d]#%d#" , p_forward_addr->netaddr.ip , p_forward_addr->netaddr.port.port_int , p_forward_addr->sock );
 			}
 		}
 	}
@@ -474,7 +474,7 @@ struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv )
 	
 	for( n = 0 ; n < penv->cmd_para.forward_session_size ; n++ )
 	{
-		if( IsForwardSessionUsed( p_forward_session ) == 0 )
+		if( p_forward_session->status == FORWARD_SESSION_STATUS_UNUSED )
 		{
 			memset( p_forward_session , 0x00 , sizeof(struct ForwardSession) );
 			p_forward_session->status = FORWARD_SESSION_STATUS_READY ;
@@ -487,11 +487,12 @@ struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv )
 			penv->forward_session_count++;
 			
 			pthread_mutex_unlock( & (penv->forward_session_count_mutex) );
+			
 			return p_forward_session;
 		}
 		
 		penv->forward_session_use_offsetpos++;
-		n++;
+		p_forward_session++;
 		if( penv->forward_session_use_offsetpos >= penv->cmd_para.forward_session_size )
 		{
 			penv->forward_session_use_offsetpos = 0 ;

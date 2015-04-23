@@ -1,5 +1,76 @@
 #include "G6.h"
 
+static int ToEndOfLine( FILE *fp )
+{
+	char	line[ 1024 + 1 ] ;
+	
+	while(1)
+	{
+		memset( line , 0x00 , sizeof(line) );
+		if( fgets( line , sizeof(line)-1 , fp ) == NULL )
+			return EOF;
+		
+		if( line[strlen(line)-1] == '\n' )
+			break;
+	}
+	
+	return 0;
+}
+
+static int ToEndOfRemark( FILE *fp )
+{
+	char	line[ 1024 + 1 ] ;
+	
+	while(1)
+	{
+		memset( line , 0x00 , sizeof(line) );
+		if( fscanf( fp , "%1024s" , line ) == EOF )
+			return EOF;
+		
+		if( STRCMP( line , == , "*/" ) )
+			break;
+	}
+	
+	return 0;
+}
+
+int vfscanf(FILE *stream, const char *format, va_list ap);
+
+static int GetToken( char *result , FILE *fp , char *format , ... )
+{
+	va_list		valist ;
+	
+	int		nret = 0 ;
+	
+	while(1)
+	{
+		va_start( valist , format );
+		nret = vfscanf( fp , format , valist ) ;
+		va_end( valist );
+		if( nret == EOF )
+			return EOF;
+		
+		if( STRNCMP( result , == , "//" , 2 ) )
+		{
+			nret = ToEndOfLine( fp ) ;
+			if( nret == EOF )
+				return EOF;
+		}
+		else if( STRNCMP( result , == , "/*" , 2 ) )
+		{
+			nret = ToEndOfRemark( fp ) ;
+			if( nret == EOF )
+				return EOF;
+		}
+		else
+		{
+			break;
+		}
+	}
+	
+	return 0;
+}
+
 static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *p_forward_rule , char *rule_id )
 {
 	char				ip_and_port[ 100 + 1 ] ;
@@ -13,7 +84,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 	strcpy( p_forward_rule->rule_id , rule_id );
 	
 	/* 读转发算法 */
-	nret = fscanf( fp , "%2s" , p_forward_rule->load_balance_algorithm ) ;
+	nret = GetToken( p_forward_rule->load_balance_algorithm , fp , "%2s" , p_forward_rule->load_balance_algorithm ) ;
 	if( nret == EOF )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
@@ -36,7 +107,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 	while(1)
 	{
 		memset( ip_and_port , 0x00 , sizeof(ip_and_port) );
-		nret = fscanf( fp , "%s" , ip_and_port ) ;
+		nret = GetToken( ip_and_port , fp , "%s" , ip_and_port ) ;
 		if( nret == EOF )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "unexpect end of config in client_addr_array in rule[%s]" , p_forward_rule->rule_id );
@@ -87,7 +158,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 	while(1)
 	{
 		memset( ip_and_port , 0x00 , sizeof(ip_and_port) );
-		nret = fscanf( fp , "%s" , ip_and_port ) ;
+		nret = GetToken( ip_and_port , fp , "%s" , ip_and_port ) ;
 		if( nret == EOF )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "unexpect end of config in forward_addr_array in rule[%s]" , p_forward_rule->rule_id );
@@ -143,7 +214,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 	while(1)
 	{
 		memset( ip_and_port , 0x00 , sizeof(ip_and_port) );
-		nret = fscanf( fp , "%s" , ip_and_port ) ;
+		nret = GetToken( ip_and_port , fp , "%s" , ip_and_port ) ;
 		if( nret == EOF )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "unexpect end of config in server_addr_array in rule[%s]" , p_forward_rule->rule_id );
@@ -246,25 +317,31 @@ int LoadConfig( struct ServerEnv *penv )
 	while( ! feof(fp) )
 	{
 		/* 读转发规则ID */
-		nret = fscanf( fp , "%64s" , rule_id ) ;
+		nret = GetToken( rule_id , fp , "%64s" , rule_id ) ;
 		if( nret == EOF )
 			break;
 		
 		if( STRCMP( rule_id , == , "(" ) )
 		{
 			char	property_name[ 64 + 1 ] ;
-			char	sepchar[ 1 + 1 ] ;
+			char	sepchar[ 2 + 1 ] ;
+			char	property_value[ 10 + 1 + 1 ] ;
+			char	*postfix = NULL ;
 			
 			while(1)
 			{
-				nret = fscanf( fp , "%64s" , property_name ) ;
+				nret = GetToken( property_name , fp , "%64s" , property_name ) ;
 				if( nret == EOF )
 				{
 					ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
 					return -1;
 				}
+				if( STRCMP( property_name , == , ")" ) )
+				{
+					break;
+				}
 				
-				nret = fscanf( fp , "%1s" , sepchar ) ;
+				nret = GetToken( sepchar , fp , "%1s" , sepchar ) ;
 				if( nret == EOF )
 				{
 					ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
@@ -276,52 +353,111 @@ int LoadConfig( struct ServerEnv *penv )
 					return -1;
 				}
 				
+				nret = GetToken( property_value , fp , "%11s" , property_value ) ;
+				if( nret == EOF )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+					return -1;
+				}
+				
 				if( STRCMP( property_name , == , "timeout" ) )
 				{
-					nret = fscanf( fp , "%u" , &(penv->timeout) ) ;
-					if( nret == EOF )
+					penv->timeout = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+					if( postfix && postfix[0] )
 					{
-						ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
-						return -1;
+						if( STRCMP( postfix , == , "s" ) || STRCMP( postfix , == , "S" ) )
+						{
+						}
+						else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+						{
+							penv->timeout *= 60 ;
+						}
+						else if( STRCMP( postfix , == , "h" ) || STRCMP( postfix , == , "H" ) )
+						{
+							penv->timeout *= 3600 ;
+						}
+						else
+						{
+							ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
+							return -1;
+						}
 					}
 					
 					InfoLog( __FILE__ , __LINE__ , "set timeout[%u]" , penv->timeout );
 				}
 				else if( STRCMP( property_name , == , "max_ip" ) )
 				{
-					nret = fscanf( fp , "%u" , &(penv->ip_connection_stat.max_ip) ) ;
-					if( nret == EOF )
+					penv->ip_connection_stat.max_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+					if( postfix && postfix[0] )
 					{
-						ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
-						return -1;
+						if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+						{
+							penv->ip_connection_stat.max_ip *= 1000 ;
+						}
+						else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+						{
+							penv->ip_connection_stat.max_ip *= 1000*1000 ;
+						}
+						else
+						{
+							ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
+							return -1;
+						}
 					}
 					
 					InfoLog( __FILE__ , __LINE__ , "set max_ip[%u]" , penv->ip_connection_stat.max_ip );
 				}
 				else if( STRCMP( property_name , == , "max_connections" ) )
 				{
-					nret = fscanf( fp , "%u" , &(penv->ip_connection_stat.max_connections) ) ;
-					if( nret == EOF )
+					penv->ip_connection_stat.max_connections = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+					if( postfix && postfix[0] )
 					{
-						ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
-						return -1;
+						if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+						{
+							penv->ip_connection_stat.max_connections *= 1000 ;
+						}
+						else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+						{
+							penv->ip_connection_stat.max_connections *= 1000*1000 ;
+						}
+						else
+						{
+							ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
+							return -1;
+						}
 					}
 					
 					InfoLog( __FILE__ , __LINE__ , "set max_connections[%u]" , penv->ip_connection_stat.max_connections );
 				}
 				else if( STRCMP( property_name , == , "max_connections_per_ip" ) )
 				{
-					nret = fscanf( fp , "%u" , &(penv->ip_connection_stat.max_connections_per_ip) ) ;
-					if( nret == EOF )
+					penv->ip_connection_stat.max_connections_per_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+					if( postfix && postfix[0] )
 					{
-						ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
-						return -1;
+						if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+						{
+							penv->ip_connection_stat.max_connections_per_ip *= 1000 ;
+						}
+						else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+						{
+							penv->ip_connection_stat.max_connections_per_ip *= 1000*1000 ;
+						}
+						else
+						{
+							ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
+							return -1;
+						}
 					}
 					
 					InfoLog( __FILE__ , __LINE__ , "set max_connections_per_ip[%u]" , penv->ip_connection_stat.max_connections_per_ip );
 				}
+				else
+				{
+					ErrorLog( __FILE__ , __LINE__ , "invalid property[%s]" , property_name );
+					return -1;
+				}
 				
-				nret = fscanf( fp , "%1s" , sepchar ) ;
+				nret = GetToken( sepchar , fp , "%1s" , sepchar ) ;
 				if( nret == EOF )
 				{
 					ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
@@ -338,7 +474,7 @@ int LoadConfig( struct ServerEnv *penv )
 				}
 			}
 			
-			nret = fscanf( fp , "%1s" , sepchar ) ;
+			nret = GetToken( sepchar , fp , "%1s" , sepchar ) ;
 			if( nret == EOF )
 			{
 				ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );

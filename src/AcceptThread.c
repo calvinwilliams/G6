@@ -483,7 +483,6 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 			p_reverse_forward_session->type = FORWARD_SESSION_TYPE_CLIENT ;
 			p_reverse_forward_session->forward_index = p_listen_session->forward_index ;
 			
-DebugLog( __FILE__ , __LINE__ , "111 - p_forward_session[%p]#%d# p_reverse_forward_session[%p]" , p_forward_session , p_forward_session->sock , p_reverse_forward_session );
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_forward_session ;
 			event.events = EPOLLERR ;
