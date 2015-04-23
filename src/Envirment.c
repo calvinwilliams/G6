@@ -634,7 +634,7 @@ static int _AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionSta
 	
 	int			nret = 0 ;
 	
-	if( p_ip_connection_stat->connection_count+1 > p_ip_connection_stat->max_connections )
+	if( p_ip_connection_stat->max_connections > 0 && p_ip_connection_stat->connection_count+1 > p_ip_connection_stat->max_connections )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "connections limit" );
 		return -1;
@@ -680,7 +680,7 @@ static int _AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionSta
 	{
 		if( p_ip_connection->used_flag == 0 )
 		{
-			if( p_ip_connection_stat->ip_count+1 > p_ip_connection_stat->max_ip )
+			if( p_ip_connection_stat->max_ip > 0 && p_ip_connection_stat->ip_count+1 > p_ip_connection_stat->max_ip )
 			{
 				ErrorLog( __FILE__ , __LINE__ , "ips limit" );
 				return -1;
@@ -693,7 +693,7 @@ static int _AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionSta
 		}
 		else if( p_ip_connection->ip_int == ip_int )
 		{
-			if( p_ip_connection->connection_count+1 > p_ip_connection_stat->max_connections_per_ip )
+			if( p_ip_connection_stat->max_connections_per_ip > 0 && p_ip_connection->connection_count+1 > p_ip_connection_stat->max_connections_per_ip )
 			{
 				ErrorLog( __FILE__ , __LINE__ , "connections_per_ip limit" );
 				return -1;
