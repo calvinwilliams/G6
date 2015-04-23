@@ -1,6 +1,6 @@
 #include "G6.h"
 
-int			g_exit_flag = -1 ;
+int			g_exit_flag = 0 ;
 int			g_SIGUSR1_flag = 0 ;
 int			g_SIGUSR2_flag = 0 ;
 int			g_SIGTERM_flag = 0 ;
@@ -72,7 +72,7 @@ static void sig_proc()
 		}
 		
 		g_SIGUSR2_flag = 0 ;
-		g_exit_flag = 1000 ;
+		g_exit_flag = 1 ;
 		DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
 	}
 	else if( g_SIGTERM_flag == 1 )
@@ -90,7 +90,7 @@ static void sig_proc()
 		InfoLog( __FILE__ , __LINE__ , "read accept_response_pipe done[%d][%c]" , nret , command );
 		
 		g_SIGTERM_flag = 0 ;
-		g_exit_flag = 1000 ;
+		g_exit_flag = 1 ;
 		DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
 	}
 	
@@ -125,7 +125,7 @@ int MonitorProcess( struct ServerEnv *penv )
 	sigaction( SIGUSR2 , & act , NULL );
 	
 	/* 主工作循环 */
-	while( g_exit_flag == -1 )
+	while( g_exit_flag == 0 )
 	{
 		/* 创建子进程 */
 		_FORK :
@@ -199,7 +199,7 @@ int MonitorProcess( struct ServerEnv *penv )
 				, penv->pid , WEXITSTATUS(status) , WIFSIGNALED(status) , WTERMSIG(status) , WCOREDUMP(status) );
 		}
 		
-		if( g_exit_flag == -1 )
+		if( g_exit_flag == 0 )
 			sleep(1);
 	}
 	

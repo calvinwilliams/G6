@@ -15,9 +15,11 @@
 	DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
 	_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
 	SetForwardSessionUnused2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
+	/*
 	if( penv->forward_session_count == 0 ) \
 		write( penv->accept_request_pipe.fds[1] , "C" , 1 ); \
-
+	*/
+	
 static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
 {
 	struct epoll_event	*p_event = NULL ;
@@ -205,20 +207,44 @@ void *ForwardThread( unsigned long forward_thread_index )
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.ForwardThread.%d ---" , forward_thread_index+1 );
 	
 	/* 主工作循环 */
-	while( ! ( g_exit_flag == 1000 && penv->forward_session_count == 0 ) )
+	while( ! ( g_exit_flag == 1 && penv->forward_session_count == 0 ) )
 	{
-		timeout = g_exit_flag ;
-		if( timeout != 1000 )
+		if( g_exit_flag == 1 )
+		{
+			timeout = 1000 ;
+		}
+		else
 		{
 			pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 			timeout = GetLastestTimeout( penv ) ;
 			pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 		}
 		
-		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]..." , penv->forward_request_pipe[forward_thread_index].fds[0] );
+		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]... timeout[%d]" , penv->forward_request_pipe[forward_thread_index].fds[0] , timeout );
 		CloseLogFile();
 		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
+		
+		while( event_count == 0 )
+		{
+			struct rb_node		*p_node = NULL ;
+			struct ForwardSession	*p_forward_session = NULL ;
+			
+			p_node = rb_first( & (penv->timeout_rbtree) ); 
+			if (p_node == NULL)
+				break;
+			
+			p_forward_session = rb_entry( p_node , struct ForwardSession , timeout_rbnode );
+			if( p_forward_session->timeout_timestamp - GETTIMEVAL.tv_sec <= 0 )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "forward session TIMEOUT" );
+				DISCONNECT_PAIR
+				continue;
+			}
+			
+			break;
+		}
+		
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
 			p_forward_session = p_event->data.ptr ;
@@ -258,7 +284,8 @@ void *ForwardThread( unsigned long forward_thread_index )
 				DebugLog( __FILE__ , __LINE__ , "forward session event" );
 				
 				pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
-				p_forward_session->timeout_timestamp += DEFAULT_ALIVE_TIMEOUT ;
+				p_forward_session->timeout_timestamp = time(NULL) + DEFAULT_ALIVE_TIMEOUT ;
+				p_forward_session->p_reverse_forward_session->timeout_timestamp = time(NULL) + DEFAULT_ALIVE_TIMEOUT ;
 				pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 				
 				if( p_event->events & EPOLLIN ) /* 输入事件 */

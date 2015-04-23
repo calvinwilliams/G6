@@ -340,8 +340,8 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		if( p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].server_unable == 1 )
 			p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].server_unable = 0 ;
 		
-		p_reverse_forward_session->timeout_timestamp = GETTIMEVAL.tv_sec + DEFAULT_ALIVE_TIMEOUT ;
-		p_reverse_forward_session->p_reverse_forward_session->timeout_timestamp = GETTIMEVAL.tv_sec + DEFAULT_ALIVE_TIMEOUT ;
+		p_reverse_forward_session->timeout_timestamp = time(NULL) + DEFAULT_ALIVE_TIMEOUT ;
+		p_reverse_forward_session->p_reverse_forward_session->timeout_timestamp = time(NULL) + DEFAULT_ALIVE_TIMEOUT ;
 		pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 		AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_reverse_forward_session->p_reverse_forward_session );
 		pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
@@ -361,7 +361,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		event.events = EPOLLIN | EPOLLERR ;
 		epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_MOD , p_reverse_forward_session->p_reverse_forward_session->sock , & event );
 		
-		write( penv->forward_request_pipe[forward_thread_index].fds[1] , " " , 1 );
+		nret = write( penv->forward_request_pipe[forward_thread_index].fds[1] , "L" , 1 ) ;
 	}
 	
 	return 0;
@@ -552,8 +552,8 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	if( p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_unable == 1 )
 		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_unable = 0 ;
 	
-	p_forward_session->timeout_timestamp = GETTIMEVAL.tv_sec + DEFAULT_ALIVE_TIMEOUT ;
-	p_forward_session->p_reverse_forward_session->timeout_timestamp = GETTIMEVAL.tv_sec + DEFAULT_ALIVE_TIMEOUT ;
+	p_forward_session->timeout_timestamp = time(NULL) + DEFAULT_ALIVE_TIMEOUT ;
+	p_forward_session->p_reverse_forward_session->timeout_timestamp = time(NULL) + DEFAULT_ALIVE_TIMEOUT ;
 	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 	AddTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session );
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
@@ -868,6 +868,7 @@ static int OnReceiveCommand( struct ServerEnv *penv , struct ForwardSession *p_f
 
 void *AcceptThread( struct ServerEnv *penv )
 {
+	int			timeout ;
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
 	int			event_count ;
 	int			event_index ;
@@ -883,12 +884,17 @@ void *AcceptThread( struct ServerEnv *penv )
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.AcceptThread ---" );
 	
 	/* 主工作循环 */
-	g_exit_flag = -1 ;
-	while( ! ( g_exit_flag == 1000 && penv->forward_session_count == 0 ) )
+	g_exit_flag = 0 ;
+	while( ! ( g_exit_flag == 1 && penv->forward_session_count == 0 ) )
 	{
-		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]..." , penv->accept_request_pipe.fds[0] );
+		if( g_exit_flag == 1 )
+			timeout = 1000 ;
+		else
+			timeout = -1 ;
+		
+		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]... timeout[%d]" , penv->accept_request_pipe.fds[0] , timeout );
 		CloseLogFile();
-		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , g_exit_flag ) ;
+		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
@@ -944,7 +950,7 @@ void *AcceptThread( struct ServerEnv *penv )
 							}
 						}
 						
-						g_exit_flag = 1000 ;
+						g_exit_flag = 1 ;
 						DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
 						
 						InfoLog( __FILE__ , __LINE__ , "write accept_response_pipe Q ..." );

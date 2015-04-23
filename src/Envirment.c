@@ -533,11 +533,11 @@ int GetLastestTimeout( struct ServerEnv *penv )
 		return -1;	
 	
 	p_forward_session = rb_entry( p_node , struct ForwardSession , timeout_rbnode );
-	timeout = p_forward_session->timeout_timestamp - GETTIMEVAL.tv_sec ;
+	timeout = p_forward_session->timeout_timestamp - time(NULL) ;
 	if( timeout < 0 )
 		timeout = 0 ;
 	
-	return timeout;
+	return timeout*1000;
 }
 
 void RemoveTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
