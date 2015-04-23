@@ -233,9 +233,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 		return -1;
 	}
 	
-	pthread_mutex_lock( & (penv->server_connection_count_mutex) );
-	p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count++;
-	pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
+	SERVER_CONNECTION_COUNT_INCREASE(penv,p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index],1)
 	
 	memcpy( & (p_forward_session->netaddr) , & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].netaddr) , sizeof(struct NetAddress) );
 	
@@ -317,9 +315,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		else /* Á¬½ÓÊ§°Ü */
 		{
 			ErrorLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] failed , errno[%d]" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , errno );
-			pthread_mutex_lock( & (penv->server_connection_count_mutex) );
-			p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].server_connection_count--;
-			pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
+			SERVER_CONNECTION_COUNT_DECREASE(penv,p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index],1)
 			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_reverse_forward_session->sock );
 			_CLOSESOCKET( p_reverse_forward_session->sock );
 			nret = ResolveConnectingError( penv , p_reverse_forward_session ) ;
@@ -544,9 +540,7 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 		{
 			struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
 			RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_reverse_forward_session->p_forward_rule->client_addr_array[p_reverse_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr );
-			pthread_mutex_lock( & (penv->server_connection_count_mutex) );
-			p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count--;
-			pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
+			SERVER_CONNECTION_COUNT_DECREASE(penv,p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index],1)
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 			DebugLog( __FILE__ , __LINE__ , "close #%d#-#%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
@@ -1000,9 +994,7 @@ void *AcceptThread( struct ServerEnv *penv )
 					{
 						struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
 						RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_reverse_forward_session->p_forward_rule->client_addr_array[p_reverse_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr );
-						pthread_mutex_lock( & (penv->server_connection_count_mutex) );
-						p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count--;
-						pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
+						SERVER_CONNECTION_COUNT_DECREASE(penv,p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index],1)
 						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 						DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->p_reverse_forward_session->sock );
@@ -1014,9 +1006,7 @@ void *AcceptThread( struct ServerEnv *penv )
 			{
 				DebugLog( __FILE__ , __LINE__ , "accepted session event" );
 				RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_forward_session->p_forward_rule->client_addr_array[p_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr );
-				pthread_mutex_lock( & (penv->server_connection_count_mutex) );
-				p_forward_session->p_reverse_forward_session->p_forward_rule->server_addr_array[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
-				pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
+				SERVER_CONNECTION_COUNT_DECREASE(penv,p_forward_session->p_reverse_forward_session->p_forward_rule->server_addr_array[p_forward_session->p_reverse_forward_session->server_index],1)
 				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 				DebugLog( __FILE__ , __LINE__ , "close #%d#-#%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );

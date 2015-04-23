@@ -173,6 +173,16 @@ struct ForwardNetAddress
 } ;
 
 /* 服务端信息结构 */
+#define SERVER_CONNECTION_COUNT_INCREASE(_penv_,_client_addr_,_d_) \
+	pthread_mutex_lock( & ((_penv_)->server_connection_count_mutex) ); \
+	(_client_addr_).server_connection_count+=(_d_); \
+	pthread_mutex_unlock( & ((_penv_)->server_connection_count_mutex) );
+
+#define SERVER_CONNECTION_COUNT_DECREASE(_penv_,_client_addr_,_d_) \
+	pthread_mutex_lock( & ((_penv_)->server_connection_count_mutex) ); \
+	(_client_addr_).server_connection_count-=(_d_); \
+	pthread_mutex_unlock( & ((_penv_)->server_connection_count_mutex) );
+
 struct ServerNetAddress
 {
 	struct NetAddress	netaddr ; /* 网络地址结构 */

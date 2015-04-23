@@ -5,24 +5,20 @@
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER ) \
 	{ \
 		RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_forward_session->p_forward_rule->client_addr_array[p_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr ); \
-		pthread_mutex_lock( & (penv->server_connection_count_mutex) ); \
-		p_forward_session->p_reverse_forward_session->p_forward_rule->server_addr_array[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--; \
-		pthread_mutex_unlock( & (penv->server_connection_count_mutex) ); \
+		SERVER_CONNECTION_COUNT_DECREASE(penv,p_forward_session->p_reverse_forward_session->p_forward_rule->server_addr_array[p_forward_session->p_reverse_forward_session->server_index],1) \
 	} \
 	else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT ) \
 	{ \
 		struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ; \
 		RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_reverse_forward_session->p_forward_rule->client_addr_array[p_reverse_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr ); \
-		pthread_mutex_lock( & (penv->server_connection_count_mutex) ); \
-		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count--; \
-		pthread_mutex_unlock( & (penv->server_connection_count_mutex) ); \
+		SERVER_CONNECTION_COUNT_DECREASE(penv,p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index],1) \
 	} \
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL ); \
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL ); \
 	DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
 	_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
 	SetForwardSessionUnused2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
-	
+
 static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
 {
 	struct epoll_event	*p_event = NULL ;
