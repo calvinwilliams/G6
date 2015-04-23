@@ -67,9 +67,9 @@ int MonitorProcess( struct ServerEnv *penv )
 	signal( SIGCHLD , SIG_DFL );
 	signal( SIGPIPE , SIG_IGN );
 	g_penv = penv ;
-	signal( SIGTERM , sig_proc );
+	signal( SIGTERM , & sig_proc );
 	signal( SIGUSR1 , SIG_IGN );
-	signal( SIGUSR2 , sig_proc );
+	signal( SIGUSR2 , & sig_proc );
 	
 	/* 主工作循环 */
 	while( g_exit_flag == 0 )
@@ -109,14 +109,10 @@ int MonitorProcess( struct ServerEnv *penv )
 		}
 		
 		/* 监控子进程结束 */
-#include <signal.h>
-{
-int nret=(int)signal( SIGUSR2 , sig_proc );
 		_WAITPID :
-DebugLog( __FILE__ , __LINE__ , "111 - nret[%d] SIG_ERR[%d] sig_proc[%p]" , nret , SIG_ERR , sig_proc );
+DebugLog( __FILE__ , __LINE__ , "111" );
 		pid = waitpid( -1 , & status , 0 );
 DebugLog( __FILE__ , __LINE__ , "222" );
-}
 		if( pid == -1 )
 		{
 			if( errno == EINTR )

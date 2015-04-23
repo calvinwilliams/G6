@@ -51,6 +51,7 @@ int InitEnvirment( struct ServerEnv *penv )
 		ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
 		return -1;
 	}
+	memset( penv->forward_request_pipe , 0x00 , sizeof(struct PipeFds) * penv->cmd_para.forward_thread_size );
 	
 	penv->forward_response_pipe = (struct PipeFds *)malloc( sizeof(struct PipeFds) * penv->cmd_para.forward_thread_size ) ;
 	if( penv->forward_response_pipe == NULL )
@@ -58,6 +59,7 @@ int InitEnvirment( struct ServerEnv *penv )
 		ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
 		return -1;
 	}
+	memset( penv->forward_response_pipe , 0x00 , sizeof(struct PipeFds) * penv->cmd_para.forward_thread_size );
 	
 	penv->forward_epoll_fd_array = (int *)malloc( sizeof(int) * penv->cmd_para.forward_thread_size ) ;
 	if( penv->forward_epoll_fd_array == NULL )
@@ -153,6 +155,8 @@ void CleanEnvirment( struct ServerEnv *penv )
 		close( penv->forward_response_pipe[forward_thread_index].fds[1] );
 		close( penv->forward_epoll_fd_array[forward_thread_index] );
 	}
+	free( penv->forward_request_pipe );
+	free( penv->forward_response_pipe );
 	free( penv->forward_epoll_fd_array );
 	
 	pthread_mutex_destroy( & (penv->mutex) );
