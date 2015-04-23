@@ -1,24 +1,27 @@
 #include "G6.h"
 
 #define DISCONNECT_PAIR	\
-	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) ); \
 	RemoveTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
-	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) ); \
-	pthread_mutex_lock( & (penv->server_connection_count_mutex) ); \
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER ) \
+	{ \
+		RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_forward_session->p_forward_rule->client_addr_array[p_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr ); \
+		pthread_mutex_lock( & (penv->server_connection_count_mutex) ); \
 		p_forward_session->p_reverse_forward_session->p_forward_rule->server_addr_array[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--; \
+		pthread_mutex_unlock( & (penv->server_connection_count_mutex) ); \
+	} \
 	else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT ) \
+	{ \
+		struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ; \
+		RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_reverse_forward_session->p_forward_rule->client_addr_array[p_reverse_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr ); \
+		pthread_mutex_lock( & (penv->server_connection_count_mutex) ); \
 		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count--; \
-	pthread_mutex_unlock( & (penv->server_connection_count_mutex) ); \
+		pthread_mutex_unlock( & (penv->server_connection_count_mutex) ); \
+	} \
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL ); \
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL ); \
 	DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
 	_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
 	SetForwardSessionUnused2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
-	/*
-	if( penv->forward_session_count == 0 ) \
-		write( penv->accept_request_pipe.fds[1] , "C" , 1 ); \
-	*/
 	
 static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
 {
@@ -215,9 +218,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 		}
 		else
 		{
-			pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 			timeout = GetLastestTimeout( penv ) ;
-			pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 		}
 		
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]... timeout[%d]" , penv->forward_request_pipe[forward_thread_index].fds[0] , timeout );
@@ -318,8 +319,8 @@ void *ForwardThread( unsigned long forward_thread_index )
 
 void *_ForwardThread( void *pv )
 {
-	unsigned long	*p_forward_thread_index = (unsigned long *)pv ;
-	unsigned long	forward_thread_index = (*p_forward_thread_index) ;
+	unsigned int	*p_forward_thread_index = (unsigned int *)pv ;
+	unsigned int	forward_thread_index = (*p_forward_thread_index) ;
 	
 	SETPID
 	SETTID

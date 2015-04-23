@@ -2,8 +2,8 @@
 
 int WorkerProcess( struct ServerEnv *penv )
 {
-	unsigned long		forward_thread_index ;
-	unsigned long		*p_forward_thread_index = NULL ;
+	unsigned int		forward_thread_index ;
+	unsigned int		*p_forward_thread_index = NULL ;
 	
 	int			nret = 0 ;
 	
@@ -18,7 +18,7 @@ int WorkerProcess( struct ServerEnv *penv )
 	/* 创建转发子线程 */
 	for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
 	{
-		p_forward_thread_index = (unsigned long *)malloc( sizeof(unsigned long) ) ;
+		p_forward_thread_index = (unsigned int *)malloc( sizeof(unsigned int) ) ;
 		if( p_forward_thread_index == NULL )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
@@ -26,6 +26,7 @@ int WorkerProcess( struct ServerEnv *penv )
 		}
 		(*p_forward_thread_index) = forward_thread_index ;
 		
+		/* 创建数据收发线程 */
 		nret = pthread_create( penv->forward_thread_tid_array+forward_thread_index , NULL , & _ForwardThread , (void*)p_forward_thread_index ) ;
 		if( nret )
 		{
@@ -38,8 +39,10 @@ int WorkerProcess( struct ServerEnv *penv )
 		}
 	}
 	
+	/* 主线程为连接接受线程 */
 	_AcceptThread( (void*)penv );
 	
+	/* 发送退出命令字符，回收数据收发线程 */
 	for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
 	{
 		InfoLog( __FILE__ , __LINE__ , "write forward_request_pipe Q ..." );

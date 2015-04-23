@@ -72,12 +72,12 @@ int main( int argc , char *argv[] )
 		else if( strcmp( argv[n] , "-t" ) == 0 && n + 1 < argc )
 		{
 			n++;
-			penv->cmd_para.forward_thread_size = atol(argv[n]) ;
+			penv->cmd_para.forward_thread_size = atoi(argv[n]) ;
 		}
 		else if( strcmp( argv[n] , "-s" ) == 0 && n + 1 < argc )
 		{
 			n++;
-			penv->cmd_para.forward_session_size = atol(argv[n]) ;
+			penv->cmd_para.forward_session_size = atoi(argv[n]) ;
 		}
 		else if( strcmp( argv[n] , "--log-level" ) == 0 && n + 1 < argc )
 		{
@@ -120,7 +120,7 @@ int main( int argc , char *argv[] )
 		exit(7);
 	}
 	
-	InfoLog( __FILE__ , __LINE__ , "--- G5 begin --- v%s build %s %s" , __G6_VERSION , __DATE__ , __TIME__ );
+	InfoLog( __FILE__ , __LINE__ , "--- G6 BEGIN --- v%s build %s %s" , __G6_VERSION , __DATE__ , __TIME__ );
 	
 	/* 初始化环境 */
 	nret = InitEnvirment( penv ) ;
@@ -162,7 +162,7 @@ int main( int argc , char *argv[] )
 	/* 清理环境 */
 	CleanEnvirment( penv );
 	
-	InfoLog( __FILE__ , __LINE__ , "--- G5 finish --- v%s build %s %s" , __G6_VERSION , __DATE__ , __TIME__ );
+	InfoLog( __FILE__ , __LINE__ , "--- G6 FINISH --- v%s build %s %s" , __G6_VERSION , __DATE__ , __TIME__ );
 	
 	return -nret;
 }

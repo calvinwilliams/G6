@@ -192,13 +192,15 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 
 static void LogOneRule( struct ServerEnv *penv , struct ForwardRule *p_forward_rule )
 {
-	int				n ;
+	unsigned int			client_addr_index ;
 	struct ClientNetAddress		*p_client_addr = NULL ;
+	unsigned int			forward_addr_index ;
 	struct ForwardNetAddress	*p_forward_addr = NULL ;
+	unsigned int			server_addr_index ;
 	struct ServerNetAddress		*p_server_addr = NULL ;
 	
 	/* 客户端配置信息 */
-	for( n = 0 , p_client_addr = p_forward_rule->client_addr_array ; n < p_forward_rule->client_addr_count ; n++ , p_client_addr++ )
+	for( client_addr_index = 0 , p_client_addr = p_forward_rule->client_addr_array ; client_addr_index < p_forward_rule->client_addr_count ; client_addr_index++ , p_client_addr++ )
 	{
 		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%s]" , p_client_addr->netaddr.ip , p_client_addr->netaddr.port.port_str );
 	}
@@ -206,7 +208,7 @@ static void LogOneRule( struct ServerEnv *penv , struct ForwardRule *p_forward_r
 	InfoLog( __FILE__ , __LINE__ , "    -" );
 	
 	/* 转发端配置信息 */
-	for( n = 0 , p_forward_addr = p_forward_rule->forward_addr_array ; n < p_forward_rule->forward_addr_count ; n++ , p_forward_addr++ )
+	for( forward_addr_index = 0 , p_forward_addr = p_forward_rule->forward_addr_array ; forward_addr_index < p_forward_rule->forward_addr_count ; forward_addr_index++ , p_forward_addr++ )
 	{
 		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%d]" , p_forward_addr->netaddr.ip , p_forward_addr->netaddr.port.port_int );
 	}
@@ -214,7 +216,7 @@ static void LogOneRule( struct ServerEnv *penv , struct ForwardRule *p_forward_r
 	InfoLog( __FILE__ , __LINE__ , "    >" );
 	
 	/* 服务端配置信息 */
-	for( n = 0 , p_server_addr = p_forward_rule->server_addr_array ; n < p_forward_rule->server_addr_count ; n++ , p_server_addr++ )
+	for( server_addr_index = 0 , p_server_addr = p_forward_rule->server_addr_array ; server_addr_index < p_forward_rule->server_addr_count ; server_addr_index++ , p_server_addr++ )
 	{
 		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%d]" , p_server_addr->netaddr.ip , p_server_addr->netaddr.port.port_int );
 	}
@@ -226,11 +228,12 @@ static void LogOneRule( struct ServerEnv *penv , struct ForwardRule *p_forward_r
 
 int LoadConfig( struct ServerEnv *penv )
 {
-	FILE		*fp = NULL ;
-	char		rule_id[ RULE_ID_MAXLEN + 1 ] ;
-	int		n ;
+	FILE			*fp = NULL ;
+	char			rule_id[ RULE_ID_MAXLEN + 1 ] ;
+	unsigned int		forward_rule_index ;
+	struct ForwardRule	*p_forward_rule = NULL ;
 	
-	int		nret = 0 ;
+	int			nret = 0 ;
 	
 	/* 打开配置文件 */
 	fp = fopen( penv->cmd_para.config_pathfilename , "r" ) ;
@@ -247,10 +250,102 @@ int LoadConfig( struct ServerEnv *penv )
 		if( nret == EOF )
 			break;
 		
+		if( STRCMP( rule_id , == , "(" ) )
+		{
+			char	property_name[ 64 + 1 ] ;
+			char	sepchar[ 1 + 1 ] ;
+			
+			while(1)
+			{
+				nret = fscanf( fp , "%64s" , property_name ) ;
+				if( nret == EOF )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+					return -1;
+				}
+				
+				nret = fscanf( fp , "%1s" , sepchar ) ;
+				if( nret == EOF )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+					return -1;
+				}
+				if( STRCMP( sepchar , != , "=" ) )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "invalid config after property[%s]" , property_name );
+					return -1;
+				}
+				
+				if( STRCMP( property_name , == , "max_ip" ) )
+				{
+					nret = fscanf( fp , "%u" , &(penv->ip_connection_stat.max_ip) ) ;
+					if( nret == EOF )
+					{
+						ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+						return -1;
+					}
+					
+					InfoLog( __FILE__ , __LINE__ , "set max_ip[%u]" , penv->ip_connection_stat.max_ip );
+				}
+				else if( STRCMP( property_name , == , "max_connections" ) )
+				{
+					nret = fscanf( fp , "%u" , &(penv->ip_connection_stat.max_connections) ) ;
+					if( nret == EOF )
+					{
+						ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+						return -1;
+					}
+					
+					InfoLog( __FILE__ , __LINE__ , "set max_connections[%u]" , penv->ip_connection_stat.max_connections );
+				}
+				else if( STRCMP( property_name , == , "max_connections_per_ip" ) )
+				{
+					nret = fscanf( fp , "%u" , &(penv->ip_connection_stat.max_connections_per_ip) ) ;
+					if( nret == EOF )
+					{
+						ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+						return -1;
+					}
+					
+					InfoLog( __FILE__ , __LINE__ , "set max_connections_per_ip[%u]" , penv->ip_connection_stat.max_connections_per_ip );
+				}
+				
+				nret = fscanf( fp , "%1s" , sepchar ) ;
+				if( nret == EOF )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+					return -1;
+				}
+				if( STRCMP( sepchar , == , ")" ) )
+				{
+					break;
+				}
+				else if( STRCMP( sepchar , != , "," ) )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "invalid config after property[%s]" , property_name );
+					return -1;
+				}
+			}
+			
+			nret = fscanf( fp , "%1s" , sepchar ) ;
+			if( nret == EOF )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+				return -11;
+			}
+			if( STRCMP( sepchar , != , ";" ) )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "invalid config after property[%s]" , property_name );
+				return -11;
+			}
+			
+			continue;
+		}
+		
 		/* 调整转发规则数组 */
 		if( penv->forward_rule_array == NULL || penv->forward_rule_count+1 > penv->forward_rule_size )
 		{
-			unsigned long		new_forward_rules_size ;
+			unsigned int		new_forward_rules_size ;
 			struct ForwardRule	*new_forward_rules = NULL ;
 			
 			if( penv->forward_rule_array == NULL )
@@ -291,15 +386,15 @@ int LoadConfig( struct ServerEnv *penv )
 	
 	/* 输出已装载转发规则到日志 */
 	InfoLog( __FILE__ , __LINE__ , "forward_rule_count[%ld/%ld] >>>" , penv->forward_rule_count , penv->forward_rule_size );
-	for( n = 0 ; n < penv->forward_rule_count ; n++ )
+	for( forward_rule_index = 0 , p_forward_rule = penv->forward_rule_array ; forward_rule_index < penv->forward_rule_count ; forward_rule_index++ , p_forward_rule++ )
 	{
 		InfoLog( __FILE__ , __LINE__ , "  rule_id[%s] load_balance_algorithm[%s] >>>"
-			, penv->forward_rule_array[n].rule_id , penv->forward_rule_array[n].load_balance_algorithm );
+			, p_forward_rule->rule_id , p_forward_rule->load_balance_algorithm );
 		InfoLog( __FILE__ , __LINE__ , "  client_addr_count[%ld/%ld] forward_addr_count[%ld/%ld] server_addr_count[%ld/%ld]"
-			, penv->forward_rule_array[n].client_addr_count , penv->forward_rule_array[n].client_addr_size
-			, penv->forward_rule_array[n].forward_addr_count , penv->forward_rule_array[n].forward_addr_size
-			, penv->forward_rule_array[n].server_addr_count , penv->forward_rule_array[n].server_addr_size );
-		LogOneRule( penv , penv->forward_rule_array+n );
+			, p_forward_rule->client_addr_count , p_forward_rule->client_addr_size
+			, p_forward_rule->forward_addr_count , p_forward_rule->forward_addr_size
+			, p_forward_rule->server_addr_count , p_forward_rule->server_addr_size );
+		LogOneRule( penv , p_forward_rule );
 	}
 	
 	return 0;
@@ -307,12 +402,12 @@ int LoadConfig( struct ServerEnv *penv )
 
 void UnloadConfig( struct ServerEnv *penv )
 {
-	int			n ;
+	unsigned int		forward_rule_index ;
 	struct ForwardRule	*p_forward_rule = NULL ;
 	
 	if( penv->forward_rule_array )
 	{
-		for( n = 0 , p_forward_rule = penv->forward_rule_array ; n < penv->forward_rule_count ; n++ , p_forward_rule++ )
+		for( forward_rule_index = 0 , p_forward_rule = penv->forward_rule_array ; forward_rule_index < penv->forward_rule_count ; forward_rule_index++ , p_forward_rule++ )
 		{
 			if( p_forward_rule->client_addr_array )
 				free( p_forward_rule->client_addr_array );

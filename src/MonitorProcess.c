@@ -31,7 +31,7 @@ static void sig_proc( struct ServerEnv *penv )
 	
 	if( g_SIGUSR1_flag == 1 )
 	{
-		/* 通知所有线程关闭日志文件描述字，后续会自动打开 */
+		/* 通知所有线程关闭日志文件描述字，后续写日志时会再次自动打开 */
 		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe L ..." );
 		nret = write( g_penv->accept_request_pipe.fds[1] , "L" , 1 ) ;
 		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe L done[%d]" , nret );

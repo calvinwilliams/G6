@@ -154,7 +154,7 @@ struct NetAddress
 	union
 	{
 		char		port_str[ PORT_MAXLEN + 1 ] ;
-		int		port_int ;
+		unsigned int	port_int ;
 	} port ; /* 端口 */
 	struct sockaddr_in	sockaddr ; /* sock地址结构 */
 } ;
@@ -163,9 +163,6 @@ struct NetAddress
 struct ClientNetAddress
 {
 	struct NetAddress	netaddr ; /* 网络地址结构 */
-	
-	unsigned long		client_connection_count ; /* 客户端连接数量 */
-	unsigned long		maxclients ; /* 最大客户端数量 */
 } ;
 
 /* 转发端信息结构 */
@@ -183,7 +180,7 @@ struct ServerNetAddress
 	unsigned char		server_unable ; /* 服务端可用标志 */
 	time_t			timestamp_to_enable ; /* 恢复正常秒戳 */
 	
-	unsigned long		server_connection_count ; /* 服务端连接数量 */
+	unsigned int		server_connection_count ; /* 服务端连接数量 */
 	
 	time_t			rtt ; /* 最近读时间戳 */
 	time_t			wtt ; /* 最近写时间戳 */
@@ -196,17 +193,17 @@ struct ForwardRule
 	char				load_balance_algorithm[ LOAD_BALANCE_ALGORITHM_MAXLEN + 1 ] ; /* 负载均衡算法 */
 	
 	struct ClientNetAddress		*client_addr_array ; /* 客户端地址结构 */
-	unsigned long			client_addr_size ; /* 客户端规则配置最大数量 */
-	unsigned long			client_addr_count ; /* 客户端规则配置数量 */
+	unsigned int			client_addr_size ; /* 客户端规则配置最大数量 */
+	unsigned int			client_addr_count ; /* 客户端规则配置数量 */
 	
 	struct ForwardNetAddress	*forward_addr_array ; /* 转发端地址结构 */
-	unsigned long			forward_addr_size ; /* 转发端规则配置最大数量 */
-	unsigned long			forward_addr_count ; /* 转发端规则配置数量 */
+	unsigned int			forward_addr_size ; /* 转发端规则配置最大数量 */
+	unsigned int			forward_addr_count ; /* 转发端规则配置数量 */
 	
 	struct ServerNetAddress		*server_addr_array ; /* 服务端地址结构 */
-	unsigned long			server_addr_size ; /* 服务端规则配置最大数量 */
-	unsigned long			server_addr_count ; /* 服务端规则配置数量 */
-	unsigned long			selected_addr_index ; /* 当前服务端索引 */
+	unsigned int			server_addr_size ; /* 服务端规则配置最大数量 */
+	unsigned int			server_addr_count ; /* 服务端规则配置数量 */
+	unsigned int			selected_addr_index ; /* 当前服务端索引 */
 } ;
 
 /* 转发会话结构 */
@@ -218,9 +215,9 @@ struct ForwardSession
 	int				sock ; /* sock描述字 */
 	struct NetAddress		netaddr ; /* 网络地址结构 */
 	struct ForwardRule		*p_forward_rule ; /* 转发规则 */
-	unsigned long			client_index ; /* 客户端索引 */
-	unsigned long			forward_index ; /* 转发端索引 */
-	unsigned long			server_index ; /* 服务端索引 */
+	unsigned int			client_index ; /* 客户端索引 */
+	unsigned int			forward_index ; /* 转发端索引 */
+	unsigned int			server_index ; /* 服务端索引 */
 	
 	char				io_buffer[ IO_BUFFER_SIZE + 1 ] ; /* 输入输出缓冲区 */
 	int				io_buffer_len ; /* 输入输出缓冲区有效数据长度 */
@@ -236,50 +233,73 @@ struct ForwardSession
 struct CommandParameter
 {
 	char				*config_pathfilename ; /* -f ... */
-	unsigned long			forward_thread_size ; /* -t ... */
-	unsigned long			forward_session_size ; /* -s ... */
+	unsigned int			forward_thread_size ; /* -t ... */
+	unsigned int			forward_session_size ; /* -s ... */
 	int				log_level ; /* --log-level (DEBUG|INFO|WARN|ERROR|FATAL)*/
 	int				no_daemon_flag ; /* --no-daemon (1|0) */
 } ;
 
 /* 服务器环境结构 */
+extern struct ServerEnv			*g_penv ;
+extern int				g_exit_flag ;
+
 struct PipeFds
 {
 	int				fds[ 2 ] ;
 } ;
 
-extern struct ServerEnv			*g_penv ;
-extern int				g_exit_flag ;
+struct IpConnection
+{
+	char		used_flag ; /* 使用标志 */
+	uint32_t	ip_int ; /* IP地址 */
+	unsigned int	connection_count ; /* 连接数量 */
+} ;
+
+#define DEFAULT_IP_CONNECTION_ARRAY_SIZE	1
+
+struct IpConnectionStat
+{
+	unsigned int			max_ip ; /* 最大IP数量 */
+	unsigned int			max_connections ; /* 最大CONNECTION数量 */
+	unsigned int			max_connections_per_ip ; /* 每个IP最大连接数量 */
+	struct IpConnection		*ip_connection_array ; /* IP-CONNECTION统计数组 */
+	unsigned int			ip_count ; /* 当前IP数量 */
+	unsigned int			connection_count ; /* 当前CONNECTION数量 */
+	unsigned int			ip_connection_stat_size ; /* 最大IP-CONNECTION数量 */
+} ;
 
 struct ServerEnv
 {
 	struct CommandParameter		cmd_para ; /* 命令行参数结构 */
 	char				**argv ;
 	
-	struct ForwardNetAddress	*old_forward_addr_array ;
+	struct ForwardNetAddress	*old_forward_addr_array ; /* 用于平滑升级的老进程侦听端口信息 */
 	unsigned int			old_forward_addr_count ;
 	
+	struct IpConnectionStat		ip_connection_stat ; /* IP-CONNECTION统计信息，也用于连接限制 */
+	
 	struct ForwardRule		*forward_rule_array ; /* 转发规则数组 */
-	unsigned long			forward_rule_size ; /* 转发规则数组大小 */
-	unsigned long			forward_rule_count ; /* 转发规则已装载数量 */
+	unsigned int			forward_rule_size ; /* 转发规则数组大小 */
+	unsigned int			forward_rule_count ; /* 转发规则已装载数量 */
+	
+	struct ForwardSession		*forward_session_array ; /* 通讯会话数组 */
+	unsigned int			forward_session_count ; /* 通讯会话数组大小 */
+	unsigned int			forward_session_use_offsetpos ; /* 转发会话最近使用单元偏移量 */
 	
 	pid_t				pid ; /* 子进程PID */
-	struct PipeFds			accept_request_pipe ; /* 父-子进程请求命令管道 */
-	struct PipeFds			accept_response_pipe ; /* 父-子进程响应命令管道 */
+	struct PipeFds			accept_request_pipe ; /* 父子进程请求命令管道 */
+	struct PipeFds			accept_response_pipe ; /* 父子进程响应命令管道 */
 	int				accept_epoll_fd ; /* 侦听端口epoll池 */
 	
 	pthread_t			*forward_thread_tid_array ; /* 子线程TID */
-	struct PipeFds			*forward_request_pipe ; /* 父-子线程请求命令管道 */
-	struct PipeFds			*forward_response_pipe ; /* 父-子线程响应命令管道 */
-	int				*forward_epoll_fd_array ; /* 子线程转发EPOLL池 */
-	
-	struct ForwardSession		*forward_session_array ; /* 转发会话数组 */
-	unsigned long			forward_session_count ; /* 转发会话数组大小 */
-	unsigned long			forward_session_use_offsetpos ; /* 转发会话最近使用单元偏移量 */
+	struct PipeFds			*forward_request_pipe ; /* 父子线程请求命令管道 */
+	struct PipeFds			*forward_response_pipe ; /* 父子线程响应命令管道 */
+	int				*forward_epoll_fd_array ; /* 数据收发epoll池 */
 	
 	struct rb_root			timeout_rbtree ; /* 超时 红黑树 */
 	
-	pthread_mutex_t			forward_session_count_mutex ; /* 转发会话数量 临界区互斥 */
+	pthread_mutex_t			ip_connection_stat_mutex ; /* IP-CONNECTION统计 临界区互斥 */
+	pthread_mutex_t			forward_session_count_mutex ; /* 通讯会话数量 临界区互斥 */
 	pthread_mutex_t			server_connection_count_mutex ; /* 服务端连接数量 临界区互斥 */
 	pthread_mutex_t			timeout_rbtree_mutex ; /* 超时红黑树 临界区互斥 */
 } ;
@@ -316,6 +336,8 @@ int AddTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forwa
 int GetLastestTimeout( struct ServerEnv *penv );
 void RemoveTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
 void RemoveTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
+int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int );
+int RemoveIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int );
 
 /********* Config *********/
 
