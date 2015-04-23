@@ -40,7 +40,6 @@ static void sig_proc( struct ServerEnv *penv )
 	}
 	else if( g_SIGUSR2_flag == 1 )
 	{
-		
 		struct ForwardSession	*forward_session_array = NULL ;
 		
 		pid_t			pid ;
