@@ -252,7 +252,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	}
 	
 	/* 创建连接服务端的客户端 */
-	p_reverse_forward_session->sock = socket( AF_INET , SOCK_STREAM , IPPROTO_TCP );
+	p_reverse_forward_session->sock = socket( AF_INET , SOCK_STREAM , IPPROTO_TCP ) ;
 	if( p_reverse_forward_session->sock == -1 )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "socket failed , errno[%d]" , errno );
@@ -264,7 +264,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	
 	/* 连接服务端 */
 	addr_len = sizeof(struct sockaddr) ;
-	nret = connect( p_reverse_forward_session->sock , (struct sockaddr *) & (p_reverse_forward_session->netaddr.sockaddr) , addr_len );
+	nret = connect( p_reverse_forward_session->sock , (struct sockaddr *) & (p_reverse_forward_session->netaddr.sockaddr) , addr_len ) ;
 	if( nret == -1 )
 	{
 		if( _ERRNO == _EINPROGRESS ) /* 正在连接 */
@@ -897,7 +897,6 @@ void *AcceptThread( struct ServerEnv *penv )
 			timeout = -1 ;
 		
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]... timeout[%d]" , penv->accept_request_pipe.fds[0] , timeout );
-		CloseLogFile();
 		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
 		UPDATE_TIME
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
@@ -995,7 +994,7 @@ void *AcceptThread( struct ServerEnv *penv )
 				}
 				else
 				{
-					ErrorLog( __FILE__ , __LINE__ , "connecting session EPOLLERR" );
+					ErrorLog( __FILE__ , __LINE__ , "connecting session #%d#EPOLLERR" , p_forward_session->sock );
 					epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 					DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
 					_CLOSESOCKET( p_forward_session->sock );

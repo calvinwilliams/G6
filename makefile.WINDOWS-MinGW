@@ -1,0 +1,102 @@
+# 此文件由makelocal.sh自动生成
+MAKEFILE_POSTFIX=.WINDOWS-MinGW
+# 此文件由makedir.sh自动生成
+############################################################
+# 项目名 :
+# 模块名 :
+# 备 注 :
+############################################################
+
+###### 子目录配置区
+DIROBJS		= \
+			src \
+			test \
+
+###### 加载mktpl模板库
+# 文件系统宏
+CD		=	cd
+RM		=	rm -f
+CP		=	cp -f
+MV		=	mv -f
+MKDIR		=	mkdir -p
+
+# 最终目标列表
+all		:	make
+
+# make规则
+.PHONY:make
+make	:
+	@for %%i in ($(DIROBJS)) do ( \
+		if exist %%i \
+		( \
+			if exist "%%i/makefile$(MAKEFILE_POSTFIX)" \
+			( \
+				$(CD) %%i && \
+				$(MAKE) -f makefile$(MAKEFILE_POSTFIX) && \
+				$(CD) .. \
+			) \
+		) && \
+		if not errorlevel 0 \
+		( \
+			exit \
+		) \
+	)
+
+# clean规则
+.PHONY:clean
+clean	:
+	@for %%i in ($(DIROBJS)) do ( \
+		if exist %%i \
+		( \
+			if exist "%%i/makefile$(MAKEFILE_POSTFIX)" \
+			( \
+				$(CD) %%i && \
+				$(MAKE) -f makefile$(MAKEFILE_POSTFIX) clean && \
+				$(CD) .. \
+			) \
+		) && \
+		if not errorlevel 0 \
+		( \
+			exit \
+		) \
+	)
+
+# install规则
+.PHONY:install
+install	:
+	@for %%i in ($(DIROBJS)) do ( \
+		if exist %%i \
+		( \
+			if exist "%%i/makefile$(MAKEFILE_POSTFIX)" \
+			( \
+				$(CD) %%i && \
+				$(MAKE) -f makefile$(MAKEFILE_POSTFIX) install && \
+				$(CD) .. \
+			) \
+		) && \
+		if not errorlevel 0 \
+		( \
+			exit \
+		) \
+	)
+
+# uninstall规则
+.PHONY:uninstall
+uninstall	:
+	@for %%i in ($(DIROBJS)) do ( \
+		if exist %%i \
+		( \
+			if exist "%%i/makefile$(MAKEFILE_POSTFIX)" \
+			( \
+				$(CD) %%i && \
+				$(MAKE) -f makefile$(MAKEFILE_POSTFIX) uninstall && \
+				$(CD) .. \
+			) \
+		) && \
+		if not errorlevel 0 \
+		( \
+			exit \
+		) \
+	)
+
+

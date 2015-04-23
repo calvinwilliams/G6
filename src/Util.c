@@ -89,7 +89,7 @@ void SetNetAddress( struct NetAddress *p_netaddr )
 	memset( & (p_netaddr->sockaddr) , 0x00 , sizeof(struct sockaddr_in) );
 	p_netaddr->sockaddr.sin_family = AF_INET ;
 	p_netaddr->sockaddr.sin_addr.s_addr = inet_addr(p_netaddr->ip) ;
-	p_netaddr->sockaddr.sin_port = htons( (unsigned short)p_netaddr->port.port_int );
+	p_netaddr->sockaddr.sin_port = htons( (unsigned short)(p_netaddr->port.port_int) );
 	return;
 }
 

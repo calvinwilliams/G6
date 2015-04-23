@@ -400,7 +400,7 @@ int AddListeners( struct ServerEnv *penv )
 			{
 _GOTO_CREATE_LISTENER :
 				/* ´´½¨ÕìÌý¶Ë¿Ú */
-				p_forward_addr->sock = socket( AF_INET , SOCK_STREAM , IPPROTO_TCP );
+				p_forward_addr->sock = socket( AF_INET , SOCK_STREAM , IPPROTO_TCP ) ;
 				if( p_forward_addr->sock == -1 )
 				{
 					ErrorLog( __FILE__ , __LINE__ , "socket failed , errno[%d]" , errno );
