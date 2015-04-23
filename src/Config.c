@@ -316,7 +316,7 @@ int LoadConfig( struct ServerEnv *penv )
 		/* 读转发规则ID */
 		nret = fscanf( fp , "%64s" , rule_id ) ;
 		if( nret == EOF )
-			return EOF;
+			return 0;
 		
 		/* 调整转发规则数组 */
 		if( penv->forward_rules_array == NULL || penv->forward_rules_count+1 > penv->forward_rules_size )
