@@ -371,8 +371,6 @@ int InitEnvirment( struct ServerEnv *penv );
 int InitEnvirment2( struct ServerEnv *penv );
 void CleanEnvirment( struct ServerEnv *penv );
 
-int InitIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat );
-
 int SaveListenSockets( struct ServerEnv *penv );
 int LoadOldListenSockets( struct ServerEnv *penv );
 int CleanOldListenSockets( struct ServerEnv *penv );
@@ -386,13 +384,15 @@ void SetForwardSessionUnused2( struct ServerEnv *penv , struct ForwardSession *p
 
 void RemoveTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
 void RemoveTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
-int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
-int AddTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
-int UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout );
-int UpdateTimeoutNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 , unsigned int timeout );
+int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout_timestamp );
+int AddTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 , unsigned int timeout_timestamp );
+int UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout_timestamp );
+int UpdateTimeoutNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 , unsigned int timeout_timestamp );
 int GetLastestTimeout( struct ServerEnv *penv );
 struct ForwardSession *GetExpireTimeoutNode( struct ServerEnv *penv );
 
+int InitIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat );
+void CleanIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat );
 int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int );
 int RemoveIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int );
 

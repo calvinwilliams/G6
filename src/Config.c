@@ -591,6 +591,14 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		p_forward_rule->server_addr_count++;
 	}
 	
+	nret = InitIpConnectionStat( penv , & (p_forward_rule->client_ip_connection_stat) ) ;
+	if( nret )
+		return nret;
+	
+	nret = InitIpConnectionStat( penv , & (p_forward_rule->server_ip_connection_stat) ) ;
+	if( nret )
+		return nret;
+	
 	return 0;
 }
 
@@ -845,6 +853,9 @@ void UnloadConfig( struct ServerEnv *penv )
 	
 	if( penv->forward_rule_array )
 	{
+		CleanIpConnectionStat( penv , & (p_forward_rule->client_ip_connection_stat) );
+		CleanIpConnectionStat( penv , & (p_forward_rule->server_ip_connection_stat) );
+		
 		for( forward_rule_index = 0 , p_forward_rule = penv->forward_rule_array ; forward_rule_index < penv->forward_rule_count ; forward_rule_index++ , p_forward_rule++ )
 		{
 			if( p_forward_rule->client_addr_array )

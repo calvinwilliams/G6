@@ -313,7 +313,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 					}
 					else
 					{
-						UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , time(NULL) + penv->timeout );
+						UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
 					}
 				}
 				else if( p_event->events & EPOLLOUT ) /* 输出事件 */
@@ -326,7 +326,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 					}
 					else
 					{
-						UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , time(NULL) + penv->timeout );
+						UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
 					}
 				}
 				else if( p_event->events ) /* 错误事件 */

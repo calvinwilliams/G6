@@ -309,15 +309,12 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		
 		p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].server_unable = 0 ;
 		
-		p_reverse_forward_session->timeout_timestamp = time(NULL) + penv->timeout ;
-		p_reverse_forward_session->p_reverse_forward_session->timeout_timestamp = time(NULL) + penv->timeout ;
-		
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL );
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->p_reverse_forward_session->sock , NULL );
 		
 		forward_thread_index = (p_reverse_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
 		
-		AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_reverse_forward_session->p_reverse_forward_session );
+		AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_reverse_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout );
 		
 		memset( & event , 0x00 , sizeof(struct epoll_event) );
 		event.data.ptr = p_reverse_forward_session ;
@@ -531,15 +528,12 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	
 	p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_unable = 0 ;
 	
-	p_forward_session->timeout_timestamp = time(NULL) + penv->timeout ;
-	p_forward_session->p_reverse_forward_session->timeout_timestamp = time(NULL) + penv->timeout ;
-	
 	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 	
 	forward_thread_index = (p_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
 	
-	AddTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session );
+	AddTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
 	
 	memset( & event , 0x00 , sizeof(struct epoll_event) );
 	event.data.ptr = p_forward_session ;
@@ -804,7 +798,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 				if( p_servers_addr->heartbeat > 0 && STRCMP( p_servers_addr->netaddr.ip , == , ip ) && p_servers_addr->netaddr.port.port_int == port_int )
 				{
 					p_servers_addr->server_unable = 0 ;
-					p_servers_addr->timestamp_to = time(NULL) + p_servers_addr->heartbeat ;
+					p_servers_addr->timestamp_to = g_time_tv.tv_sec + p_servers_addr->heartbeat ;
 					
 					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d heartbeat\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 					send( sock , io_buffer , io_buffer_len , 0 );

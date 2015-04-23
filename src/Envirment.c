@@ -156,12 +156,15 @@ void CleanEnvirment( struct ServerEnv *penv )
 		penv->old_forward_addr_array = NULL ;
 	}
 	
-	if( penv->ip_connection_stat.ip_connection_array )
-	{
-		free( penv->ip_connection_stat.ip_connection_array );
-		penv->ip_connection_stat.ip_connection_array = NULL ;
-	}
+	CleanIpConnectionStat( penv , & (penv->ip_connection_stat) );
 	
+	close( penv->accept_request_pipe.fds[0] );
+	close( penv->accept_request_pipe.fds[1] );
+	close( penv->accept_response_pipe.fds[0] );
+	close( penv->accept_response_pipe.fds[1] );
+	
+	close( penv->accept_epoll_fd );
+	free( penv->forward_thread_tid_array );
 	for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
 	{
 		if( IsForwardSessionUsed( p_forward_session ) )
@@ -172,14 +175,6 @@ void CleanEnvirment( struct ServerEnv *penv )
 			SetForwardSessionUnused( penv , p_forward_session );
 		}
 	}
-	
-	close( penv->accept_request_pipe.fds[0] );
-	close( penv->accept_request_pipe.fds[1] );
-	close( penv->accept_response_pipe.fds[0] );
-	close( penv->accept_response_pipe.fds[1] );
-	
-	close( penv->accept_epoll_fd );
-	free( penv->forward_thread_tid_array );
 	free( penv->forward_session_array );
 	
 	for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
@@ -201,26 +196,6 @@ void CleanEnvirment( struct ServerEnv *penv )
 	pthread_mutex_destroy( & (penv->time_cache_mutex) );
 	
 	return;
-}
-
-int InitIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat )
-{
-	if( penv->ip_connection_stat.max_ip > 0 || penv->ip_connection_stat.max_connections > 0 || penv->ip_connection_stat.max_connections_per_ip > 0 )
-	{
-		penv->ip_connection_stat.ip_connection_stat_size = DEFAULT_IP_CONNECTION_ARRAY_SIZE ;
-		penv->ip_connection_stat.ip_connection_array = (struct IpConnection *)malloc( sizeof(struct IpConnection) * penv->ip_connection_stat.ip_connection_stat_size ) ;
-		if( penv->ip_connection_stat.ip_connection_array == NULL )
-		{
-			ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
-			return -1;
-		}
-		memset( penv->ip_connection_stat.ip_connection_array , 0x00 , sizeof(struct IpConnection) * penv->ip_connection_stat.ip_connection_stat_size );
-		
-		penv->ip_connection_stat.ip_count = 0 ;
-		penv->ip_connection_stat.connection_count = 0 ;
-	}
-	
-	return 0;
 }
 
 int SaveListenSockets( struct ServerEnv *penv )
@@ -584,11 +559,13 @@ void RemoveTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_f
 	return;
 }
 
-static int _AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
+static int _AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout_timestamp )
 {
         struct rb_node		**pp_new_node = NULL ;
         struct rb_node		*p_parent = NULL ;
         struct ForwardSession	*p = NULL ;
+	
+	p_forward_session->timeout_timestamp = timeout_timestamp ;
 	
 	pp_new_node = & (penv->timeout_rbtree.rb_node) ;
         while( *pp_new_node )
@@ -610,33 +587,33 @@ static int _AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *
 	return 0;
 }
 
-int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
+int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout_timestamp )
 {
 	int		nret = 0 ;
 	
 	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 	
-	nret = _AddTimeoutTreeNode( penv , p_forward_session ) ;
+	nret = _AddTimeoutTreeNode( penv , p_forward_session , timeout_timestamp ) ;
 	
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 	
         return 0;
 }
 
-int AddTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 )
+int AddTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 , unsigned int timeout_timestamp )
 {
 	int		nret = 0 ;
 	
 	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 	
-	nret = _AddTimeoutTreeNode( penv , p_forward_session ) ;
+	nret = _AddTimeoutTreeNode( penv , p_forward_session , timeout_timestamp ) ;
 	if( nret )
 	{
 		pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 		return nret;
 	}
 	
-	nret = _AddTimeoutTreeNode( penv , p_forward_session2 ) ;
+	nret = _AddTimeoutTreeNode( penv , p_forward_session2 , timeout_timestamp ) ;
 	if( nret )
 	{
 		_RemoveTimeoutTreeNode( penv , p_forward_session );
@@ -649,44 +626,44 @@ int AddTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forwa
 	return 0;
 }
 
-static int _UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout )
+static int _UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout_timestamp )
 {
 	int		nret = 0 ;
 	
 	_RemoveTimeoutTreeNode( penv , p_forward_session );
-	p_forward_session->timeout_timestamp = timeout ;
-	nret = _AddTimeoutTreeNode( penv , p_forward_session ) ;
+	
+	nret = _AddTimeoutTreeNode( penv , p_forward_session , timeout_timestamp ) ;
 	
 	return nret;
 }
 
-int UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout )
+int UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout_timestamp )
 {
 	int		nret = 0 ;
 	
 	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 	
-	nret = _UpdateTimeoutNode( penv , p_forward_session , timeout ) ;
+	nret = _UpdateTimeoutNode( penv , p_forward_session , timeout_timestamp ) ;
 	
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 	
 	return 0;
 }
 
-int UpdateTimeoutNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 , unsigned int timeout )
+int UpdateTimeoutNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 , unsigned int timeout_timestamp )
 {
 	int		nret = 0 ;
 	
 	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 	
-	nret = _UpdateTimeoutNode( penv , p_forward_session , timeout ) ;
+	nret = _UpdateTimeoutNode( penv , p_forward_session , timeout_timestamp ) ;
 	if( nret )
 	{
 		pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 		return nret;
 	}
 	
-	nret = _UpdateTimeoutNode( penv , p_forward_session2 , timeout ) ;
+	nret = _UpdateTimeoutNode( penv , p_forward_session2 , timeout_timestamp ) ;
 	
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 	
@@ -709,7 +686,7 @@ int GetLastestTimeout( struct ServerEnv *penv )
 	}
 	
 	p_forward_session = rb_entry( p_node , struct ForwardSession , timeout_rbnode );
-	timeout = p_forward_session->timeout_timestamp - time(NULL) ;
+	timeout = p_forward_session->timeout_timestamp - g_time_tv.tv_sec ;
 	if( timeout < 0 )
 		timeout = 0 ;
 	
@@ -742,6 +719,40 @@ struct ForwardSession *GetExpireTimeoutNode( struct ServerEnv *penv )
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 	
 	return NULL;
+}
+
+int InitIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat )
+{
+	if( penv->ip_connection_stat.max_ip > 0 || penv->ip_connection_stat.max_connections > 0 || penv->ip_connection_stat.max_connections_per_ip > 0 )
+	{
+		penv->ip_connection_stat.ip_connection_stat_size = DEFAULT_IP_CONNECTION_ARRAY_SIZE ;
+		penv->ip_connection_stat.ip_connection_array = (struct IpConnection *)malloc( sizeof(struct IpConnection) * penv->ip_connection_stat.ip_connection_stat_size ) ;
+		if( penv->ip_connection_stat.ip_connection_array == NULL )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
+			return -1;
+		}
+		memset( penv->ip_connection_stat.ip_connection_array , 0x00 , sizeof(struct IpConnection) * penv->ip_connection_stat.ip_connection_stat_size );
+		
+		penv->ip_connection_stat.ip_count = 0 ;
+		penv->ip_connection_stat.connection_count = 0 ;
+	}
+	
+	return 0;
+}
+
+void CleanIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat )
+{
+	if( penv->ip_connection_stat.max_ip > 0 || penv->ip_connection_stat.max_connections > 0 || penv->ip_connection_stat.max_connections_per_ip > 0 )
+	{
+		if( penv->ip_connection_stat.ip_connection_array )
+		{
+			free( penv->ip_connection_stat.ip_connection_array );
+			penv->ip_connection_stat.ip_connection_array = NULL ;
+		}
+	}
+	
+	return;
 }
 
 static int _AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int )
