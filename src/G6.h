@@ -114,8 +114,8 @@
 #define DEFAULT_SERVERS_INITCOUNT_IN_ONE_RULE	2
 #define DEFAULT_SERVERS_INCREASE_IN_ONE_RULE	5
 
-#define DEFAULT_FORWARD_THREAD_COUNT		2	/* 转发线程数量 */
-#define DEFAULT_FORWARD_SESSIONS_MAXCOUNT	60000	/* 缺省最大连接数量 */
+#define DEFAULT_FORWARD_THREAD_COUNT		1	/* 转发线程数量 */
+#define DEFAULT_FORWARD_SESSIONS_MAXCOUNT	10000	/* 缺省最大连接数量 */
 #define DEFAULT_FORWARD_TRANSFER_BUFSIZE	4096	/* 缺省通讯转发缓冲区大小 */
 
 #define RULE_ID_MAXLEN				64
@@ -286,6 +286,8 @@ int Rand( int min, int max );
 unsigned long CalcHash( char *str );
 int SetReuseAddr( int sock );
 int SetNonBlocking( int sock );
+void SetNetAddress( struct NetAddress *p_netaddr );
+void GetNetAddress( struct NetAddress *p_netaddr );
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) );
 
 /********* envirment *********/

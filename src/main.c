@@ -28,8 +28,9 @@ int main( int argc , char *argv[] )
 	
 	/* 设置日志环境 */
 	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
-	penv->log_level = LOGLEVEL_DEBUG ;
+	penv->log_level = LOGLEVEL_INFO ;
 	SetLogLevel( penv->log_level );
+	InfoLog( __FILE__ , __LINE__ , "--- G5 begin ---" );
 	
 	/* 初始化服务器环境 */
 	memset( penv , 0x00 , sizeof(struct ServerEnv) );
@@ -103,6 +104,7 @@ int main( int argc , char *argv[] )
 		usage();
 		exit(7);
 	}
+DebugLog( __FILE__ , __LINE__ , "penv->cmd_para.forward_thread_size[%ld]" , penv->cmd_para.forward_thread_size );
 	
 	/* 初始化环境 */
 	nret = InitEnvirment( penv ) ;
@@ -120,18 +122,16 @@ int main( int argc , char *argv[] )
 		return -nret;
 	}
 	
-	InfoLog( __FILE__ , __LINE__ , "--- G5 beinning ---" );
-	
 	/* 进入监控父进程 */
 	nret = BindDaemonServer( NULL , & _MonitorProcess , penv , NULL );
-	
-	InfoLog( __FILE__ , __LINE__ , "--- G5 exiting ---" );
 	
 	/* 卸载配置 */
 	UnloadConfig( penv );
 	
 	/* 清理环境 */
 	CleanEnvirment( penv );
+	
+	InfoLog( __FILE__ , __LINE__ , "--- G5 finish ---" );
 	
 	return -nret;
 }

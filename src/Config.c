@@ -54,15 +54,6 @@ static int AddListen( struct ServerEnv *penv , struct ForwardRule *p_forward_rul
 	return 0;
 }
 
-static void SetNetAddress( struct NetAddress *p_netaddr )
-{
-	memset( & (p_netaddr->sockaddr) , 0x00 , sizeof(struct sockaddr_in) );
-	p_netaddr->sockaddr.sin_family = AF_INET ;
-	p_netaddr->sockaddr.sin_addr.s_addr = inet_addr( p_netaddr->ip ) ;
-	p_netaddr->sockaddr.sin_port = htons( (unsigned short)p_netaddr->port.port_int );
-	return;
-}
-
 static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *p_forward_rule , char *rule_id )
 {
 	char				ip_and_port[ 100 + 1 ] ;
@@ -71,10 +62,6 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 	struct ServerNetAddress		*p_server_addr = NULL ;
 	
 	int				nret = 0 ;
-	
-	/*
-	(rule_id) (load_balance_algorithm) (client_ip1:client_port1 ...) - (forward_ip1:forward_port1 ...) > (server_ip1:server_port1 ...) ;
-	*/
 	
 	/* 复制转发规则ID */
 	strcpy( p_forward_rule->rule_id , rule_id );

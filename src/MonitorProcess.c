@@ -12,6 +12,7 @@ static int MonitorProcess( struct ServerEnv *penv )
 	/* 设置日志环境 */
 	SetLogFile( "%s/log/G6_MonitorProcess.log" , getenv("HOME") );
 	SetLogLevel( penv->log_level );
+	InfoLog( __FILE__ , __LINE__ , "--- G6.MonitorProcess begin ---" );
 	
 	/* 设置信号句柄 */
 	signal( SIGCLD , SIG_DFL );
@@ -77,6 +78,8 @@ static int MonitorProcess( struct ServerEnv *penv )
 		
 		/* 重启子进程 */
 	}
+	
+	InfoLog( __FILE__ , __LINE__ , "--- G6.MonitorProcess finish ---" );
 	
 	return 0;
 }

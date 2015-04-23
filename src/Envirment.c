@@ -53,8 +53,6 @@ int InitEnvirment( struct ServerEnv *penv )
 	}
 	memset( penv->forward_session_array , 0x00 , sizeof(struct ForwardSession) * penv->cmd_para.forward_session_size );
 	
-	InfoLog( __FILE__ , __LINE__ , "--- G5 beginning ---" );
-	
 	return 0;
 }
 

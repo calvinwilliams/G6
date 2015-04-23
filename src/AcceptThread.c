@@ -2,7 +2,7 @@
 
 static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
 {
-	struct ForwardRule	*p_forward_rule = NULL ;
+	struct ForwardRule	*p_forward_rule = p_forward_session->p_forward_rule ;
 	
 	if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_MS ) )
 	{
@@ -95,14 +95,11 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		SetForwardSessionUnused( p_forward_session->p_reverse_forward_session );
 		return -1;
 	}
-	else
-	{
-		DebugLog( __FILE__ , __LINE__ , "socket #%d# ok" , p_forward_session->sock );
-	}
 	
 	SetNonBlocking( p_forward_session->sock );
 	
 	/* 连接服务端 */
+InfoLog( __FILE__ , __LINE__ , "p_forward_session->balance_algorithm.MS.server_index[%d]" , p_forward_session->balance_algorithm.MS.server_index );
 	nret = connect( p_forward_session->sock , ( struct sockaddr *) & (p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].netaddr) , addr_len );
 	if( nret == -1 )
 	{
@@ -110,7 +107,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		{
 			p_forward_session->status = FORWARD_SESSION_STATUS_CONNECTING ;
 			
-			InfoLog( __FILE__ , __LINE__ , "connecting [%s:%d] ..." , p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].netaddr.ip , p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].netaddr.port.port_int );
+			InfoLog( __FILE__ , __LINE__ , "#%d# connecting [%s:%d] ..." , p_forward_session->sock , p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].netaddr.ip , p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].netaddr.port.port_int );
 			
 			memset( & (event) , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_forward_session ;
@@ -187,7 +184,8 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 	}
 	else
 	{
-		DebugLog( __FILE__ , __LINE__ , "accept #%d# ok" , p_forward_session->sock );
+		GetNetAddress( & (p_forward_session->netaddr) );
+		DebugLog( __FILE__ , __LINE__ , "accept #%d# from [%s:%d] ok" , p_forward_session->sock , p_forward_session->netaddr.ip , p_forward_session->netaddr.port.port_int );
 	}
 	
 	SetNonBlocking( p_forward_session->sock );
@@ -272,6 +270,12 @@ static void *AcceptThread( struct ServerEnv *penv )
 	
 	int			nret = 0 ;
 	
+	/* 设置日志环境 */
+	SetLogFile( "%s/log/G6_WorkerProcess_AcceptThread.log" , getenv("HOME") );
+	SetLogLevel( penv->log_level );
+	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.AcceptThread bebin ---" );
+	
+	/* 主工作循环 */
 	event_count = epoll_wait( penv->accept_epoll_fd , events , sizeof(events)/sizeof(events[0]) , -1 ) ;
 	for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 	{
@@ -367,6 +371,8 @@ static void *AcceptThread( struct ServerEnv *penv )
 			}
 		}
 	}
+	
+	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.AcceptThread finish ---" );
 	
 	return 0;
 }

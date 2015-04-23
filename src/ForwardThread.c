@@ -150,8 +150,8 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 
 static void *ForwardThread( struct ServerEnv *penv )
 {
-	int			forward_thread_index = *(penv->forward_thread_index) ;
-	int			forward_epoll_fd = penv->forward_epoll_fd_array[forward_thread_index] ;
+	int			forward_thread_index ;
+	int			forward_epoll_fd ;
 	
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
 	int			event_count ;
@@ -164,9 +164,16 @@ static void *ForwardThread( struct ServerEnv *penv )
 	
 	int			nret = 0 ;
 	
-	free( penv->forward_thread_index );
-	penv->forward_thread_index = NULL ;
+	forward_thread_index = *(penv->forward_thread_index) ;
+	forward_epoll_fd = penv->forward_epoll_fd_array[forward_thread_index] ;
+	{ int *tmp = penv->forward_thread_index ; penv->forward_thread_index = NULL ; free( tmp ); }
 	
+	/* 设置日志环境 */
+	SetLogFile( "%s/log/G6_WorkerProcess_ForwardThread_%d.log" , getenv("HOME") , forward_thread_index+1 );
+	SetLogLevel( penv->log_level );
+	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.ForwardThread begin ---" );
+	
+	/* 主工作循环 */
 	event_count = epoll_wait( forward_epoll_fd , events , sizeof(events)/sizeof(events[0]) , -1 ) ;
 	for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 	{
@@ -232,6 +239,8 @@ static void *ForwardThread( struct ServerEnv *penv )
 			}
 		}
 	}
+	
+	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.ForwardThread finish ---" );
 	
 	return NULL;
 }
