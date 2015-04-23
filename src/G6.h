@@ -87,6 +87,7 @@
 #endif
 
 #include "LOGC.h"
+#include "rbtree.h"
 
 #ifndef ULONG_MAX
 #define ULONG_MAX 0xffffffffUL
@@ -225,6 +226,9 @@ struct ForwardSession
 	int				io_buffer_offsetpos ; /* 输入输出缓冲区有效数据开始偏移量 */
 	
 	struct ForwardSession		*p_reverse_forward_session ; /* 反向会话 */
+	
+	struct rb_node			timeout_rbnode ; /* 超时 红黑树节点 */
+	int				timeout_timestamp ; /* 超时时间戳 */
 } ;
 
 /* 命令行参数 */
@@ -272,8 +276,11 @@ struct ServerEnv
 	unsigned long			forward_session_count ; /* 转发会话数组大小 */
 	unsigned long			forward_session_use_offsetpos ; /* 转发会话最近使用单元偏移量 */
 	
+	struct rb_root			timeout_rbtree ; /* 超时 红黑树 */
+	
 	pthread_mutex_t			forward_session_count_mutex ; /* 转发会话数量 临界区互斥 */
 	pthread_mutex_t			server_connection_count_mutex ; /* 服务端连接数量 临界区互斥 */
+	pthread_mutex_t			timeout_rbtree_mutex ; /* 超时红黑树 临界区互斥 */
 } ;
 
 /********* util *********/
@@ -303,6 +310,11 @@ struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv );
 #define IsForwardSessionUsed(_p_forward_session_)	((_p_forward_session_)->status!=FORWARD_SESSION_STATUS_UNUSED?1:0)
 void SetForwardSessionUnused( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
 void SetForwardSessionUnused2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
+int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
+int AddTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
+int GetLastestTimeout( struct ServerEnv *penv );
+void RemoveTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
+void RemoveTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
 
 /********* Config *********/
 

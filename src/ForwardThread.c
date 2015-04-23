@@ -1,6 +1,9 @@
 #include "G6.h"
 
 #define DISCONNECT_PAIR	\
+	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) ); \
+	RemoveTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
+	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) ); \
 	pthread_mutex_lock( & (penv->server_connection_count_mutex) ); \
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER ) \
 		p_forward_session->p_reverse_forward_session->p_forward_rule->server_addr_array[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--; \
@@ -184,6 +187,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 	struct ServerEnv	*penv = g_penv ;
 	int			forward_epoll_fd ;
 	
+	int			timeout ;
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
 	int			event_count ;
 	int			event_index ;
@@ -203,9 +207,17 @@ void *ForwardThread( unsigned long forward_thread_index )
 	/* 主工作循环 */
 	while( ! ( g_exit_flag == 1000 && penv->forward_session_count == 0 ) )
 	{
+		timeout = g_exit_flag ;
+		if( timeout != 1000 )
+		{
+			pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
+			timeout = GetLastestTimeout( penv ) ;
+			pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
+		}
+			
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]..." , penv->forward_request_pipe[forward_thread_index].fds[0] );
 		CloseLogFile();
-		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , g_exit_flag ) ;
+		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{

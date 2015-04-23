@@ -9,6 +9,7 @@
 #@ c_FILE
 c_FILE		=	\
 			LOGC.c \
+			rbtree.c \
 			Util.c \
 			main.c \
 			Envirment.c \

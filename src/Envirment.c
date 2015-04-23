@@ -109,8 +109,11 @@ int InitEnvirment( struct ServerEnv *penv )
 	}
 	memset( penv->forward_session_array , 0x00 , sizeof(struct ForwardSession) * penv->cmd_para.forward_session_size );
 	
+	penv->timeout_rbtree = RB_ROOT ;
+	
 	pthread_mutex_init( & (penv->forward_session_count_mutex) , NULL );
 	pthread_mutex_init( & (penv->server_connection_count_mutex) , NULL );
+	pthread_mutex_init( & (penv->timeout_rbtree_mutex) , NULL );
 	
 	return 0;
 }
@@ -162,6 +165,7 @@ void CleanEnvirment( struct ServerEnv *penv )
 	
 	pthread_mutex_destroy( & (penv->forward_session_count_mutex) );
 	pthread_mutex_destroy( & (penv->server_connection_count_mutex) );
+	pthread_mutex_destroy( & (penv->timeout_rbtree_mutex) );
 	
 	return;
 }
@@ -445,7 +449,9 @@ struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv )
 void SetForwardSessionUnused( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
 {
 	if( p_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
+	{
 		p_forward_session->status = FORWARD_SESSION_STATUS_UNUSED ;
+	}
 	
 	pthread_mutex_lock( & (penv->forward_session_count_mutex) );
 	penv->forward_session_count--;
@@ -457,10 +463,14 @@ void SetForwardSessionUnused( struct ServerEnv *penv , struct ForwardSession *p_
 void SetForwardSessionUnused2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 )
 {
 	if( p_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
+	{
 		p_forward_session->status = FORWARD_SESSION_STATUS_UNUSED ;
+	}
 	
 	if( p_forward_session2->status != FORWARD_SESSION_STATUS_UNUSED )
+	{
 		p_forward_session2->status = FORWARD_SESSION_STATUS_UNUSED ;
+	}
 	
 	pthread_mutex_lock( & (penv->forward_session_count_mutex) );
 	penv->forward_session_count -= 2 ;
@@ -468,3 +478,78 @@ void SetForwardSessionUnused2( struct ServerEnv *penv , struct ForwardSession *p
 	
 	return;
 }
+
+int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
+{
+        struct rb_node		**pp_new_node = &(penv->timeout_rbtree.rb_node) ;
+        struct rb_node		*p_parent = NULL ;
+        struct ForwardSession	*p = NULL ;
+
+        while( *pp_new_node )
+        {
+                p = container_of( *pp_new_node , struct ForwardSession , timeout_rbnode );
+		
+                p_parent = (*pp_new_node) ;
+                if( p_forward_session->timeout_timestamp < p->timeout_timestamp )
+                        pp_new_node = &((*pp_new_node)->rb_left) ;
+                else if( p_forward_session->timeout_timestamp > p->timeout_timestamp )
+                        pp_new_node = &((*pp_new_node)->rb_right) ;
+                else 
+                        pp_new_node = &((*pp_new_node)->rb_left) ;
+        }
+	
+        rb_link_node( &(p_forward_session->timeout_rbnode) , p_parent , pp_new_node );
+        rb_insert_color( &(p_forward_session->timeout_rbnode) , &(penv->timeout_rbtree) );
+
+        return 0;
+}
+
+int AddTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 )
+{
+	int		nret = 0 ;
+	
+	nret = AddTimeoutTreeNode( penv , p_forward_session ) ;
+	if( nret )
+		return nret;
+	
+	nret = AddTimeoutTreeNode( penv , p_forward_session2 ) ;
+	if( nret )
+	{
+		RemoveTimeoutTreeNode( penv , p_forward_session );
+		return nret;
+	}
+	
+	return 0;
+}
+
+int GetLastestTimeout( struct ServerEnv *penv )
+{
+	struct rb_node		*p_node = NULL ;
+	struct ForwardSession	*p_forward_session = NULL ;
+	int			timeout ;
+	
+	p_node = rb_first( & (penv->timeout_rbtree) ); 
+	if (p_node == NULL)
+		return -1;	
+	
+	p_forward_session = rb_entry( p_node , struct ForwardSession , timeout_rbnode );
+	timeout = p_forward_session->timeout_timestamp - GETTIMEVAL.tv_sec ;
+	if( timeout < 0 )
+		timeout = 0 ;
+	
+	return timeout;
+}
+
+void RemoveTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
+{
+	rb_erase( &(p_forward_session->timeout_rbnode) , & (penv->timeout_rbtree) );
+	return;
+}
+
+void RemoveTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 )
+{
+	RemoveTimeoutTreeNode( penv , p_forward_session );
+	RemoveTimeoutTreeNode( penv , p_forward_session2 );
+	return;
+}
+
