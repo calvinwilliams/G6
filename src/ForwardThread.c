@@ -214,7 +214,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 			timeout = GetLastestTimeout( penv ) ;
 			pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 		}
-			
+		
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]..." , penv->forward_request_pipe[forward_thread_index].fds[0] );
 		CloseLogFile();
 		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
@@ -256,6 +256,10 @@ void *ForwardThread( unsigned long forward_thread_index )
 			else
 			{
 				DebugLog( __FILE__ , __LINE__ , "forward session event" );
+				
+				pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
+				p_forward_session->timeout_timestamp += DEFAULT_ALIVE_TIMEOUT ;
+				pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 				
 				if( p_event->events & EPOLLIN ) /* ÊäÈëÊÂ¼ş */
 				{

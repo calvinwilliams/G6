@@ -340,6 +340,8 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		if( p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].server_unable == 1 )
 			p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].server_unable = 0 ;
 		
+		p_reverse_forward_session->timeout_timestamp = GETTIMEVAL.tv_sec + DEFAULT_ALIVE_TIMEOUT ;
+		p_reverse_forward_session->p_reverse_forward_session->timeout_timestamp = GETTIMEVAL.tv_sec + DEFAULT_ALIVE_TIMEOUT ;
 		pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 		AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_reverse_forward_session->p_reverse_forward_session );
 		pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
@@ -550,6 +552,8 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	if( p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_unable == 1 )
 		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_unable = 0 ;
 	
+	p_forward_session->timeout_timestamp = GETTIMEVAL.tv_sec + DEFAULT_ALIVE_TIMEOUT ;
+	p_forward_session->p_reverse_forward_session->timeout_timestamp = GETTIMEVAL.tv_sec + DEFAULT_ALIVE_TIMEOUT ;
 	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 	AddTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session );
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
