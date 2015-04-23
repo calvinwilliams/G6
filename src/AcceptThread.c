@@ -301,7 +301,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		{
 			p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTING ;
 			
-			InfoLog( __FILE__ , __LINE__ , "#%d#-#%d# connecting [%s:%d] ..." , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int );
+			InfoLog( __FILE__ , __LINE__ , "#%d# connecting [%s:%d]#%d# ..." , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , p_reverse_forward_session->sock );
 			
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_reverse_forward_session ;
@@ -868,55 +868,56 @@ void *AcceptThread( struct ServerEnv *penv )
 	g_exit_flag = 0 ;
 	while( ! ( g_exit_flag == 1 && penv->forward_session_count == 0 ) )
 	{
-DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
 		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , -1 ) ;
-DebugLog( __FILE__ , __LINE__ , "event_count[%d]" , event_count );
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
-DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
 			p_forward_session = p_event->data.ptr ;
 			
 			if( p_forward_session == NULL )
 			{
 				char		command ;
 				
+				DebugLog( __FILE__ , __LINE__ , "read request pipe ..." );
 				nret = read( penv->request_pipe.fds[0] , & command , 1 ) ;
 				if( nret == -1 )
 				{
-					ErrorLog( __FILE__ , __LINE__ , "read request_pipe failed , errno[%d]" , errno );
+					ErrorLog( __FILE__ , __LINE__ , "read request pipe failed , errno[%d]" , errno );
 					exit(0);
 				}
 				else if( nret == 0 )
 				{
-					InfoLog( __FILE__ , __LINE__ , "read request_pipe close" );
+					InfoLog( __FILE__ , __LINE__ , "read request pipe close" );
 					exit(0);
 				}
 				else
 				{
-					int			forward_session_index ;
-					struct ForwardSession	*p_forward_session = NULL ;
+					DebugLog( __FILE__ , __LINE__ , "read request pipe ok %c" , command );
 					
-DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
-					for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
+					if( command == 'Q' )
 					{
-						if( p_forward_session->type == FORWARD_SESSION_TYPE_LISTEN )
+						int			forward_session_index ;
+						struct ForwardSession	*p_forward_session = NULL ;
+						
+						for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
 						{
-							epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-							DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
-							_CLOSESOCKET( p_forward_session->sock );
-							SetForwardSessionUnused( penv , p_forward_session );
+							if( p_forward_session->type == FORWARD_SESSION_TYPE_LISTEN )
+							{
+								epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+								DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+								_CLOSESOCKET( p_forward_session->sock );
+								SetForwardSessionUnused( penv , p_forward_session );
+							}
 						}
+						
+						DebugLog( __FILE__ , __LINE__ , "write response pipe P ..." );
+						write( penv->response_pipe.fds[1] , "P" , 1 );
+						DebugLog( __FILE__ , __LINE__ , "write response pipe P ok" );
+						
+						g_exit_flag = 1 ;
+						DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
 					}
-DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
-					
-					write( penv->response_pipe.fds[1] , "P" , 1 );
-DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
-					
-					g_exit_flag = 1 ;
-DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
 				}
-DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
 			}
 			else if( p_forward_session->status == FORWARD_SESSION_STATUS_LISTEN )
 			{

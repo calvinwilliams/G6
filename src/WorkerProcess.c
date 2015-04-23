@@ -10,7 +10,7 @@ int WorkerProcess( struct ServerEnv *penv )
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess ---" );
 	
 	signal( SIGTERM , SIG_IGN );
-	signal( SIGUSR1 , SIG_IGN );
+	signal( SIGUSR2 , SIG_IGN );
 	
 	/* 创建转发子线程 */
 	penv->forward_thread_index = NULL ;
