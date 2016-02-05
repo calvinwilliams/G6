@@ -81,47 +81,171 @@
 	}
 #endif
 
+#include "LOGC.h"
+
 #ifndef ULONG_MAX
 #define ULONG_MAX 0xffffffffUL
 #endif
 
-#define FOUND				9	/* ÕÒµ½ */ /* found */
-#define NOT_FOUND			4	/* ÕÒ²»µ½ */ /* not found */
+#define FOUND				9	/* ÕÒµ½ */
+#define NOT_FOUND			4	/* ÕÒ²»µ½ */
 
-#define MATCH				1	/* Æ¥Åä */ /* match */
-#define NOT_MATCH			-1	/* ²»Æ¥Åä */ /* not match */
+#define MATCH				1	/* Æ¥Åä */
+#define NOT_MATCH			-1	/* ²»Æ¥Åä */
 
-#define RULE_ID_MAXLEN			64	/* ×î³¤×ª·¢¹æÔòÃû³¤¶È */ /* The longest length of forwarding rules */
-#define RULE_MODE_MAXLEN		2	/* ×î³¤×ª·¢¹æÔòÄ£Ê½³¤¶È */ /* The longest length of forwarding rules mode */
+#define RULE_ID_MAXLEN			64	/* ×î³¤×ª·¢¹æÔòÃû³¤¶È */
+#define RULE_MODE_MAXLEN		2	/* ×î³¤×ª·¢¹æÔòÄ£Ê½³¤¶È */
 
-#define FORWARD_RULE_MODE_G		"G"	/* ¹ÜÀí¶Ë¿Ú */ /* manager port */
-#define FORWARD_RULE_MODE_MS		"MS"	/* Ö÷±¸Ä£Ê½ */ /* master-standby mode */
-#define FORWARD_RULE_MODE_RR		"RR"	/* ÂÖÑ¯Ä£Ê½ */ /* polling mode */
-#define FORWARD_RULE_MODE_LC		"LC"	/* ×îÉÙÁ¬½ÓÄ£Ê½ */ /* minimum number of connections mode */
-#define FORWARD_RULE_MODE_RT		"RT"	/* ×îĞ¡ÏìÓ¦Ê±¼äÄ£Ê½ */ /* minimum response time mode */
-#define FORWARD_RULE_MODE_RD		"RD"	/* Ëæ»úÄ£Ê½ */ /* random mode */
-#define FORWARD_RULE_MODE_HS		"HS"	/* HASHÄ£Ê½ */ /* HASH mode */
+#define LOAD_BALANCE_ALGORITHM_G	"G"	/* ¹ÜÀí¶Ë¿Ú */
+#define LOAD_BALANCE_ALGORITHM_MS	"MS"	/* Ö÷±¸Ä£Ê½ */
+#define LOAD_BALANCE_ALGORITHM_RR	"RR"	/* ÂÖÑ¯Ä£Ê½ */
+#define LOAD_BALANCE_ALGORITHM_LC	"LC"	/* ×îÉÙÁ¬½ÓÄ£Ê½ */
+#define LOAD_BALANCE_ALGORITHM_RT	"RT"	/* ×îĞ¡ÏìÓ¦Ê±¼äÄ£Ê½ */
+#define LOAD_BALANCE_ALGORITHM_RD	"RD"	/* Ëæ»úÄ£Ê½ */
+#define LOAD_BALANCE_ALGORITHM_HS	"HS"	/* HASHÄ£Ê½ */
 
-#define RULE_CLIENT_MAXCOUNT		10	/* µ¥Ìõ¹æÔòÖĞ×î´ó¿Í»§¶ËÅäÖÃÊıÁ¿ */ /* maximum clients in rule */
-#define RULE_FORWARD_MAXCOUNT		3	/* µ¥Ìõ¹æÔòÖĞ×î´ó×ª·¢¶ËÅäÖÃÊıÁ¿ */ /* maximum forwards in rule */
-#define RULE_SERVER_MAXCOUNT		100	/* µ¥Ìõ¹æÔòÖĞ×î´ó·şÎñ¶ËÅäÖÃÊıÁ¿ */ /* maximum servers in rule */
+#define DEFAULT_RULE_INITCOUNT			1
+#define DEFAULT_RULE_INCREASE			5
 
-#define DEFAULT_FORWARD_RULE_MAXCOUNT	100	/* È±Ê¡×î´ó×ª·¢¹æÔòÊıÁ¿ */ /* maximum forward rules for default */
-#define DEFAULT_CONNECTION_MAXCOUNT	1024	/* È±Ê¡×î´óÁ¬½ÓÊıÁ¿ */ /* ×î´ó×ª·¢»á»°ÊıÁ¿ = ×î´óÁ¬½ÓÊıÁ¿ * 3 */ /* maximum connections for default */
-#define DEFAULT_TRANSFER_BUFSIZE	4096	/* È±Ê¡Í¨Ñ¶×ª·¢»º³åÇø´óĞ¡ */ /* communication I/O buffer for default */
+#define DEFAULT_CLIENT_INITCOUNT_IN_ONE_RULE	1
+#define DEFAULT_CLIENT_INCREASE_IN_ONE_RULE	5
+#define DEFAULT_FORWARD_INITCOUNT_IN_ONE_RULE	1
+#define DEFAULT_FORWARD_INCREASE_IN_ONE_RULE	5
+#define DEFAULT_SERVER_INITCOUNT_IN_ONE_RULE	1
+#define DEFAULT_SERVER_INCREASE_IN_ONE_RULE	5
 
+#define DEFAULT_FORWARD_SESSIONS_MAXCOUNT	1024	/* È±Ê¡×î´óÁ¬½ÓÊıÁ¿ */
+#define DEFAULT_FORWARD_TRANSFER_BUFSIZE	4096	/* È±Ê¡Í¨Ñ¶×ª·¢»º³åÇø´óĞ¡ */
 
-
-
-struct ServerEnv
+/* ÍøÂçµØÖ·ĞÅÏ¢½á¹¹ */
+struct NetAddress
 {
+	char			ip[ 15 + 1 ] ; /* ipµØÖ· */
+	char			port[ 10 + 1 ] ; /* ¶Ë¿Ú */
+	struct sockaddr_in	sockaddr ; /* sockµØÖ·½á¹¹ */
+} ;
+
+/* ¿Í»§¶ËĞÅÏ¢½á¹¹ */
+struct ClientNetAddress
+{
+	struct NetAddress	netaddr ; /* ÍøÂçµØÖ·½á¹¹ */
+	int			sock ; /* sockÃèÊö×Ö */
 	
+	unsigned long		client_connection_count ; /* ¿Í»§¶ËÁ¬½ÓÊıÁ¿ */
+	unsigned long		maxclients ; /* ×î´ó¿Í»§¶ËÊıÁ¿ */
+} ;
+
+/* ×ª·¢¶ËĞÅÏ¢½á¹¹ */
+struct ForwardNetAddress
+{
+	struct NetAddress	netaddr ; /* ÍøÂçµØÖ·½á¹¹ */
+	int			sock ; /* sockÃèÊö×Ö */
+} ;
+
+/* ·şÎñ¶ËĞÅÏ¢½á¹¹ */
+struct ServerNetAddress
+{
+	struct NetAddress	netaddr ; /* ÍøÂçµØÖ·½á¹¹ */
+	int			sock ; /* sockÃèÊö×Ö */
 	
+	unsigned long		server_connection_count ; /* ·şÎñ¶ËÁ¬½ÓÊıÁ¿ */
+} ;
+
+/* ×ª·¢¹æÔò½á¹¹ */
+struct ForwardRule
+{
+	char				rule_id[ RULE_ID_MAXLEN + 1 ] ; /* ¹æÔòID © */
+	char				load_balance_algorithm[ LOAD_BALANCE_ALGORITHM_MAXLEN + 1 ] ; /* ¸ºÔØ¾ùºâËã·¨ */
 	
+	struct ClientNetAddress		*clients_addr ; /* ¿Í»§¶ËµØÖ·½á¹¹ */
+	unsigned long			clients_maxcount ; /* ¿Í»§¶Ë¹æÔòÅäÖÃ×î´óÊıÁ¿ */
+	unsigned long			clients_count ; /* ¿Í»§¶Ë¹æÔòÅäÖÃÊıÁ¿ */
+	
+	struct ForwardNetAddress	*forwards_addr[ RULE_FORWARD_MAXCOUNT ] ; /* ×ª·¢¶ËµØÖ·½á¹¹ */
+	unsigned long			forwards_maxcount ; /* ×ª·¢¶Ë¹æÔòÅäÖÃ×î´óÊıÁ¿ */
+	unsigned long			forwards_count ; /* ×ª·¢¶Ë¹æÔòÅäÖÃÊıÁ¿ */
+	
+	struct ServerNetAddress		servers_addr[ RULE_SERVER_MAXCOUNT ] ; /* ·şÎñ¶ËµØÖ·½á¹¹ */
+	unsigned long			servers_maxcount ; /* ·şÎñ¶Ë¹æÔòÅäÖÃ×î´óÊıÁ¿ */
+	unsigned long			servers_count ; /* ·şÎñ¶Ë¹æÔòÅäÖÃÊıÁ¿ */
+	unsigned long			selects_index ; /* µ±Ç°·şÎñ¶ËË÷Òı */
+	
+	union
+	{
+		struct
+		{
+			unsigned long	server_unable ; /* ·şÎñ²»¿ÉÓÃÔİ½û´ÎÊı */
+		} RR[ RULE_SERVER_MAXCOUNT ] ;
+		struct
+		{
+			unsigned long	server_unable ; /* ·şÎñ²»¿ÉÓÃÔİ½û´ÎÊı */
+		} LC[ RULE_SERVER_MAXCOUNT ] ;
+		struct
+		{
+			unsigned long	server_unable ; /* ·şÎñ²»¿ÉÓÃÔİ½û´ÎÊı */
+			struct timeval	tv1 ; /* ×î½ü¶ÁÊ±¼ä´Á */
+			struct timeval	tv2 ; /* ×î½üĞ´Ê±¼ä´Á */
+			struct timeval	dtv ; /* ×î½ü¶ÁĞ´Ê±¼ä´Á²î */
+		} RT[ RULE_SERVER_MAXCOUNT ] ;
+	} status ;
 	
 } ;
 
+#define FORWARD_SESSION_STATUS_CONNECTING	1 /* ·Ç¶ÂÈûÁ¬½ÓÖĞ */
+#define FORWARD_SESSION_STATUS_CONNECTED	2 /* Á¬½ÓÍê³É */
 
+#define IO_BUFFER_SIZE				4096 /* ÊäÈëÊä³ö»º³åÇø´óĞ¡ */
+
+struct IoBuffer
+{
+	char			buffer[ IO_BUFFER_SIZE + 1 ] ;
+	unsinged long		buffer_len ;
+} ;
+
+/* ×ª·¢»á»°½á¹¹ */
+struct ForwardSession
+{
+	struct ForwardRule	*p_forward_rule ;
+	
+	unsigned char		status ;
+	
+	struct IoBuffer		io_buffer ;
+	
+	struct ForwardSession	*p_reverse_forward_session ;
+} ;
+
+/* ÃüÁîĞĞ²ÎÊı */
+struct CommandParameter
+{
+	char			*config_pathfilename ; /* -f ... */
+	unsigned long		forward_thread_count ; /* -t ... */
+	unsigned long		forward_session_maxcount ; /* -s ... */
+} ;
+
+/* ·şÎñÆ÷»·¾³½á¹¹ */
+struct ServerEnv
+{
+	struct CommandParameter	cmd_para ;
+	
+	struct ForwardRule	*forward_rules ;
+	unsigned long		forward_rules_size ;
+	unsigned long		forward_rules_count ;
+	
+	struct ForwardSession	*forward_sessions ;
+	unsigned long		forward_session_count ;
+	unsigned long		forward_session_use_offsetpos ;
+} ;
+
+/********* util *********/
+
+int Rand( int min, int max );
+unsigned long CalcHash( char *str );
+int SetReuseAddr( int sock );
+int SetNonBlocking( int sock );
+
+/********* MonitorProcess *********/
+
+int MonitorProcess( struct ServerEnv *penv );
 
 #endif
 
