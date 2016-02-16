@@ -4,6 +4,6 @@ int WorkerProcess( struct ServerEnv *penv )
 {
 	
 	
-	
+	return 0;
 }
 

@@ -1,4 +1,4 @@
-#include "dc4c_util.h"
+#include "LOGC.h"
 
 /*
  * iLOG3Lite - log function library written in c

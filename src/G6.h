@@ -26,6 +26,9 @@
 #include <time.h>
 #include <stdarg.h>
 #include <limits.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <pthread.h>
 #define _VSNPRINTF		vsnprintf
 #define _SNPRINTF		snprintf
 #define _CLOSESOCKET		close
@@ -93,9 +96,6 @@
 #define MATCH				1	/* Æ¥Åä */
 #define NOT_MATCH			-1	/* ²»Æ¥Åä */
 
-#define RULE_ID_MAXLEN			64	/* ×î³¤×ª·¢¹æÔòÃû³¤¶È */
-#define RULE_MODE_MAXLEN		2	/* ×î³¤×ª·¢¹æÔòÄ£Ê½³¤¶È */
-
 #define LOAD_BALANCE_ALGORITHM_G	"G"	/* ¹ÜÀí¶Ë¿Ú */
 #define LOAD_BALANCE_ALGORITHM_MS	"MS"	/* Ö÷±¸Ä£Ê½ */
 #define LOAD_BALANCE_ALGORITHM_RR	"RR"	/* ÂÖÑ¯Ä£Ê½ */
@@ -104,15 +104,15 @@
 #define LOAD_BALANCE_ALGORITHM_RD	"RD"	/* Ëæ»úÄ£Ê½ */
 #define LOAD_BALANCE_ALGORITHM_HS	"HS"	/* HASHÄ£Ê½ */
 
-#define DEFAULT_RULE_INITCOUNT			1
-#define DEFAULT_RULE_INCREASE			5
+#define DEFAULT_RULES_INITCOUNT			2
+#define DEFAULT_RULES_INCREASE			5
 
-#define DEFAULT_CLIENT_INITCOUNT_IN_ONE_RULE	1
-#define DEFAULT_CLIENT_INCREASE_IN_ONE_RULE	5
-#define DEFAULT_FORWARD_INITCOUNT_IN_ONE_RULE	1
-#define DEFAULT_FORWARD_INCREASE_IN_ONE_RULE	5
-#define DEFAULT_SERVER_INITCOUNT_IN_ONE_RULE	1
-#define DEFAULT_SERVER_INCREASE_IN_ONE_RULE	5
+#define DEFAULT_CLIENTS_INITCOUNT_IN_ONE_RULE	2
+#define DEFAULT_CLIENTS_INCREASE_IN_ONE_RULE	5
+#define DEFAULT_FORWARDS_INITCOUNT_IN_ONE_RULE	2
+#define DEFAULT_FORWARDS_INCREASE_IN_ONE_RULE	5
+#define DEFAULT_SERVERS_INITCOUNT_IN_ONE_RULE	2
+#define DEFAULT_SERVERS_INCREASE_IN_ONE_RULE	5
 
 #define DEFAULT_FORWARD_SESSIONS_MAXCOUNT	1024	/* È±Ê¡×î´óÁ¬½ÓÊıÁ¿ */
 #define DEFAULT_FORWARD_TRANSFER_BUFSIZE	4096	/* È±Ê¡Í¨Ñ¶×ª·¢»º³åÇø´óĞ¡ */
@@ -120,8 +120,8 @@
 /* ÍøÂçµØÖ·ĞÅÏ¢½á¹¹ */
 struct NetAddress
 {
-	char			ip[ 15 + 1 ] ; /* ipµØÖ· */
-	char			port[ 10 + 1 ] ; /* ¶Ë¿Ú */
+	char			ip[ 30 + 1 ] ; /* ipµØÖ· */
+	char			port[ 20 + 1 ] ; /* ¶Ë¿Ú */
 	struct sockaddr_in	sockaddr ; /* sockµØÖ·½á¹¹ */
 } ;
 
@@ -152,41 +152,44 @@ struct ServerNetAddress
 } ;
 
 /* ×ª·¢¹æÔò½á¹¹ */
+#define RULE_ID_MAXLEN			64
+#define LOAD_BALANCE_ALGORITHM_MAXLEN	2
+
 struct ForwardRule
 {
 	char				rule_id[ RULE_ID_MAXLEN + 1 ] ; /* ¹æÔòID © */
 	char				load_balance_algorithm[ LOAD_BALANCE_ALGORITHM_MAXLEN + 1 ] ; /* ¸ºÔØ¾ùºâËã·¨ */
 	
 	struct ClientNetAddress		*clients_addr ; /* ¿Í»§¶ËµØÖ·½á¹¹ */
-	unsigned long			clients_maxcount ; /* ¿Í»§¶Ë¹æÔòÅäÖÃ×î´óÊıÁ¿ */
-	unsigned long			clients_count ; /* ¿Í»§¶Ë¹æÔòÅäÖÃÊıÁ¿ */
+	unsigned long			clients_addr_size ; /* ¿Í»§¶Ë¹æÔòÅäÖÃ×î´óÊıÁ¿ */
+	unsigned long			clients_addr_count ; /* ¿Í»§¶Ë¹æÔòÅäÖÃÊıÁ¿ */
 	
-	struct ForwardNetAddress	*forwards_addr[ RULE_FORWARD_MAXCOUNT ] ; /* ×ª·¢¶ËµØÖ·½á¹¹ */
-	unsigned long			forwards_maxcount ; /* ×ª·¢¶Ë¹æÔòÅäÖÃ×î´óÊıÁ¿ */
-	unsigned long			forwards_count ; /* ×ª·¢¶Ë¹æÔòÅäÖÃÊıÁ¿ */
+	struct ForwardNetAddress	*forwards_addr ; /* ×ª·¢¶ËµØÖ·½á¹¹ */
+	unsigned long			forwards_addr_size ; /* ×ª·¢¶Ë¹æÔòÅäÖÃ×î´óÊıÁ¿ */
+	unsigned long			forwards_addr_count ; /* ×ª·¢¶Ë¹æÔòÅäÖÃÊıÁ¿ */
 	
-	struct ServerNetAddress		servers_addr[ RULE_SERVER_MAXCOUNT ] ; /* ·şÎñ¶ËµØÖ·½á¹¹ */
-	unsigned long			servers_maxcount ; /* ·şÎñ¶Ë¹æÔòÅäÖÃ×î´óÊıÁ¿ */
-	unsigned long			servers_count ; /* ·şÎñ¶Ë¹æÔòÅäÖÃÊıÁ¿ */
-	unsigned long			selects_index ; /* µ±Ç°·şÎñ¶ËË÷Òı */
+	struct ServerNetAddress		*servers_addr ; /* ·şÎñ¶ËµØÖ·½á¹¹ */
+	unsigned long			servers_addr_size ; /* ·şÎñ¶Ë¹æÔòÅäÖÃ×î´óÊıÁ¿ */
+	unsigned long			servers_addr_count ; /* ·şÎñ¶Ë¹æÔòÅäÖÃÊıÁ¿ */
+	unsigned long			selects_addr_index ; /* µ±Ç°·şÎñ¶ËË÷Òı */
 	
 	union
 	{
 		struct
 		{
 			unsigned long	server_unable ; /* ·şÎñ²»¿ÉÓÃÔİ½û´ÎÊı */
-		} RR[ RULE_SERVER_MAXCOUNT ] ;
+		} *RR ;
 		struct
 		{
 			unsigned long	server_unable ; /* ·şÎñ²»¿ÉÓÃÔİ½û´ÎÊı */
-		} LC[ RULE_SERVER_MAXCOUNT ] ;
+		} *LC ;
 		struct
 		{
 			unsigned long	server_unable ; /* ·şÎñ²»¿ÉÓÃÔİ½û´ÎÊı */
 			struct timeval	tv1 ; /* ×î½ü¶ÁÊ±¼ä´Á */
 			struct timeval	tv2 ; /* ×î½üĞ´Ê±¼ä´Á */
 			struct timeval	dtv ; /* ×î½ü¶ÁĞ´Ê±¼ä´Á²î */
-		} RT[ RULE_SERVER_MAXCOUNT ] ;
+		} *RT ;
 	} status ;
 	
 } ;
@@ -199,7 +202,7 @@ struct ForwardRule
 struct IoBuffer
 {
 	char			buffer[ IO_BUFFER_SIZE + 1 ] ;
-	unsinged long		buffer_len ;
+	unsigned long		buffer_len ;
 } ;
 
 /* ×ª·¢»á»°½á¹¹ */
@@ -227,6 +230,9 @@ struct ServerEnv
 {
 	struct CommandParameter	cmd_para ;
 	
+	pid_t			pid ;
+	int			pipefds[2] ;
+	
 	struct ForwardRule	*forward_rules ;
 	unsigned long		forward_rules_size ;
 	unsigned long		forward_rules_count ;
@@ -242,10 +248,28 @@ int Rand( int min, int max );
 unsigned long CalcHash( char *str );
 int SetReuseAddr( int sock );
 int SetNonBlocking( int sock );
+int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) );
+
+/********* LoadConfig *********/
+
+int LoadConfig( struct ServerEnv *penv );
+void UnloadConfig( struct ServerEnv *penv );
 
 /********* MonitorProcess *********/
 
-int MonitorProcess( struct ServerEnv *penv );
+int _MonitorProcess( void *pv );
+
+/********* WorkerProcess *********/
+
+int WorkerProcess( struct ServerEnv *penv );
+
+/********* AcceptThread *********/
+
+void _AcceptThread( void *pv );
+
+/********* ForwardThread *********/
+
+void _ForwardThread( void *pv );
 
 #endif
 

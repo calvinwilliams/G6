@@ -57,3 +57,50 @@ int SetNonBlocking( int sock )
 	return 0;
 }
 
+/* 转换为守护进程 */
+int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) )
+{
+	int pid;
+	int sig,fd;
+	
+	pid=fork();
+	switch( pid )
+	{
+		case -1:
+			return -1;
+		case 0:
+			break;
+		default		:
+			exit( 0 );	
+			break;
+	}
+
+	setsid() ;
+	signal( SIGHUP,SIG_IGN );
+
+	pid=fork();
+	switch( pid )
+	{
+		case -1:
+			return -2;
+		case 0:
+			break ;
+		default:
+			exit( 0 );
+			break;
+	}
+	
+	setuid( getpid() ) ;
+	
+	chdir("/tmp");
+	
+	umask( 0 ) ;
+	
+	for( sig=0 ; sig<30 ; sig++ )
+		signal( sig , SIG_IGN );
+	
+	for( fd=0 ; fd<=2 ; fd++ )
+		close( fd );
+	
+	return ServerMain( pv );
+}
