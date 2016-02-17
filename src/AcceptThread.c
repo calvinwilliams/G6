@@ -1,8 +1,80 @@
 #include "G6.h"
 
+int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
+{
+	struct ForwardSession	*p_forward_session = NULL ;
+	
+	SetNonBlocking( sock );
+	SetReuseAddr( sock );
+	
+	
+	
+	
+	
+	
+	
+	return 0;
+}
+
+static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_listen_session )
+{
+	struct ForwardSession	*p_forward_session = NULL ;
+	struct ForwardSession	*p_reverse_forward_session = NULL ;
+	_SOCKLEN_T		addr_len = sizeof(struct sockaddr_in) ;
+	
+	p_forward_session = GetForwardSessionUnused( penv ) ;
+	if( p_forward_session == NULL )
+	{
+		ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed[%d]" , nret );
+		return -1;
+	}
+	
+	p_reverse_forward_session = GetForwardSessionUnused( penv ) ;
+	if( p_reverse_forward_session == NULL )
+	{
+		ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed[%d]" , nret );
+		return -1;
+	}
+	
+	p_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
+	p_forward_session->p_reverse_forward_session = p_reverse_forward_session ;
+	
+	p_reverse_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
+	p_reverse_forward_session->p_reverse_forward_session = p_forward_session ;
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	p_forward_session->sock = accept( p_listen_session->sock , (struct sockaddr *) & (p_forward_session->netaddr) , & addr_len ) ;
+	if( p_forward_session->sock == -1 )
+	{
+		ErrorLog( __FILE__ , __LINE__ , "accept failed , errno[%d]" , errno );
+		SetForwardSessionUnused( p_forward_session );
+		SetForwardSessionUnused( p_reverse_forward_session );
+		return -1;
+	}
+	
+	nret = TryToConnectServer( penv , p_reverse_forward_session ) ;
+	if( nret )
+	{
+		ErrorLog( __FILE__ , __LINE__ , "TryToConnectServer failed[%d]" , nret );
+		SetForwardSessionUnused( p_forward_session );
+		return -1;
+	}
+	
+	return 0;
+}
+
 static void *AcceptThread( struct ServerEnv *penv )
 {
-	int			thread_index = *(penv->thread_index) ;
+	int			forward_thread_index = *(penv->forward_thread_index) ;
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
 	int			event_count ;
 	struct epoll_event	*p_event = NULL ;
@@ -10,18 +82,18 @@ static void *AcceptThread( struct ServerEnv *penv )
 	
 	char			command ;
 	
-	struct ForwardRule	*p_forward_rule = NULL ;
+	struct ForwardSession	*p_forward_session = NULL ;
 	
-	free( penv->thread_index );
+	free( penv->forward_thread_index );
 	
-	event_count = epoll_wait( penv->accept_epoll_fd , penv->events , sizeof(events)/sizeof(events[0]) , -1 ) ;
-	if( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
+	event_count = epoll_wait( penv->accept_epoll_fd , events , sizeof(events)/sizeof(events[0]) , -1 ) ;
+	for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 	{
-		if( p_event->events.data.ptr == NULL ) /* 命令管道事件 */
+		if( p_event->data.ptr == NULL ) /* 命令管道事件 */
 		{
 			if( p_event->events & EPOLLIN )
 			{
-				read( penv->accept_pipe[thread_index].fds[0] , & command , 1 );
+				read( penv->accept_pipe_array[forward_thread_index].fds[0] , & command , 1 );
 				InfoLog( __FILE__ , __LINE__ , "read command pipe[%c]" , command );
 			}
 			else if( p_event->events & EPOLLERR )
@@ -41,12 +113,17 @@ static void *AcceptThread( struct ServerEnv *penv )
 		{
 			if( p_event->events & EPOLLIN )
 			{
-				p_forward_rule = p_event->events.data.ptr ;
+				p_forward_session = p_event->data.ptr ;
 				
-				sock = accept( p_forward_rule->listen_addr.sock , (struct sockaddr *) & (client_addr.netaddr.sockaddr) , & addr_len ) ;
-				
-				
-				InfoLog( __FILE__ , __LINE__ , "" );
+				nret = OnListenAccept( penv , p_forward_session ) ;
+				if( nret )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "OnListenAccept failed[%d]" , nret );
+				}
+				else
+				{
+					DebugLog( __FILE__ , __LINE__ , "OnListenAccept ok" );
+				}
 			}
 			else if( p_event->events & EPOLLERR )
 			{

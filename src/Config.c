@@ -3,6 +3,7 @@
 static int AddListen( struct ServerEnv *penv , struct ForwardRule *p_forward_rule )
 {
 	int			n ;
+	struct ForwardSession	*p_forward_session = NULL ;
 	struct epoll_event	event ;
 	
 	int			nret = 0 ;
@@ -38,8 +39,18 @@ static int AddListen( struct ServerEnv *penv , struct ForwardRule *p_forward_rul
 			return -1;
 		}
 		
+		p_forward_session = GetForwardSessionUnused( penv ) ;
+		if( p_forward_session == NULL )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed[%d]" , nret );
+			return -1;
+		}
+		
+		p_forward_session->sock = p_forward_rule->forwards_addr[n].sock ;
+		p_forward_session->p_forward_rule = p_forward_rule ;
+		
 		memset( & event , 0x00 , sizeof(event) );
-		event.data.ptr = p_forward_rule ;
+		event.data.ptr = p_forward_session ;
 		event.events = EPOLLIN | EPOLLET ;
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_forward_rule->forwards_addr[n].sock , & event );
 	}
@@ -68,6 +79,18 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 	if( nret == EOF )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+		return -11;
+	}
+	
+	if( strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_G )
+		&& strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_MS )
+		&& strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_RR )
+		&& strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_LC )
+		&& strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_RT )
+		&& strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_RD )
+		&& strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_HS ) )
+	{
+		ErrorLog( __FILE__ , __LINE__ , "rule rule_mode [%s] invalid\r\n" , p_forward_rule->load_balance_algorithm );
 		return -11;
 	}
 	
@@ -287,30 +310,30 @@ int LoadConfig( struct ServerEnv *penv )
 			return EOF;
 		
 		/* 调整转发规则数组 */
-		if( penv->forward_rules == NULL || penv->forward_rules_count+1 > penv->forward_rules_size )
+		if( penv->forward_rules_array == NULL || penv->forward_rules_count+1 > penv->forward_rules_size )
 		{
 			unsigned long		new_forward_rules_size ;
 			struct ForwardRule	*new_forward_rules = NULL ;
 			
-			if( penv->forward_rules == NULL )
+			if( penv->forward_rules_array == NULL )
 				new_forward_rules_size = DEFAULT_RULES_INITCOUNT ;
 			else
 				new_forward_rules_size = penv->forward_rules_size + DEFAULT_RULES_INCREASE ;
 			
-			new_forward_rules = realloc( penv->forward_rules , sizeof(struct ForwardRule) * new_forward_rules_size ) ;
+			new_forward_rules = realloc( penv->forward_rules_array , sizeof(struct ForwardRule) * new_forward_rules_size ) ;
 			if( new_forward_rules == NULL )
 			{
 				ErrorLog( __FILE__ , __LINE__ , "realloc failed , errno[%d]" , errno );
 				nret = -11 ;
 				break;
 			}
-			penv->forward_rules = new_forward_rules ;
+			penv->forward_rules_array = new_forward_rules ;
 			penv->forward_rules_size = new_forward_rules_size ;
-			memset( penv->forward_rules + penv->forward_rules_count , 0x00 , sizeof(struct ForwardRule) * (penv->forward_rules_size-penv->forward_rules_count) );
+			memset( penv->forward_rules_array + penv->forward_rules_count , 0x00 , sizeof(struct ForwardRule) * (penv->forward_rules_size-penv->forward_rules_count) );
 		}
 		
 		/* 装载一条转发规则 */
-		nret = LoadOneRule( penv , fp , penv->forward_rules+penv->forward_rules_count , rule_id ) ;
+		nret = LoadOneRule( penv , fp , penv->forward_rules_array+penv->forward_rules_count , rule_id ) ;
 		if( nret == EOF )
 			break;
 		if( nret )
@@ -335,12 +358,12 @@ int LoadConfig( struct ServerEnv *penv )
 	for( n = 0 ; n < penv->forward_rules_count ; n++ )
 	{
 		InfoLog( __FILE__ , __LINE__ , "  rule_id[%s] load_balance_algorithm[%s] >>>"
-			, penv->forward_rules[n].rule_id , penv->forward_rules[n].load_balance_algorithm );
+			, penv->forward_rules_array[n].rule_id , penv->forward_rules_array[n].load_balance_algorithm );
 		InfoLog( __FILE__ , __LINE__ , "  clients_addr_count[%ld/%ld] forwards_addr_count[%ld/%ld] servers_addr_count[%ld/%ld]"
-			, penv->forward_rules[n].clients_addr_count , penv->forward_rules[n].clients_addr_size
-			, penv->forward_rules[n].forwards_addr_count , penv->forward_rules[n].forwards_addr_size
-			, penv->forward_rules[n].servers_addr_count , penv->forward_rules[n].servers_addr_size );
-		LogOneRule( penv , penv->forward_rules+n );
+			, penv->forward_rules_array[n].clients_addr_count , penv->forward_rules_array[n].clients_addr_size
+			, penv->forward_rules_array[n].forwards_addr_count , penv->forward_rules_array[n].forwards_addr_size
+			, penv->forward_rules_array[n].servers_addr_count , penv->forward_rules_array[n].servers_addr_size );
+		LogOneRule( penv , penv->forward_rules_array+n );
 	}
 	
 	return 0;
@@ -351,9 +374,9 @@ void UnloadConfig( struct ServerEnv *penv )
 	int			n ;
 	struct ForwardRule	*p_forward_rule = NULL ;
 	
-	if( penv->forward_rules )
+	if( penv->forward_rules_array )
 	{
-		for( n = 0 , p_forward_rule = penv->forward_rules ; n < penv->forward_rules_count ; n++ , p_forward_rule++ )
+		for( n = 0 , p_forward_rule = penv->forward_rules_array ; n < penv->forward_rules_count ; n++ , p_forward_rule++ )
 		{
 			if( p_forward_rule->clients_addr )
 				free( p_forward_rule->clients_addr );
@@ -363,7 +386,7 @@ void UnloadConfig( struct ServerEnv *penv )
 				free( p_forward_rule->servers_addr );
 		}
 		
-		free( penv->forward_rules );
+		free( penv->forward_rules_array );
 	}
 	
 	return;
