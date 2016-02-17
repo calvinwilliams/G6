@@ -11,7 +11,8 @@ c_FILE		=	\
 			LOGC.c \
 			util.c \
 			main.c \
-			LoadConfig.c \
+			Envirment.c \
+			Config.c \
 			AcceptThread.c \
 			ForwardThread.c \
 			MonitorProcess.c \

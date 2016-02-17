@@ -1,5 +1,52 @@
 #include "G6.h"
 
+static int AddListen( struct ServerEnv *penv , struct ForwardRule *p_forward_rule )
+{
+	int			n ;
+	struct epoll_event	event ;
+	
+	int			nret = 0 ;
+	
+	for( n = 0 ; n < p_forward_rule->forwards_addr_count ; n++ )
+	{
+		p_forward_rule->forwards_addr[n].sock = socket( AF_INET , SOCK_STREAM , IPPROTO_TCP );
+		if( p_forward_rule->forwards_addr[n].sock == -1 )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "socket failed , errno[%d]" , errno );
+			return -1;
+		}
+		
+		SetReuseAddr( p_forward_rule->forwards_addr[n].sock );
+		SetNonBlocking( p_forward_rule->forwards_addr[n].sock );
+		
+		memset( & (p_forward_rule->forwards_addr[n].netaddr.sockaddr) , 0x00 , sizeof(struct NetAddress) );
+		p_forward_rule->forwards_addr[n].netaddr.sockaddr.sin_family = AF_INET ;
+		p_forward_rule->forwards_addr[n].netaddr.sockaddr.sin_addr.s_addr = inet_addr( p_forward_rule->forwards_addr[n].netaddr.ip ) ;
+		p_forward_rule->forwards_addr[n].netaddr.sockaddr.sin_port = htons( (unsigned short)p_forward_rule->forwards_addr[n].netaddr.port.port_int );
+		
+		nret = bind( p_forward_rule->forwards_addr[n].sock , (struct sockaddr *) & (p_forward_rule->forwards_addr[n].netaddr.sockaddr) , sizeof(struct sockaddr) ) ;
+		if( nret )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "bind[%s:%s] failed , errno[%d]" , p_forward_rule->forwards_addr[n].netaddr.ip , p_forward_rule->forwards_addr[n].netaddr.port.port_int , _ERRNO );
+			return -1;
+		}
+		
+		nret = listen( p_forward_rule->forwards_addr[n].sock , 1024 ) ;
+		if( nret )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "listen[%s:%s] failed , errno[%d]" , p_forward_rule->forwards_addr[n].netaddr.ip , p_forward_rule->forwards_addr[n].netaddr.port.port_int , _ERRNO );
+			return -1;
+		}
+		
+		memset( & event , 0x00 , sizeof(event) );
+		event.data.ptr = p_forward_rule ;
+		event.events = EPOLLIN | EPOLLET ;
+		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_forward_rule->forwards_addr[n].sock , & event );
+	}
+	
+	return 0;
+}
+
 static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *p_forward_rule , char *rule_id )
 {
 	char				ip_and_port[ 100 + 1 ] ;
@@ -65,8 +112,8 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		}
 		
 		p_client_addr = p_forward_rule->clients_addr + p_forward_rule->clients_addr_count ;
-		sscanf( ip_and_port , "%30[^:]:%20s" , p_client_addr->netaddr.ip , p_client_addr->netaddr.port );
-		if( STRCMP( p_client_addr->netaddr.ip , == , "" ) || STRCMP( p_client_addr->netaddr.port , == , "" ) )
+		sscanf( ip_and_port , "%30[^:]:%10s" , p_client_addr->netaddr.ip , p_client_addr->netaddr.port.port_str );
+		if( STRCMP( p_client_addr->netaddr.ip , == , "" ) || STRCMP( p_client_addr->netaddr.port.port_str , == , "" ) )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "unexpect config in clients_addr in rule[%s]" , p_forward_rule->rule_id );
 			return -11;
@@ -116,15 +163,21 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		}
 		
 		p_forward_addr = p_forward_rule->forwards_addr + p_forward_rule->forwards_addr_count ;
-		sscanf( ip_and_port , "%30[^:]:%20s" , p_forward_addr->netaddr.ip , p_forward_addr->netaddr.port );
-		if( STRCMP( p_forward_addr->netaddr.ip , == , "" ) || STRCMP( p_forward_addr->netaddr.port , == , "" ) )
+		sscanf( ip_and_port , "%30[^:]:%d" , p_forward_addr->netaddr.ip , & (p_forward_addr->netaddr.port.port_int) );
+		if( STRCMP( p_forward_addr->netaddr.ip , == , "" ) || p_forward_addr->netaddr.port.port_int == 0 )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "unexpect config in forwards_addr in rule[%s]" , p_forward_rule->rule_id );
 			return -11;
 		}
 		
-		
 		p_forward_rule->forwards_addr_count++;
+	}
+	
+	nret = AddListen( penv , p_forward_rule ) ;
+	if( nret )
+	{
+		ErrorLog( __FILE__ , __LINE__ , "AddListen failed[%d]" , nret );
+		return -11;
 	}
 	
 	/* 读服务端信息 */
@@ -163,8 +216,8 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		}
 		
 		p_server_addr = p_forward_rule->servers_addr + p_forward_rule->servers_addr_count ;
-		sscanf( ip_and_port , "%30[^:]:%20s" , p_server_addr->netaddr.ip , p_server_addr->netaddr.port );
-		if( STRCMP( p_server_addr->netaddr.ip , == , "" ) || STRCMP( p_server_addr->netaddr.port , == , "" ) )
+		sscanf( ip_and_port , "%30[^:]:%d" , p_server_addr->netaddr.ip , & (p_server_addr->netaddr.port.port_int) );
+		if( STRCMP( p_server_addr->netaddr.ip , == , "" ) || p_server_addr->netaddr.port.port_int == 0 )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "unexpect config in servers_addr in rule[%s]" , p_forward_rule->rule_id );
 			return -11;

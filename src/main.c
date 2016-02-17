@@ -9,7 +9,7 @@ static void version()
 
 static void usage()
 {
-	printf( "USAGE : G6 -f config_pathfilename [ -t forward_thread_count ] [ -m session_max_count ] [ --log-level (DEBUG|INFO|WARN|ERROR|FATAL) ]\n" );
+	printf( "USAGE : G6 -f config_pathfilename [ -t forward_thread_size ] [ -m forward_session_size ] [ --log-level (DEBUG|INFO|WARN|ERROR|FATAL) ]\n" );
 	return;
 }
 
@@ -34,8 +34,8 @@ int main( int argc , char *argv[] )
 	memset( penv , 0x00 , sizeof(struct ServerEnv) );
 	
 	/* 初始化命令行参数 */
-	penv->cmd_para.forward_thread_count = 2 ;
-	penv->cmd_para.forward_session_maxcount = DEFAULT_FORWARD_SESSIONS_MAXCOUNT ;
+	penv->cmd_para.forward_thread_size = DEFAULT_FORWARD_THREAD_COUNT ;
+	penv->cmd_para.forward_session_size = DEFAULT_FORWARD_SESSIONS_MAXCOUNT ;
 	
 	/* 分析命令行参数 */
 	if( argc == 1 )
@@ -60,12 +60,12 @@ int main( int argc , char *argv[] )
 		else if( strcmp( argv[n] , "-t" ) == 0 && n + 1 < argc )
 		{
 			n++;
-			penv->cmd_para.forward_thread_count = atol(argv[n]) ;
+			penv->cmd_para.forward_thread_size = atol(argv[n]) ;
 		}
 		else if( strcmp( argv[n] , "-s" ) == 0 && n + 1 < argc )
 		{
 			n++;
-			penv->cmd_para.forward_session_maxcount = atol(argv[n]) ;
+			penv->cmd_para.forward_session_size = atol(argv[n]) ;
 		}
 		else if( strcmp( argv[n] , "--log-level" ) == 0 && n + 1 < argc )
 		{
@@ -101,6 +101,56 @@ int main( int argc , char *argv[] )
 		exit(7);
 	}
 	
+	/* 初始化环境 */
+	penv->accept_epoll_fd = epoll_create( 1024 );
+	if( penv->accept_epoll_fd == -1 )
+	{
+		printf( "epoll_create failed , errno[%d]" , errno );
+		return 1;
+	}
+	
+	penv->forward_thread_tid = (pthread_t *)malloc( sizeof(pthread_t) * penv->cmd_para.forward_thread_size ) ;
+	if( penv->forward_thread_tid == NULL )
+	{
+		printf( "malloc failed , errno[%d]" , errno );
+		return 1;
+	}
+	memset( penv->forward_thread_tid , 0x00 , sizeof(pthread_t) * penv->cmd_para.forward_thread_size );
+	
+	penv->accept_pipe = (struct PipeFds *)malloc( sizeof(struct PipeFds) * penv->cmd_para.forward_thread_size ) ;
+	if( penv->accept_pipe == NULL )
+	{
+		printf( "malloc failed , errno[%d]" , errno );
+		return 1;
+	}
+	memset( penv->accept_pipe , 0x00 , sizeof(struct PipeFds) * penv->cmd_para.forward_thread_size );
+	
+	penv->forward_epoll_fd = (int *)malloc( sizeof(int) * penv->cmd_para.forward_thread_size ) ;
+	if( penv->forward_epoll_fd == NULL )
+	{
+		printf( "malloc failed , errno[%d]" , errno );
+		return 1;
+	}
+	memset( penv->forward_epoll_fd , 0x00 , sizeof(int) * penv->cmd_para.forward_thread_size );
+	
+	for( n = 0 ; n < penv->cmd_para.forward_thread_size ; n++ )
+	{
+		penv->forward_epoll_fd[n] = epoll_create( 1024 );
+		if( penv->forward_epoll_fd[n] == -1 )
+		{
+			printf( "epoll_create failed , errno[%d]" , errno );
+			return 1;
+		}
+	}
+	
+	penv->forward_sessions = (struct ForwardSession *)malloc( sizeof(struct ForwardSession) * penv->cmd_para.forward_session_size ) ;
+	if( penv->forward_sessions == NULL )
+	{
+		printf( "malloc failed , errno[%d]" , errno );
+		return 1;
+	}
+	memset( penv->forward_sessions , 0x00 , sizeof(struct ForwardSession) * penv->cmd_para.forward_session_size );
+	
 	InfoLog( __FILE__ , __LINE__ , "--- G5 beginning ---" );
 	
 	/* 装载配置 */
@@ -117,6 +167,16 @@ int main( int argc , char *argv[] )
 	
 	/* 卸载配置 */
 	UnloadConfig( penv );
+	
+	/* 清理环境 */
+	close( penv->accept_epoll_fd );
+	free( penv->forward_thread_tid );
+	free( penv->forward_sessions );
+	
+	for( n = 0 ; n < penv->cmd_para.forward_thread_size ; n++ )
+	{
+		close( penv->forward_epoll_fd[n] );
+	}
 	
 	InfoLog( __FILE__ , __LINE__ , "--- G5 finished ---" );
 	return -nret;

@@ -9,10 +9,11 @@ static int MonitorProcess( struct ServerEnv *penv )
 	
 	signal( SIGCLD , SIG_DFL );
 	signal( SIGCHLD , SIG_DFL );
+	signal( SIGPIPE , SIG_IGN );
 	
 	while(1)
 	{
-		nret = pipe( penv->pipefds ) ;
+		nret = pipe( penv->monitor_pipe.fds ) ;
 		if( nret == -1 )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "pipe failed , errno[%d]" , errno );
@@ -23,8 +24,8 @@ static int MonitorProcess( struct ServerEnv *penv )
 		if( penv->pid == -1 )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "fork failed , errno[%d]" , errno );
-			close( penv->pipefds[0] );
-			close( penv->pipefds[1] );
+			close( penv->monitor_pipe.fds[0] );
+			close( penv->monitor_pipe.fds[1] );
 			return -1;
 		}
 		else if( penv->pid == 0 )
@@ -32,12 +33,12 @@ static int MonitorProcess( struct ServerEnv *penv )
 			InfoLog( __FILE__ , __LINE__ , "child : [%ld]fork[%ld]" , getppid() , getpid() );
 			
 			nret = WorkerProcess( penv ) ;
-			close( penv->pipefds[0] );
+			close( penv->monitor_pipe.fds[0] );
 			exit(-nret);
 		}
 		else
 		{
-			close( penv->pipefds[1] );
+			close( penv->monitor_pipe.fds[1] );
 			InfoLog( __FILE__ , __LINE__ , "parent : [%ld]fork[%ld]" , getpid() , penv->pid );
 		}
 		
@@ -45,13 +46,13 @@ static int MonitorProcess( struct ServerEnv *penv )
 		if( lret == -1 )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "waitpid failed , errno[%d]" , errno );
-			close( penv->pipefds[0] );
-			close( penv->pipefds[1] );
+			close( penv->monitor_pipe.fds[0] );
+			close( penv->monitor_pipe.fds[1] );
 			return -1;
 		}
 		
-		close( penv->pipefds[0] );
-		close( penv->pipefds[1] );
+		close( penv->monitor_pipe.fds[0] );
+		close( penv->monitor_pipe.fds[1] );
 		
 		InfoLog( __FILE__ , __LINE__
 			, "waitpid[%ld] WEXITSTATUS[%d] WIFSIGNALED[%d] WTERMSIG[%d] WCOREDUMP[%d]"

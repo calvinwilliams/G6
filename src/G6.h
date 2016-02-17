@@ -114,14 +114,35 @@
 #define DEFAULT_SERVERS_INITCOUNT_IN_ONE_RULE	2
 #define DEFAULT_SERVERS_INCREASE_IN_ONE_RULE	5
 
-#define DEFAULT_FORWARD_SESSIONS_MAXCOUNT	1024	/* È±Ê¡×î´óÁ¬½ÓÊýÁ¿ */
+#define DEFAULT_FORWARD_THREAD_COUNT		2	/* ×ª·¢Ïß³ÌÊýÁ¿ */
+#define DEFAULT_FORWARD_SESSIONS_MAXCOUNT	60000	/* È±Ê¡×î´óÁ¬½ÓÊýÁ¿ */
 #define DEFAULT_FORWARD_TRANSFER_BUFSIZE	4096	/* È±Ê¡Í¨Ñ¶×ª·¢»º³åÇø´óÐ¡ */
+
+#define RULE_ID_MAXLEN				64
+#define LOAD_BALANCE_ALGORITHM_MAXLEN		2
+#define IP_MAXLEN				30
+#define PORT_MAXLEN				10
+
+#define WAIT_EVENTS_COUNT			100 /* Ò»´Î»ñÈ¡epollÊÂ¼þÊýÁ¿ */
+
+#define FORWARD_SESSION_TYPE_CLIENT		1
+#define FORWARD_SESSION_TYPE_LISTEN		2
+#define FORWARD_SESSION_TYPE_SERVER		3
+
+#define FORWARD_SESSION_STATUS_CONNECTING	1 /* ·Ç¶ÂÈûÁ¬½ÓÖÐ */
+#define FORWARD_SESSION_STATUS_CONNECTED	2 /* Á¬½ÓÍê³É */
+
+#define IO_BUFFER_SIZE				4096 /* ÊäÈëÊä³ö»º³åÇø´óÐ¡ */
 
 /* ÍøÂçµØÖ·ÐÅÏ¢½á¹¹ */
 struct NetAddress
 {
-	char			ip[ 30 + 1 ] ; /* ipµØÖ· */
-	char			port[ 20 + 1 ] ; /* ¶Ë¿Ú */
+	char			ip[ IP_MAXLEN + 1 ] ; /* ipµØÖ· */
+	union
+	{
+		char		port_str[ PORT_MAXLEN + 1 ] ;
+		int		port_int ;
+	} port ; /* ¶Ë¿Ú */
 	struct sockaddr_in	sockaddr ; /* sockµØÖ·½á¹¹ */
 } ;
 
@@ -129,7 +150,6 @@ struct NetAddress
 struct ClientNetAddress
 {
 	struct NetAddress	netaddr ; /* ÍøÂçµØÖ·½á¹¹ */
-	int			sock ; /* sockÃèÊö×Ö */
 	
 	unsigned long		client_connection_count ; /* ¿Í»§¶ËÁ¬½ÓÊýÁ¿ */
 	unsigned long		maxclients ; /* ×î´ó¿Í»§¶ËÊýÁ¿ */
@@ -146,15 +166,11 @@ struct ForwardNetAddress
 struct ServerNetAddress
 {
 	struct NetAddress	netaddr ; /* ÍøÂçµØÖ·½á¹¹ */
-	int			sock ; /* sockÃèÊö×Ö */
 	
 	unsigned long		server_connection_count ; /* ·þÎñ¶ËÁ¬½ÓÊýÁ¿ */
 } ;
 
 /* ×ª·¢¹æÔò½á¹¹ */
-#define RULE_ID_MAXLEN			64
-#define LOAD_BALANCE_ALGORITHM_MAXLEN	2
-
 struct ForwardRule
 {
 	char				rule_id[ RULE_ID_MAXLEN + 1 ] ; /* ¹æÔòID © */
@@ -194,25 +210,16 @@ struct ForwardRule
 	
 } ;
 
-#define FORWARD_SESSION_STATUS_CONNECTING	1 /* ·Ç¶ÂÈûÁ¬½ÓÖÐ */
-#define FORWARD_SESSION_STATUS_CONNECTED	2 /* Á¬½ÓÍê³É */
-
-#define IO_BUFFER_SIZE				4096 /* ÊäÈëÊä³ö»º³åÇø´óÐ¡ */
-
-struct IoBuffer
-{
-	char			buffer[ IO_BUFFER_SIZE + 1 ] ;
-	unsigned long		buffer_len ;
-} ;
-
 /* ×ª·¢»á»°½á¹¹ */
 struct ForwardSession
 {
 	struct ForwardRule	*p_forward_rule ;
 	
+	int			sock ;
 	unsigned char		status ;
 	
-	struct IoBuffer		io_buffer ;
+	char			io_buffer[ IO_BUFFER_SIZE + 1 ] ;
+	unsigned long		io_buffer_len ;
 	
 	struct ForwardSession	*p_reverse_forward_session ;
 } ;
@@ -221,21 +228,33 @@ struct ForwardSession
 struct CommandParameter
 {
 	char			*config_pathfilename ; /* -f ... */
-	unsigned long		forward_thread_count ; /* -t ... */
-	unsigned long		forward_session_maxcount ; /* -s ... */
+	unsigned long		forward_thread_size ; /* -t ... */
+	unsigned long		forward_session_size ; /* -s ... */
 } ;
 
 /* ·þÎñÆ÷»·¾³½á¹¹ */
+struct PipeFds
+{
+	int			fds[ 2 ] ;
+} ;
+
 struct ServerEnv
 {
 	struct CommandParameter	cmd_para ;
 	
 	pid_t			pid ;
-	int			pipefds[2] ;
+	struct PipeFds		monitor_pipe ;
 	
 	struct ForwardRule	*forward_rules ;
 	unsigned long		forward_rules_size ;
 	unsigned long		forward_rules_count ;
+	
+	int			accept_epoll_fd ;
+	
+	int			*thread_index ;
+	pthread_t		*forward_thread_tid ;
+	struct PipeFds		*accept_pipe ;
+	int			*forward_epoll_fd ;
 	
 	struct ForwardSession	*forward_sessions ;
 	unsigned long		forward_session_count ;
@@ -265,11 +284,11 @@ int WorkerProcess( struct ServerEnv *penv );
 
 /********* AcceptThread *********/
 
-void _AcceptThread( void *pv );
+void *_AcceptThread( void *pv );
 
 /********* ForwardThread *********/
 
-void _ForwardThread( void *pv );
+void *_ForwardThread( void *pv );
 
 #endif
 

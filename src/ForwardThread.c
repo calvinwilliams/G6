@@ -1,14 +1,14 @@
 #include "G6.h"
 
-static void ForwardThread( struct ServerEnv *penv )
+static void *ForwardThread( struct ServerEnv *penv )
 {
 	
 	
-	return;
+	return NULL;
 }
 
-void _ForwardThread( void *pv )
+void *_ForwardThread( void *pv )
 {
-	ForwardThread( (struct ServerEnv *)pv );
+	return ForwardThread( (struct ServerEnv *)pv );
 }
 
