@@ -27,8 +27,9 @@ int main( int argc , char *argv[] )
 	srand( (unsigned)time(NULL) );
 	
 	/* 设置日志环境 */
-	SetLogFile( "%s/log/G6_MonitorProcess.log" , getenv("HOME") );
-	SetLogLevel( LOGLEVEL_DEBUG );
+	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
+	penv->log_level = LOGLEVEL_DEBUG ;
+	SetLogLevel( penv->log_level );
 	
 	/* 初始化服务器环境 */
 	memset( penv , 0x00 , sizeof(struct ServerEnv) );
@@ -71,21 +72,23 @@ int main( int argc , char *argv[] )
 		{
 			n++;
 			if( strcmp( argv[n] , "DEBUG" ) == 0 )
-				SetLogLevel( LOGLEVEL_DEBUG );
+				penv->log_level = LOGLEVEL_DEBUG ;
 			else if( strcmp( argv[n] , "INFO" ) == 0 )
-				SetLogLevel( LOGLEVEL_INFO );
+				penv->log_level = LOGLEVEL_INFO ;
 			else if( strcmp( argv[n] , "WARN" ) == 0 )
-				SetLogLevel( LOGLEVEL_WARN );
+				penv->log_level = LOGLEVEL_WARN ;
 			else if( strcmp( argv[n] , "ERROR" ) == 0 )
-				SetLogLevel( LOGLEVEL_ERROR );
+				penv->log_level = LOGLEVEL_ERROR ;
 			else if( strcmp( argv[n] , "FATAL" ) == 0 )
-				SetLogLevel( LOGLEVEL_FATAL );
+				penv->log_level = LOGLEVEL_FATAL ;
 			else
 			{
 				fprintf( stderr , "invalid log level[%s]\r\n" , argv[n] );
 				usage();
 				exit(7);
 			}
+			
+			SetLogLevel( penv->log_level );
 		}
 		else
 		{

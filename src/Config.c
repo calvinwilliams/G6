@@ -17,8 +17,8 @@ static int AddListen( struct ServerEnv *penv , struct ForwardRule *p_forward_rul
 			return -1;
 		}
 		
-		SetReuseAddr( p_forward_rule->forwards_addr[n].sock );
 		SetNonBlocking( p_forward_rule->forwards_addr[n].sock );
+		SetReuseAddr( p_forward_rule->forwards_addr[n].sock );
 		
 		nret = bind( p_forward_rule->forwards_addr[n].sock , (struct sockaddr *) & (p_forward_rule->forwards_addr[n].netaddr.sockaddr) , sizeof(struct sockaddr) ) ;
 		if( nret )
@@ -43,6 +43,7 @@ static int AddListen( struct ServerEnv *penv , struct ForwardRule *p_forward_rul
 		
 		p_forward_session->sock = p_forward_rule->forwards_addr[n].sock ;
 		p_forward_session->p_forward_rule = p_forward_rule ;
+		p_forward_session->status = FORWARD_SESSION_STATUS_LISTEN ;
 		
 		memset( & event , 0x00 , sizeof(event) );
 		event.data.ptr = p_forward_session ;

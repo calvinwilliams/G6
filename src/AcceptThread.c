@@ -73,7 +73,6 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 {
 	_SOCKLEN_T		addr_len = sizeof(struct sockaddr_in) ;
 	struct epoll_event	event ;
-	struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
 	
 	int			nret = 0 ;
 	
@@ -83,7 +82,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	{
 		ErrorLog( __FILE__ , __LINE__ , "SelectServerAddress failed[%d]" , nret );
 		SetForwardSessionUnused( p_forward_session );
-		SetForwardSessionUnused( p_reverse_forward_session );
+		SetForwardSessionUnused( p_forward_session->p_reverse_forward_session );
 		return -1;
 	}
 	
@@ -93,8 +92,12 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	{
 		ErrorLog( __FILE__ , __LINE__ , "socket failed , errno[%d]" , errno );
 		SetForwardSessionUnused( p_forward_session );
-		SetForwardSessionUnused( p_reverse_forward_session );
+		SetForwardSessionUnused( p_forward_session->p_reverse_forward_session );
 		return -1;
+	}
+	else
+	{
+		DebugLog( __FILE__ , __LINE__ , "socket #%d# ok" , p_forward_session->sock );
 	}
 	
 	SetNonBlocking( p_forward_session->sock );
@@ -105,7 +108,9 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	{
 		if( _ERRNO == _EINPROGRESS || _ERRNO == _EWOULDBLOCK ) /* 正在连接 */
 		{
-			InfoLog( __FILE__ , __LINE__ , "connecting ..." );
+			p_forward_session->status = FORWARD_SESSION_STATUS_CONNECTING ;
+			
+			InfoLog( __FILE__ , __LINE__ , "connecting [%s:%d] ..." , p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].netaddr.ip , p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].netaddr.port.port_int );
 			
 			memset( & (event) , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_forward_session ;
@@ -114,16 +119,18 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		}
 		else /* 连接失败 */
 		{
-			ErrorLog( __FILE__ , __LINE__ , "connect failed , errno[%d]" , errno );
+			ErrorLog( __FILE__ , __LINE__ , "connect [%s:%d] failed , errno[%d]" , p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].netaddr.ip , p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].netaddr.port.port_int , errno );
 			ResolveSocketError( penv , p_forward_session );
 			SetForwardSessionUnused( p_forward_session );
-			SetForwardSessionUnused( p_reverse_forward_session );
+			SetForwardSessionUnused( p_forward_session->p_reverse_forward_session );
 			return -1;
 		}
 	}
 	else /* 连接成功 */
 	{
-		InfoLog( __FILE__ , __LINE__ , "connect ok" );
+		p_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
+		
+		InfoLog( __FILE__ , __LINE__ , "connect [%s:%d] ok" , p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].netaddr.ip , p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].netaddr.port.port_int );
 		
 		if( p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].server_unable == 1 )
 			p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].server_unable = 0 ;
@@ -131,12 +138,12 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		memset( & (event) , 0x00 , sizeof(struct epoll_event) );
 		event.data.ptr = p_forward_session ;
 		event.events = EPOLLIN | EPOLLERR ;
-		epoll_ctl( penv->forward_epoll_fd_array[(p_forward_session->sock)%(penv->cmd_para.forward_thread_size)] , EPOLL_CTL_ADD , p_forward_session->sock , & event );
+		epoll_ctl( penv->forward_epoll_fd_array[(p_forward_session->sock)%(penv->cmd_para.forward_thread_size)] , EPOLL_CTL_MOD , p_forward_session->sock , & event );
 		
 		memset( & (event) , 0x00 , sizeof(struct epoll_event) );
-		event.data.ptr = p_reverse_forward_session ;
+		event.data.ptr = p_forward_session->p_reverse_forward_session ;
 		event.events = EPOLLIN | EPOLLERR ;
-		epoll_ctl( penv->forward_epoll_fd_array[(p_forward_session->sock)%(penv->cmd_para.forward_thread_size)] , EPOLL_CTL_ADD , p_reverse_forward_session->sock , & event );
+		epoll_ctl( penv->forward_epoll_fd_array[(p_forward_session->sock)%(penv->cmd_para.forward_thread_size)] , EPOLL_CTL_MOD , p_forward_session->p_reverse_forward_session->sock , & event );
 	}
 	
 	return 0;
@@ -178,6 +185,10 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 		SetForwardSessionUnused( p_reverse_forward_session );
 		return -1;
 	}
+	else
+	{
+		DebugLog( __FILE__ , __LINE__ , "accept #%d# ok" , p_forward_session->sock );
+	}
 	
 	SetNonBlocking( p_forward_session->sock );
 	
@@ -198,7 +209,6 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	int			error , code ;
 #endif
 	_SOCKLEN_T		addr_len ;
-	struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
 	struct epoll_event	event ;
 	
 	/* 检查非堵塞连接结果 */
@@ -208,6 +218,8 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	if( code < 0 || error )
 	{
 		ResolveSocketError( penv , p_forward_session );
+		SetForwardSessionUnused( p_forward_session );
+		SetForwardSessionUnused( p_forward_session->p_reverse_forward_session );
 		return -1;
 	}
 #elif ( defined _WIN32 )
@@ -220,12 +232,16 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	else
         {
 		ResolveSocketError( penv , p_forward_session );
+		SetForwardSessionUnused( p_forward_session );
+		SetForwardSessionUnused( p_forward_session->p_reverse_forward_session );
 		return -1;
         }
 #endif
 	
 	/* 连接成功 */
-	InfoLog( __FILE__ , __LINE__ , "connect2 ok" );
+	p_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
+	
+	InfoLog( __FILE__ , __LINE__ , "connect2 [%s:%d] ok" , p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].netaddr.ip , p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].netaddr.port.port_int );
 	
 	if( p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].server_unable == 1 )
 		p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index].server_unable = 0 ;
@@ -236,28 +252,25 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	epoll_ctl( penv->forward_epoll_fd_array[(p_forward_session->sock)%(penv->cmd_para.forward_thread_size)] , EPOLL_CTL_ADD , p_forward_session->sock , & event );
 	
 	memset( & (event) , 0x00 , sizeof(struct epoll_event) );
-	event.data.ptr = p_reverse_forward_session ;
+	event.data.ptr = p_forward_session->p_reverse_forward_session ;
 	event.events = EPOLLIN | EPOLLERR ;
-	epoll_ctl( penv->forward_epoll_fd_array[(p_forward_session->sock)%(penv->cmd_para.forward_thread_size)] , EPOLL_CTL_ADD , p_reverse_forward_session->sock , & event );
+	epoll_ctl( penv->forward_epoll_fd_array[(p_forward_session->sock)%(penv->cmd_para.forward_thread_size)] , EPOLL_CTL_ADD , p_forward_session->p_reverse_forward_session->sock , & event );
 	
 	return 0;
 }
 
 static void *AcceptThread( struct ServerEnv *penv )
 {
-	int			forward_thread_index = *(penv->forward_thread_index) ;
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
 	int			event_count ;
-	struct epoll_event	*p_event = NULL ;
 	int			event_index ;
+	struct epoll_event	*p_event = NULL ;
 	
 	char			command ;
 	
 	struct ForwardSession	*p_forward_session = NULL ;
 	
 	int			nret = 0 ;
-	
-	free( penv->forward_thread_index );
 	
 	event_count = epoll_wait( penv->accept_epoll_fd , events , sizeof(events)/sizeof(events[0]) , -1 ) ;
 	for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
@@ -266,7 +279,7 @@ static void *AcceptThread( struct ServerEnv *penv )
 		{
 			if( p_event->events & EPOLLIN )
 			{
-				read( penv->accept_pipe_array[forward_thread_index].fds[0] , & command , 1 );
+				read( penv->accept_pipe.fds[0] , & command , 1 );
 				InfoLog( __FILE__ , __LINE__ , "read command pipe[%c]" , command );
 			}
 			else if( p_event->events & EPOLLERR )
@@ -284,45 +297,73 @@ static void *AcceptThread( struct ServerEnv *penv )
 		}
 		else
 		{
-			if( p_event->events & EPOLLIN ) /* 侦听端口事件 */
+			p_forward_session = p_event->data.ptr ;
+			
+			if( p_forward_session->status == FORWARD_SESSION_STATUS_LISTEN )
 			{
-				p_forward_session = p_event->data.ptr ;
-				
-				nret = OnListenAccept( penv , p_forward_session ) ;
-				if( nret )
+				if( p_event->events & EPOLLIN ) /* 侦听端口事件 */
 				{
-					ErrorLog( __FILE__ , __LINE__ , "OnListenAccept failed[%d]" , nret );
+					nret = OnListenAccept( penv , p_forward_session ) ;
+					if( nret )
+					{
+						ErrorLog( __FILE__ , __LINE__ , "OnListenAccept failed[%d]" , nret );
+					}
+					else
+					{
+						DebugLog( __FILE__ , __LINE__ , "OnListenAccept ok" );
+					}
+				}
+				else if( p_event->events & EPOLLERR )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "accept pipe EPOLLERR" );
+					exit(0);
+				}
+				else if( p_event->events & EPOLLHUP )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "accept pipe EPOLLHUP" );
+					exit(0);
 				}
 				else
 				{
-					DebugLog( __FILE__ , __LINE__ , "OnListenAccept ok" );
+					ErrorLog( __FILE__ , __LINE__ , "accept pipe [%d]" , p_event->events );
+					exit(0);
 				}
 			}
-			else if( p_event->events & EPOLLOUT ) /* 非堵塞连接事件 */
+			else if( p_forward_session->status == FORWARD_SESSION_STATUS_CONNECTING )
 			{
-				p_forward_session = p_event->data.ptr ;
-				
-				nret = OnConnectingServer( penv , p_forward_session ) ;
-				if( nret )
+				if( p_event->events & EPOLLOUT ) /* 非堵塞连接事件 */
 				{
-					ErrorLog( __FILE__ , __LINE__ , "OnConnectingServer failed[%d]" , nret );
+					nret = OnConnectingServer( penv , p_forward_session ) ;
+					if( nret )
+					{
+						ErrorLog( __FILE__ , __LINE__ , "OnConnectingServer failed[%d]" , nret );
+					}
+					else
+					{
+						DebugLog( __FILE__ , __LINE__ , "OnConnectingServer ok" );
+					}
+				}
+				else if( p_event->events & EPOLLERR )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "accept pipe EPOLLERR" );
+					ResolveSocketError( penv , p_forward_session );
+					SetForwardSessionUnused( p_forward_session );
+					SetForwardSessionUnused( p_forward_session->p_reverse_forward_session );
+				}
+				else if( p_event->events & EPOLLHUP )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "accept pipe EPOLLHUP" );
+					ResolveSocketError( penv , p_forward_session );
+					SetForwardSessionUnused( p_forward_session );
+					SetForwardSessionUnused( p_forward_session->p_reverse_forward_session );
 				}
 				else
 				{
-					DebugLog( __FILE__ , __LINE__ , "OnConnectingServer ok" );
+					ErrorLog( __FILE__ , __LINE__ , "accept pipe [%d]" , p_event->events );
+					ResolveSocketError( penv , p_forward_session );
+					SetForwardSessionUnused( p_forward_session );
+					SetForwardSessionUnused( p_forward_session->p_reverse_forward_session );
 				}
-			}
-			else if( p_event->events & EPOLLERR )
-			{
-				ErrorLog( __FILE__ , __LINE__ , "accept pipe EPOLLERR" );
-			}
-			else if( p_event->events & EPOLLHUP )
-			{
-				ErrorLog( __FILE__ , __LINE__ , "accept pipe EPOLLHUP" );
-			}
-			else
-			{
-				ErrorLog( __FILE__ , __LINE__ , "accept pipe [%d]" , p_event->events );
 			}
 		}
 	}

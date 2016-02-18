@@ -131,6 +131,7 @@
 
 #define FORWARD_SESSION_STATUS_UNUSED		0 /* 未使用 */
 #define FORWARD_SESSION_STATUS_READY		1 /* 准备使用 */
+#define FORWARD_SESSION_STATUS_LISTEN		9 /* 侦听中 */
 #define FORWARD_SESSION_STATUS_CONNECTING	11 /* 非堵塞连接中 */
 #define FORWARD_SESSION_STATUS_CONNECTED	12 /* 连接完成 */
 
@@ -236,7 +237,8 @@ struct ForwardSession
 	int			sock ; /* sock描述字 */
 	
 	char			io_buffer[ IO_BUFFER_SIZE + 1 ] ; /* 输入输出缓冲区 */
-	unsigned long		io_buffer_len ; /* 输入输出缓冲区有效数据长度 */
+	int			io_buffer_len ; /* 输入输出缓冲区有效数据长度 */
+	int			io_buffer_offsetpos ; /* 输入输出缓冲区有效数据开始偏移量 */
 	
 	struct ForwardSession	*p_reverse_forward_session ; /* 反向会话 */
 } ;
@@ -258,20 +260,19 @@ struct PipeFds
 struct ServerEnv
 {
 	struct CommandParameter	cmd_para ; /* 命令行参数结构 */
-	
-	pid_t			pid ; /* 子进程PID */
-	struct PipeFds		monitor_pipe ; /* 父子进程命令管道 */
+	int			log_level ; /* 日志等级 */
 	
 	struct ForwardRule	*forward_rules_array ; /* 转发规则数组 */
 	unsigned long		forward_rules_size ; /* 转发规则数组大小 */
 	unsigned long		forward_rules_count ; /* 转发规则已装载数量 */
 	
+	pid_t			pid ; /* 子进程PID */
+	struct PipeFds		accept_pipe ; /* 父子进程命令管道 */
 	int			accept_epoll_fd ; /* 侦听端口epoll池 */
 	
 	int			*forward_thread_index ; /* 子线程序号 */
-	
 	pthread_t		*forward_thread_tid_array ; /* 子线程TID */
-	struct PipeFds		*accept_pipe_array ; /* 父子线程命令管道 */
+	struct PipeFds		*forward_pipe_array ; /* 父子线程命令管道 */
 	int			*forward_epoll_fd_array ; /* 子线程转发EPOLL池 */
 	
 	struct ForwardSession	*forward_session_array ; /* 转发会话数组 */
