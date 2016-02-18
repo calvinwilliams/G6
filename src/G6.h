@@ -169,6 +169,8 @@ struct ServerNetAddress
 {
 	struct NetAddress	netaddr ; /* 网络地址结构 */
 	
+	unsigned char		server_unable ; /* 服务端可用标志 */
+	time_t			timestamp_to_enable ; /* 恢复正常秒戳 */
 	unsigned long		server_connection_count ; /* 服务端连接数量 */
 } ;
 
@@ -189,27 +191,30 @@ struct ForwardRule
 	struct ServerNetAddress		*servers_addr ; /* 服务端地址结构 */
 	unsigned long			servers_addr_size ; /* 服务端规则配置最大数量 */
 	unsigned long			servers_addr_count ; /* 服务端规则配置数量 */
-	unsigned long			selects_addr_index ; /* 当前服务端索引 */
+	//unsigned long			selects_addr_index ; /* 当前服务端索引 */
 	
 	union
 	{
 		struct
 		{
-			unsigned long	server_unable ; /* 服务不可用暂禁次数 */
-		} *RR ;
+			unsigned int	server_index ; /* 服务端索引 */
+		} MS ;
 		struct
 		{
 			unsigned long	server_unable ; /* 服务不可用暂禁次数 */
-		} *LC ;
+		} RR ;
+		struct
+		{
+			unsigned long	server_unable ; /* 服务不可用暂禁次数 */
+		} LC ;
 		struct
 		{
 			unsigned long	server_unable ; /* 服务不可用暂禁次数 */
 			struct timeval	tv1 ; /* 最近读时间戳 */
 			struct timeval	tv2 ; /* 最近写时间戳 */
 			struct timeval	dtv ; /* 最近读写时间戳差 */
-		} *RT ;
-	} status ;
-	
+		} RT ;
+	} balance_algorithm ;
 } ;
 
 /* 转发会话结构 */
@@ -218,6 +223,14 @@ struct ForwardSession
 	unsigned char		status ; /* 会话状态 */
 	
 	struct ForwardRule	*p_forward_rule ; /* 转发规则派生 */
+	
+	union
+	{
+		struct
+		{
+			unsigned int	server_index ; /* 服务端索引 */
+		} MS ;
+	} balance_algorithm ;
 	
 	struct NetAddress	netaddr ; /* 网络地址结构 */
 	int			sock ; /* sock描述字 */

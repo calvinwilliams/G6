@@ -20,11 +20,6 @@ static int AddListen( struct ServerEnv *penv , struct ForwardRule *p_forward_rul
 		SetReuseAddr( p_forward_rule->forwards_addr[n].sock );
 		SetNonBlocking( p_forward_rule->forwards_addr[n].sock );
 		
-		memset( & (p_forward_rule->forwards_addr[n].netaddr.sockaddr) , 0x00 , sizeof(struct NetAddress) );
-		p_forward_rule->forwards_addr[n].netaddr.sockaddr.sin_family = AF_INET ;
-		p_forward_rule->forwards_addr[n].netaddr.sockaddr.sin_addr.s_addr = inet_addr( p_forward_rule->forwards_addr[n].netaddr.ip ) ;
-		p_forward_rule->forwards_addr[n].netaddr.sockaddr.sin_port = htons( (unsigned short)p_forward_rule->forwards_addr[n].netaddr.port.port_int );
-		
 		nret = bind( p_forward_rule->forwards_addr[n].sock , (struct sockaddr *) & (p_forward_rule->forwards_addr[n].netaddr.sockaddr) , sizeof(struct sockaddr) ) ;
 		if( nret )
 		{
@@ -58,6 +53,15 @@ static int AddListen( struct ServerEnv *penv , struct ForwardRule *p_forward_rul
 	return 0;
 }
 
+static void SetNetAddress( struct NetAddress *p_netaddr )
+{
+	memset( & (p_netaddr->sockaddr) , 0x00 , sizeof(struct sockaddr_in) );
+	p_netaddr->sockaddr.sin_family = AF_INET ;
+	p_netaddr->sockaddr.sin_addr.s_addr = inet_addr( p_netaddr->ip ) ;
+	p_netaddr->sockaddr.sin_port = htons( (unsigned short)p_netaddr->port.port_int );
+	return;
+}
+
 static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *p_forward_rule , char *rule_id )
 {
 	char				ip_and_port[ 100 + 1 ] ;
@@ -82,13 +86,13 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		return -11;
 	}
 	
-	if( strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_G )
-		&& strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_MS )
-		&& strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_RR )
-		&& strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_LC )
-		&& strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_RT )
-		&& strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_RD )
-		&& strcmp( p_forward_rule->load_balance_algorithm , FORWARD_RULE_MODE_HS ) )
+	if( strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_G )
+		&& strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_MS )
+		&& strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_RR )
+		&& strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_LC )
+		&& strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_RT )
+		&& strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_RD )
+		&& strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_HS ) )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "rule rule_mode [%s] invalid\r\n" , p_forward_rule->load_balance_algorithm );
 		return -11;
@@ -193,6 +197,8 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 			return -11;
 		}
 		
+		SetNetAddress( & (p_forward_addr->netaddr) );
+		
 		p_forward_rule->forwards_addr_count++;
 	}
 	
@@ -245,6 +251,8 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 			ErrorLog( __FILE__ , __LINE__ , "unexpect config in servers_addr in rule[%s]" , p_forward_rule->rule_id );
 			return -11;
 		}
+		
+		SetNetAddress( & (p_server_addr->netaddr) );
 		
 		p_forward_rule->servers_addr_count++;
 	}
