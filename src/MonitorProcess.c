@@ -9,10 +9,8 @@ static int MonitorProcess( struct ServerEnv *penv )
 	int			nret = 0 ;
 	long			lret = 0 ;
 	
-	/* 设置日志环境 */
-	SetLogFile( "%s/log/G6_MonitorProcess.log" , getenv("HOME") );
-	SetLogLevel( penv->log_level );
-	InfoLog( __FILE__ , __LINE__ , "--- G6.MonitorProcess begin ---" );
+	/* 设置日志输出文件 */
+	InfoLog( __FILE__ , __LINE__ , "--- G6.MonitorProcess ---" );
 	
 	/* 设置信号句柄 */
 	signal( SIGCLD , SIG_DFL );
@@ -77,9 +75,8 @@ static int MonitorProcess( struct ServerEnv *penv )
 			, penv->pid , WEXITSTATUS(status) , WIFSIGNALED(status) , WTERMSIG(status) , WCOREDUMP(status) );
 		
 		/* 重启子进程 */
+		sleep(1);
 	}
-	
-	InfoLog( __FILE__ , __LINE__ , "--- G6.MonitorProcess finish ---" );
 	
 	return 0;
 }

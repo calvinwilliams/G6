@@ -258,7 +258,7 @@ static void LogOneRule( struct ServerEnv *penv , struct ForwardRule *p_forward_r
 	/* 客户端配置信息 */
 	for( n = 0 , p_client_addr = p_forward_rule->clients_addr ; n < p_forward_rule->clients_addr_count ; n++ , p_client_addr++ )
 	{
-		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%s]" , p_client_addr->netaddr.ip , p_client_addr->netaddr.port );
+		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%s]" , p_client_addr->netaddr.ip , p_client_addr->netaddr.port.port_str );
 	}
 	
 	InfoLog( __FILE__ , __LINE__ , "    -" );
@@ -266,7 +266,7 @@ static void LogOneRule( struct ServerEnv *penv , struct ForwardRule *p_forward_r
 	/* 转发端配置信息 */
 	for( n = 0 , p_forward_addr = p_forward_rule->forwards_addr ; n < p_forward_rule->forwards_addr_count ; n++ , p_forward_addr++ )
 	{
-		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%s]" , p_forward_addr->netaddr.ip , p_forward_addr->netaddr.port );
+		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%d]" , p_forward_addr->netaddr.ip , p_forward_addr->netaddr.port.port_int );
 	}
 	
 	InfoLog( __FILE__ , __LINE__ , "    >" );
@@ -274,7 +274,7 @@ static void LogOneRule( struct ServerEnv *penv , struct ForwardRule *p_forward_r
 	/* 服务端配置信息 */
 	for( n = 0 , p_server_addr = p_forward_rule->servers_addr ; n < p_forward_rule->servers_addr_count ; n++ , p_server_addr++ )
 	{
-		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%s]" , p_server_addr->netaddr.ip , p_server_addr->netaddr.port );
+		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%d]" , p_server_addr->netaddr.ip , p_server_addr->netaddr.port.port_int );
 	}
 	
 	InfoLog( __FILE__ , __LINE__ , "    ;" );
@@ -303,7 +303,7 @@ int LoadConfig( struct ServerEnv *penv )
 		/* 读转发规则ID */
 		nret = fscanf( fp , "%64s" , rule_id ) ;
 		if( nret == EOF )
-			return 0;
+			break;
 		
 		/* 调整转发规则数组 */
 		if( penv->forward_rules_array == NULL || penv->forward_rules_count+1 > penv->forward_rules_size )
@@ -330,8 +330,6 @@ int LoadConfig( struct ServerEnv *penv )
 		
 		/* 装载一条转发规则 */
 		nret = LoadOneRule( penv , fp , penv->forward_rules_array+penv->forward_rules_count , rule_id ) ;
-		if( nret == EOF )
-			break;
 		if( nret )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "LoadOneRule failed[%d]" , nret );

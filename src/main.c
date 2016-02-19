@@ -26,17 +26,19 @@ int main( int argc , char *argv[] )
 	/* 设置随机数种子 */
 	srand( (unsigned)time(NULL) );
 	
-	/* 设置日志环境 */
-	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
+	/* 设置日志输出文件 */
 	penv->log_level = LOGLEVEL_INFO ;
+	
+	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
 	SetLogLevel( penv->log_level );
+	
 	InfoLog( __FILE__ , __LINE__ , "--- G5 begin ---" );
 	
 	/* 初始化服务器环境 */
 	memset( penv , 0x00 , sizeof(struct ServerEnv) );
 	
 	/* 初始化命令行参数 */
-	penv->cmd_para.forward_thread_size = DEFAULT_FORWARD_THREAD_COUNT ;
+	penv->cmd_para.forward_thread_size = sysconf(_SC_NPROCESSORS_ONLN) ;
 	penv->cmd_para.forward_session_size = DEFAULT_FORWARD_SESSIONS_MAXCOUNT ;
 	
 	/* 分析命令行参数 */
@@ -104,7 +106,6 @@ int main( int argc , char *argv[] )
 		usage();
 		exit(7);
 	}
-DebugLog( __FILE__ , __LINE__ , "penv->cmd_para.forward_thread_size[%ld]" , penv->cmd_para.forward_thread_size );
 	
 	/* 初始化环境 */
 	nret = InitEnvirment( penv ) ;

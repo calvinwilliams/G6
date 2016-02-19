@@ -57,18 +57,20 @@ int SetNonBlocking( int sock )
 	return 0;
 }
 
+/* 用IP和PORT设置sockaddr结构 */
 void SetNetAddress( struct NetAddress *p_netaddr )
 {
 	memset( & (p_netaddr->sockaddr) , 0x00 , sizeof(struct sockaddr_in) );
 	p_netaddr->sockaddr.sin_family = AF_INET ;
-	p_netaddr->sockaddr.sin_addr.s_addr = inet_addr( p_netaddr->ip ) ;
+	p_netaddr->sockaddr.sin_addr.s_addr = inet_addr(p_netaddr->ip) ;
 	p_netaddr->sockaddr.sin_port = htons( (unsigned short)p_netaddr->port.port_int );
 	return;
 }
 
+/* 从sockaddr结构析出IP和PORT */
 void GetNetAddress( struct NetAddress *p_netaddr )
 {
-	strcpy( p_netaddr->ip , inet_ntoa( p_netaddr->sockaddr.sin_addr ) );
+	strcpy( p_netaddr->ip , inet_ntoa(p_netaddr->sockaddr.sin_addr) );
 	p_netaddr->port.port_int = (int)ntohs( p_netaddr->sockaddr.sin_port ) ;
 	return;
 }

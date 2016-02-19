@@ -168,79 +168,85 @@ static void *ForwardThread( struct ServerEnv *penv )
 	forward_epoll_fd = penv->forward_epoll_fd_array[forward_thread_index] ;
 	{ int *tmp = penv->forward_thread_index ; penv->forward_thread_index = NULL ; free( tmp ); }
 	
-	/* 设置日志环境 */
-	SetLogFile( "%s/log/G6_WorkerProcess_ForwardThread_%d.log" , getenv("HOME") , forward_thread_index+1 );
+	/* 设置日志输出文件 */
+	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
 	SetLogLevel( penv->log_level );
-	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.ForwardThread begin ---" );
+	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.ForwardThread.%d ---" , forward_thread_index+1 );
 	
 	/* 主工作循环 */
-	event_count = epoll_wait( forward_epoll_fd , events , sizeof(events)/sizeof(events[0]) , -1 ) ;
-	for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
+	while(1)
 	{
-		if( p_event->data.ptr == NULL ) /* 命令管道事件 */
+		event_count = epoll_wait( forward_epoll_fd , events , sizeof(events)/sizeof(events[0]) , -1 ) ;
+		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
+		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
-			if( p_event->events & EPOLLIN )
+			if( p_event->data.ptr == NULL ) /* 命令管道事件 */
 			{
-				read( penv->forward_pipe_array[forward_thread_index].fds[0] , & command , 1 );
-				InfoLog( __FILE__ , __LINE__ , "read command pipe[%c]" , command );
-			}
-			else if( p_event->events & EPOLLERR )
-			{
-				ErrorLog( __FILE__ , __LINE__ , "command pipe EPOLLERR" );
-			}
-			else if( p_event->events & EPOLLHUP )
-			{
-				ErrorLog( __FILE__ , __LINE__ , "command pipe EPOLLHUP" );
-			}
-			else
-			{
-				ErrorLog( __FILE__ , __LINE__ , "command pipe [%d]" , p_event->events );
-			}
-		}
-		else
-		{
-			p_forward_session = p_event->data.ptr ;
-			
-			if( p_event->events & EPOLLIN ) /* 输入事件 */
-			{
-				nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , events , event_count ) ;
-				if( nret )
+				DebugLog( __FILE__ , __LINE__ , "command pipe event" );
+				
+				if( p_event->events & EPOLLIN )
 				{
-					ErrorLog( __FILE__ , __LINE__ , "OnForwardInput failed[%d]" , nret );
+					read( penv->forward_pipe_array[forward_thread_index].fds[0] , & command , 1 );
+					InfoLog( __FILE__ , __LINE__ , "read command pipe[%c]" , command );
+				}
+				else if( p_event->events & EPOLLERR )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "command pipe EPOLLERR" );
+				}
+				else if( p_event->events & EPOLLHUP )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "command pipe EPOLLHUP" );
 				}
 				else
 				{
-					DebugLog( __FILE__ , __LINE__ , "OnForwardInput ok" );
+					ErrorLog( __FILE__ , __LINE__ , "command pipe [%d]" , p_event->events );
 				}
-			}
-			else if( p_event->events & EPOLLOUT ) /* 输出事件 */
-			{
-				nret = OnForwardOutput( penv , p_forward_session , forward_epoll_fd , events , event_count ) ;
-				if( nret )
-				{
-					ErrorLog( __FILE__ , __LINE__ , "OnForwardOutput failed[%d]" , nret );
-				}
-				else
-				{
-					DebugLog( __FILE__ , __LINE__ , "OnForwardOutput ok" );
-				}
-			}
-			else if( p_event->events & EPOLLERR )
-			{
-				ErrorLog( __FILE__ , __LINE__ , "accept pipe EPOLLERR" );
-			}
-			else if( p_event->events & EPOLLHUP )
-			{
-				ErrorLog( __FILE__ , __LINE__ , "accept pipe EPOLLHUP" );
 			}
 			else
 			{
-				ErrorLog( __FILE__ , __LINE__ , "accept pipe [%d]" , p_event->events );
+				DebugLog( __FILE__ , __LINE__ , "forward session event" );
+				
+				p_forward_session = p_event->data.ptr ;
+				
+				if( p_event->events & EPOLLIN ) /* 输入事件 */
+				{
+					nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , events , event_count ) ;
+					if( nret )
+					{
+						ErrorLog( __FILE__ , __LINE__ , "OnForwardInput failed[%d]" , nret );
+					}
+					else
+					{
+						DebugLog( __FILE__ , __LINE__ , "OnForwardInput ok" );
+					}
+				}
+				else if( p_event->events & EPOLLOUT ) /* 输出事件 */
+				{
+					nret = OnForwardOutput( penv , p_forward_session , forward_epoll_fd , events , event_count ) ;
+					if( nret )
+					{
+						ErrorLog( __FILE__ , __LINE__ , "OnForwardOutput failed[%d]" , nret );
+					}
+					else
+					{
+						DebugLog( __FILE__ , __LINE__ , "OnForwardOutput ok" );
+					}
+				}
+				else if( p_event->events & EPOLLERR )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "accept pipe EPOLLERR" );
+				}
+				else if( p_event->events & EPOLLHUP )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "accept pipe EPOLLHUP" );
+				}
+				else
+				{
+					ErrorLog( __FILE__ , __LINE__ , "accept pipe [%d]" , p_event->events );
+				}
 			}
 		}
 	}
-	
-	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.ForwardThread finish ---" );
 	
 	return NULL;
 }

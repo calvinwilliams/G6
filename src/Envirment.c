@@ -102,15 +102,17 @@ void SetForwardSessionUnused( struct ForwardSession *p_forward_session )
 {
 	if( p_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
 	{
-		close( p_forward_session->sock );
-		
-		if( p_forward_session->p_reverse_forward_session )
+		if( p_forward_session->p_reverse_forward_session || p_forward_session->p_reverse_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
 		{
-			if( p_forward_session->p_reverse_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
-			{
-				close( p_forward_session->p_reverse_forward_session->sock );
-				p_forward_session->p_reverse_forward_session->status = FORWARD_SESSION_STATUS_UNUSED ;
-			}
+			DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
+			_CLOSESOCKET( p_forward_session->sock );
+			_CLOSESOCKET( p_forward_session->p_reverse_forward_session->sock );
+			p_forward_session->p_reverse_forward_session->status = FORWARD_SESSION_STATUS_UNUSED ;
+		}
+		else
+		{
+			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+			_CLOSESOCKET( p_forward_session->sock );
 		}
 		
 		p_forward_session->status = FORWARD_SESSION_STATUS_UNUSED ;

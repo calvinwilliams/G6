@@ -7,17 +7,13 @@ int WorkerProcess( struct ServerEnv *penv )
 	
 	int			nret = 0 ;
 	
-	/* 设置日志环境 */
-	SetLogFile( "%s/log/G6_WorkerProcess.log" , getenv("HOME") );
-	SetLogLevel( penv->log_level );
-	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess begin ---" );
+	/* 设置日志输出文件 */
+	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess ---" );
 	
 	/* 创建转发子线程 */
 	penv->forward_thread_index = NULL ;
-DebugLog( __FILE__ , __LINE__ , "penv->cmd_para.forward_thread_size[%d]" , penv->cmd_para.forward_thread_size );
 	for( n = 0 ; n < penv->cmd_para.forward_thread_size ; n++ )
 	{
-DebugLog( __FILE__ , __LINE__ , "n[%ld]" , n );
 		while( penv->forward_thread_index ) sleep(1);
 		
 		penv->forward_thread_index = (int*)malloc( sizeof(int) ) ;
@@ -48,13 +44,11 @@ DebugLog( __FILE__ , __LINE__ , "n[%ld]" , n );
 		}
 		else
 		{
-			InfoLog( __FILE__ , __LINE__ , "parent [%lu] pthread_create [%lu]" , pthread_self() , penv->forward_thread_tid_array[n] );
+			InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_create [%lu]" , pthread_self() , penv->forward_thread_tid_array[n] );
 		}
 	}
 	
 	_AcceptThread( (void*)penv );
-	
-	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess finish ---" );
 	
 	return 0;
 }
