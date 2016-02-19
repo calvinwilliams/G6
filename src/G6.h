@@ -122,7 +122,7 @@
 #define IP_MAXLEN				30
 #define PORT_MAXLEN				10
 
-#define WAIT_EVENTS_COUNT			100 /* 一次获取epoll事件数量 */
+#define WAIT_EVENTS_COUNT			1024 /* 一次获取epoll事件数量 */
 
 #define FORWARD_SESSION_TYPE_CLIENT		1
 #define FORWARD_SESSION_TYPE_LISTEN		2
@@ -288,7 +288,7 @@ int SetReuseAddr( int sock );
 int SetNonBlocking( int sock );
 void SetNetAddress( struct NetAddress *p_netaddr );
 void GetNetAddress( struct NetAddress *p_netaddr );
-void CloseSocket2( int sock , int sock2 );
+void _CLOSESOCKET2( int sock , int sock2 );
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) );
 
 /********* envirment *********/

@@ -41,8 +41,6 @@ int main( int argc , char *argv[] )
 	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
 	SetLogLevel( penv->cmd_para.log_level );
 	
-	InfoLog( __FILE__ , __LINE__ , "--- G5 begin ---" );
-	
 	/* 分析命令行参数 */
 	if( argc == 1 )
 	{
@@ -112,6 +110,8 @@ int main( int argc , char *argv[] )
 		usage();
 		exit(7);
 	}
+	
+	InfoLog( __FILE__ , __LINE__ , "--- G5 begin ---" );
 	
 	/* 初始化环境 */
 	nret = InitEnvirment( penv ) ;

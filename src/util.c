@@ -76,7 +76,7 @@ void GetNetAddress( struct NetAddress *p_netaddr )
 }
 
 /* 关闭两个套接字 */
-void CloseSocket2( int sock , int sock2 )
+void _CLOSESOCKET2( int sock , int sock2 )
 {
 	_CLOSESOCKET( sock );
 	_CLOSESOCKET( sock2 );
