@@ -33,7 +33,7 @@ int WorkerProcess( struct ServerEnv *penv )
 		
 		memset( & event , 0x00 , sizeof(event) );
 		event.data.ptr = NULL ;
-		event.events = EPOLLIN | EPOLLET ;
+		event.events = EPOLLIN | EPOLLERR ;
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , penv->forward_pipe_array[n].fds[0] , & event );
 		
 		nret = pthread_create( penv->forward_thread_tid_array+n , NULL , & _ForwardThread , (void*)penv ) ;

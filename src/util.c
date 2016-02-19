@@ -75,6 +75,14 @@ void GetNetAddress( struct NetAddress *p_netaddr )
 	return;
 }
 
+/* 关闭两个套接字 */
+void CloseSocket2( int sock , int sock2 )
+{
+	_CLOSESOCKET( sock );
+	_CLOSESOCKET( sock2 );
+	return;
+}
+
 /* 转换为守护进程 */
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) )
 {

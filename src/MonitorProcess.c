@@ -1,6 +1,6 @@
 #include "G6.h"
 
-static int MonitorProcess( struct ServerEnv *penv )
+int MonitorProcess( struct ServerEnv *penv )
 {
 	struct epoll_event	event ;
 	
@@ -31,7 +31,7 @@ static int MonitorProcess( struct ServerEnv *penv )
 		/* 将管道读端加入到侦听端口epoll池 */
 		memset( & event , 0x00 , sizeof(event) );
 		event.data.ptr = NULL ;
-		event.events = EPOLLIN | EPOLLET ;
+		event.events = EPOLLIN | EPOLLERR ;
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , penv->accept_pipe.fds[0] , & event );
 		
 		/* 创建子进程 */

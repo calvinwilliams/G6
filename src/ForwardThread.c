@@ -1,75 +1,76 @@
 #include "G6.h"
 
-static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_count )
+static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
 {
-	int			event_index ;
-	struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
+	struct epoll_event	*p_event = NULL ;
 	
-	for( event_index = 0 ; event_index < event_count ; event_index++ )
+	for( ++event_index , p_event = p_events + event_index ; event_index < event_count ; event_index++ , p_event++ )
 	{
-		if( p_events[event_index].data.ptr == p_forward_session )
+		if( p_event->data.ptr == p_forward_session )
 			continue;
 		
-		if( p_events[event_index].data.ptr == p_reverse_forward_session )
-			p_events[event_index].events = 0 ;
+		if( p_event->data.ptr == p_forward_session->p_reverse_forward_session )
+			p_event->events = 0 ;
 	}
 	
 	return;
 }
 
-static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_session , int forward_epoll_fd , struct epoll_event *p_events , int event_count )
+static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_session , int forward_epoll_fd , struct epoll_event *p_events , int event_index , int event_count )
 {
 	int			len ;
 	struct epoll_event	event ;
 	
+	/* 接收通讯数据 */
 	p_forward_session->io_buffer_offsetpos = 0 ;
 	p_forward_session->io_buffer_len = recv( p_forward_session->sock , p_forward_session->io_buffer , IO_BUFFER_SIZE , 0 ) ;
 	if( p_forward_session->io_buffer_len == 0 )
 	{
-		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock , p_forward_session->io_buffer_len );
+		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock );
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
-		SetForwardSessionUnused( p_forward_session );
-		SetForwardSessionUnused( p_forward_session->p_reverse_forward_session );
+		DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
+		CloseSocket2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
+		SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
 		return 0;
 	}
 	else if( p_forward_session->io_buffer_len == -1 )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "recv #%d# failed , errno[%d]" , p_forward_session->sock , p_forward_session->io_buffer_len , errno );
-		IgnoreReverseSessionEvents( p_forward_session , p_events , event_count );
+		IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
-		SetForwardSessionUnused( p_forward_session );
-		SetForwardSessionUnused( p_forward_session->p_reverse_forward_session );
+		DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
+		CloseSocket2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
+		SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
 		return 0;
 	}
 	
+	/* 发送通讯数据 */
 	len = send( p_forward_session->p_reverse_forward_session->sock , p_forward_session->io_buffer , p_forward_session->io_buffer_len , 0 ) ;
 	if( len == -1 )
 	{
 		if( _ERRNO == _EWOULDBLOCK )
 		{
-			IgnoreReverseSessionEvents( p_forward_session , p_events , event_count );
-			
-			p_forward_session->io_buffer_len -= len ;
-			p_forward_session->io_buffer_offsetpos = len ;
+			IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
 			
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_forward_session ;
-			event.events = EPOLLERR | EPOLLET ;
+			event.events = EPOLLERR ;
 			epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_forward_session->sock , & event );
 			
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_forward_session->p_reverse_forward_session ;
-			event.events = EPOLLOUT | EPOLLERR | EPOLLET ;
+			event.events = EPOLLOUT | EPOLLERR ;
 			epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_forward_session->p_reverse_forward_session->sock , & event );
 		}
 		else
 		{
 			epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 			epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
-			SetForwardSessionUnused( p_forward_session );
-			SetForwardSessionUnused( p_forward_session->p_reverse_forward_session );
+			DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
+			CloseSocket2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
+			SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
 		}
 	}
 	else if( len == p_forward_session->io_buffer_len )
@@ -81,44 +82,44 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	{
 		InfoLog( __FILE__ , __LINE__ , "transfer #%d# [%d/%d]bytes to #%d#" , p_forward_session->sock , len , p_forward_session->io_buffer_len , p_forward_session->p_reverse_forward_session->sock );
 		
-		IgnoreReverseSessionEvents( p_forward_session , p_events , event_count );
+		IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
 		
 		p_forward_session->io_buffer_len -= len ;
 		p_forward_session->io_buffer_offsetpos = len ;
 		
 		memset( & event , 0x00 , sizeof(struct epoll_event) );
 		event.data.ptr = p_forward_session ;
-		event.events = EPOLLERR | EPOLLET ;
+		event.events = EPOLLERR ;
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_forward_session->sock , & event );
 		
 		memset( & event , 0x00 , sizeof(struct epoll_event) );
 		event.data.ptr = p_forward_session->p_reverse_forward_session ;
-		event.events = EPOLLOUT | EPOLLERR | EPOLLET ;
+		event.events = EPOLLOUT | EPOLLERR ;
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_forward_session->p_reverse_forward_session->sock , & event );
 	}
 	
 	return 0;
 }
 
-static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_forward_session , int forward_epoll_fd , struct epoll_event *p_events , int event_count )
+static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_forward_session , int forward_epoll_fd , struct epoll_event *p_events , int event_index , int event_count )
 {
 	int			len ;
 	struct epoll_event	event ;
 	
+	/* 继续发送通讯数据 */
 	len = send( p_forward_session->p_reverse_forward_session->sock , p_forward_session->io_buffer + p_forward_session->io_buffer_offsetpos , p_forward_session->io_buffer_len , 0 ) ;
 	if( len == -1 )
 	{
 		if( _ERRNO == _EWOULDBLOCK )
 		{
-			p_forward_session->io_buffer_len -= len ;
-			p_forward_session->io_buffer_offsetpos = len ;
 		}
 		else
 		{
 			epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 			epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
-			SetForwardSessionUnused( p_forward_session );
-			SetForwardSessionUnused( p_forward_session->p_reverse_forward_session );
+			DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
+			CloseSocket2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
+			SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
 		}
 	}
 	else if( len == p_forward_session->io_buffer_len )
@@ -129,12 +130,12 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 		
 		memset( & event , 0x00 , sizeof(struct epoll_event) );
 		event.data.ptr = p_forward_session ;
-		event.events = EPOLLIN | EPOLLERR | EPOLLET ;
+		event.events = EPOLLIN | EPOLLERR ;
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_forward_session->sock , & event );
 		
 		memset( & event , 0x00 , sizeof(struct epoll_event) );
 		event.data.ptr = p_forward_session->p_reverse_forward_session ;
-		event.events = EPOLLIN | EPOLLERR | EPOLLET ;
+		event.events = EPOLLIN | EPOLLERR ;
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_forward_session->p_reverse_forward_session->sock , & event );
 	}
 	else
@@ -148,7 +149,7 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 	return 0;
 }
 
-static void *ForwardThread( struct ServerEnv *penv )
+void *ForwardThread( struct ServerEnv *penv )
 {
 	int			forward_thread_index ;
 	int			forward_epoll_fd ;
@@ -170,7 +171,7 @@ static void *ForwardThread( struct ServerEnv *penv )
 	
 	/* 设置日志输出文件 */
 	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
-	SetLogLevel( penv->log_level );
+	SetLogLevel( penv->cmd_para.log_level );
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.ForwardThread.%d ---" , forward_thread_index+1 );
 	
 	/* 主工作循环 */
@@ -207,29 +208,22 @@ static void *ForwardThread( struct ServerEnv *penv )
 				DebugLog( __FILE__ , __LINE__ , "forward session event" );
 				
 				p_forward_session = p_event->data.ptr ;
+DebugLog( __FILE__ , __LINE__ , "p_forward_session[%p] ->sock[%d]" , p_forward_session , p_forward_session->sock );
 				
 				if( p_event->events & EPOLLIN ) /* 输入事件 */
 				{
-					nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , events , event_count ) ;
+					nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count ) ;
 					if( nret )
 					{
 						ErrorLog( __FILE__ , __LINE__ , "OnForwardInput failed[%d]" , nret );
 					}
-					else
-					{
-						DebugLog( __FILE__ , __LINE__ , "OnForwardInput ok" );
-					}
 				}
 				else if( p_event->events & EPOLLOUT ) /* 输出事件 */
 				{
-					nret = OnForwardOutput( penv , p_forward_session , forward_epoll_fd , events , event_count ) ;
+					nret = OnForwardOutput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count ) ;
 					if( nret )
 					{
 						ErrorLog( __FILE__ , __LINE__ , "OnForwardOutput failed[%d]" , nret );
-					}
-					else
-					{
-						DebugLog( __FILE__ , __LINE__ , "OnForwardOutput ok" );
 					}
 				}
 				else if( p_event->events & EPOLLERR )

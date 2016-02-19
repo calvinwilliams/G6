@@ -248,6 +248,8 @@ struct CommandParameter
 	char			*config_pathfilename ; /* -f ... */
 	unsigned long		forward_thread_size ; /* -t ... */
 	unsigned long		forward_session_size ; /* -s ... */
+	int			log_level ; /* --log-level (DEBUG|INFO|WARN|ERROR|FATAL)*/
+	int			no_daemon_flag ; /* --no-daemon (1|0) */
 } ;
 
 /* 服务器环境结构 */
@@ -259,7 +261,6 @@ struct PipeFds
 struct ServerEnv
 {
 	struct CommandParameter	cmd_para ; /* 命令行参数结构 */
-	int			log_level ; /* 日志等级 */
 	
 	struct ForwardRule	*forward_rules_array ; /* 转发规则数组 */
 	unsigned long		forward_rules_size ; /* 转发规则数组大小 */
@@ -287,6 +288,7 @@ int SetReuseAddr( int sock );
 int SetNonBlocking( int sock );
 void SetNetAddress( struct NetAddress *p_netaddr );
 void GetNetAddress( struct NetAddress *p_netaddr );
+void CloseSocket2( int sock , int sock2 );
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) );
 
 /********* envirment *********/
@@ -295,6 +297,7 @@ int InitEnvirment( struct ServerEnv *penv );
 void CleanEnvirment( struct ServerEnv *penv );
 struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv );
 void SetForwardSessionUnused( struct ForwardSession *p_forward_session );
+void SetForwardSessionUnused2( struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
 
 /********* Config *********/
 
@@ -303,18 +306,22 @@ void UnloadConfig( struct ServerEnv *penv );
 
 /********* MonitorProcess *********/
 
+int MonitorProcess( struct ServerEnv *penv );
 int _MonitorProcess( void *pv );
 
 /********* WorkerProcess *********/
 
 int WorkerProcess( struct ServerEnv *penv );
+int WorkerProcess( struct ServerEnv *penv );
 
 /********* AcceptThread *********/
 
+void *AcceptThread( struct ServerEnv *penv );
 void *_AcceptThread( void *pv );
 
 /********* ForwardThread *********/
 
+void *ForwardThread( struct ServerEnv *penv );
 void *_ForwardThread( void *pv );
 
 #endif

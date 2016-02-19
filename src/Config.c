@@ -23,14 +23,14 @@ static int AddListen( struct ServerEnv *penv , struct ForwardRule *p_forward_rul
 		nret = bind( p_forward_rule->forwards_addr[n].sock , (struct sockaddr *) & (p_forward_rule->forwards_addr[n].netaddr.sockaddr) , sizeof(struct sockaddr) ) ;
 		if( nret )
 		{
-			ErrorLog( __FILE__ , __LINE__ , "bind[%s:%s] failed , errno[%d]" , p_forward_rule->forwards_addr[n].netaddr.ip , p_forward_rule->forwards_addr[n].netaddr.port.port_int , _ERRNO );
+			ErrorLog( __FILE__ , __LINE__ , "bind[%s:%d] failed , errno[%d]" , p_forward_rule->forwards_addr[n].netaddr.ip , p_forward_rule->forwards_addr[n].netaddr.port.port_int , _ERRNO );
 			return -1;
 		}
 		
 		nret = listen( p_forward_rule->forwards_addr[n].sock , 1024 ) ;
 		if( nret )
 		{
-			ErrorLog( __FILE__ , __LINE__ , "listen[%s:%s] failed , errno[%d]" , p_forward_rule->forwards_addr[n].netaddr.ip , p_forward_rule->forwards_addr[n].netaddr.port.port_int , _ERRNO );
+			ErrorLog( __FILE__ , __LINE__ , "listen[%s:%d] failed , errno[%d]" , p_forward_rule->forwards_addr[n].netaddr.ip , p_forward_rule->forwards_addr[n].netaddr.port.port_int , _ERRNO );
 			return -1;
 		}
 		
@@ -47,7 +47,7 @@ static int AddListen( struct ServerEnv *penv , struct ForwardRule *p_forward_rul
 		
 		memset( & event , 0x00 , sizeof(event) );
 		event.data.ptr = p_forward_session ;
-		event.events = EPOLLIN | EPOLLET ;
+		event.events = EPOLLIN | EPOLLERR ;
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_forward_rule->forwards_addr[n].sock , & event );
 	}
 	

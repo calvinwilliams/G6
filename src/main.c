@@ -9,7 +9,7 @@ static void version()
 
 static void usage()
 {
-	printf( "USAGE : G6 -f config_pathfilename [ -t forward_thread_size ] [ -m forward_session_size ] [ --log-level (DEBUG|INFO|WARN|ERROR|FATAL) ]\n" );
+	printf( "USAGE : G6 -f config_pathfilename [ -t forward_thread_size ] [ -s forward_session_size ] [ --log-level (DEBUG|INFO|WARN|ERROR|FATAL) ] [ --no-daemon ]\n" );
 	return;
 }
 
@@ -26,20 +26,22 @@ int main( int argc , char *argv[] )
 	/* 设置随机数种子 */
 	srand( (unsigned)time(NULL) );
 	
-	/* 设置日志输出文件 */
-	penv->log_level = LOGLEVEL_INFO ;
-	
-	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
-	SetLogLevel( penv->log_level );
-	
-	InfoLog( __FILE__ , __LINE__ , "--- G5 begin ---" );
-	
 	/* 初始化服务器环境 */
 	memset( penv , 0x00 , sizeof(struct ServerEnv) );
 	
 	/* 初始化命令行参数 */
+	memset( & (penv->cmd_para) , 0x00 , sizeof(struct CommandParameter) );
+	penv->cmd_para.config_pathfilename = NULL ;
 	penv->cmd_para.forward_thread_size = sysconf(_SC_NPROCESSORS_ONLN) ;
 	penv->cmd_para.forward_session_size = DEFAULT_FORWARD_SESSIONS_MAXCOUNT ;
+	penv->cmd_para.log_level = LOGLEVEL_INFO ;
+	penv->cmd_para.no_daemon_flag = 0 ;
+	
+	/* 设置日志输出文件 */
+	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
+	SetLogLevel( penv->cmd_para.log_level );
+	
+	InfoLog( __FILE__ , __LINE__ , "--- G5 begin ---" );
 	
 	/* 分析命令行参数 */
 	if( argc == 1 )
@@ -75,15 +77,15 @@ int main( int argc , char *argv[] )
 		{
 			n++;
 			if( strcmp( argv[n] , "DEBUG" ) == 0 )
-				penv->log_level = LOGLEVEL_DEBUG ;
+				penv->cmd_para.log_level = LOGLEVEL_DEBUG ;
 			else if( strcmp( argv[n] , "INFO" ) == 0 )
-				penv->log_level = LOGLEVEL_INFO ;
+				penv->cmd_para.log_level = LOGLEVEL_INFO ;
 			else if( strcmp( argv[n] , "WARN" ) == 0 )
-				penv->log_level = LOGLEVEL_WARN ;
+				penv->cmd_para.log_level = LOGLEVEL_WARN ;
 			else if( strcmp( argv[n] , "ERROR" ) == 0 )
-				penv->log_level = LOGLEVEL_ERROR ;
+				penv->cmd_para.log_level = LOGLEVEL_ERROR ;
 			else if( strcmp( argv[n] , "FATAL" ) == 0 )
-				penv->log_level = LOGLEVEL_FATAL ;
+				penv->cmd_para.log_level = LOGLEVEL_FATAL ;
 			else
 			{
 				fprintf( stderr , "invalid log level[%s]\r\n" , argv[n] );
@@ -91,7 +93,11 @@ int main( int argc , char *argv[] )
 				exit(7);
 			}
 			
-			SetLogLevel( penv->log_level );
+			SetLogLevel( penv->cmd_para.log_level );
+		}
+		else if( strcmp( argv[n] , "--no-daemon" ) == 0 )
+		{
+			penv->cmd_para.no_daemon_flag = 1 ;
 		}
 		else
 		{
@@ -124,7 +130,14 @@ int main( int argc , char *argv[] )
 	}
 	
 	/* 进入监控父进程 */
-	nret = BindDaemonServer( NULL , & _MonitorProcess , penv , NULL );
+	if( penv->cmd_para.no_daemon_flag )
+	{
+		nret = MonitorProcess( penv ) ;
+	}
+	else
+	{
+		nret = BindDaemonServer( NULL , & _MonitorProcess , penv , NULL ) ;
+	}
 	
 	/* 卸载配置 */
 	UnloadConfig( penv );

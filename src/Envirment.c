@@ -74,15 +74,20 @@ void CleanEnvirment( struct ServerEnv *penv )
 
 struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv )
 {
+	int			n ;
 	struct ForwardSession	*p_forward_session = penv->forward_session_array + penv->forward_session_use_offsetpos ;
 	
-	while(1)
+	for( n = 0 ; n < penv->cmd_para.forward_session_size ; n++ )
 	{
 		if( p_forward_session->status == FORWARD_SESSION_STATUS_UNUSED )
 		{
 			memset( p_forward_session , 0x00 , sizeof(struct ForwardSession) );
 			p_forward_session->status = FORWARD_SESSION_STATUS_READY ;
 			penv->forward_session_use_offsetpos++;
+			if( penv->forward_session_use_offsetpos >= penv->cmd_para.forward_session_size )
+			{
+				penv->forward_session_use_offsetpos = 0 ;
+			}
 			return p_forward_session;
 		}
 		
@@ -101,22 +106,18 @@ struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv )
 void SetForwardSessionUnused( struct ForwardSession *p_forward_session )
 {
 	if( p_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
-	{
-		if( p_forward_session->p_reverse_forward_session || p_forward_session->p_reverse_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
-		{
-			DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-			_CLOSESOCKET( p_forward_session->sock );
-			_CLOSESOCKET( p_forward_session->p_reverse_forward_session->sock );
-			p_forward_session->p_reverse_forward_session->status = FORWARD_SESSION_STATUS_UNUSED ;
-		}
-		else
-		{
-			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
-			_CLOSESOCKET( p_forward_session->sock );
-		}
-		
 		p_forward_session->status = FORWARD_SESSION_STATUS_UNUSED ;
-	}
+	
+	return;
+}
+
+void SetForwardSessionUnused2( struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 )
+{
+	if( p_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
+		p_forward_session->status = FORWARD_SESSION_STATUS_UNUSED ;
+	
+	if( p_forward_session2->status != FORWARD_SESSION_STATUS_UNUSED )
+		p_forward_session2->status = FORWARD_SESSION_STATUS_UNUSED ;
 	
 	return;
 }
