@@ -1,5 +1,31 @@
 #include "G6.h"
 
+static int MatchClientAddr( struct NetAddress *p_netaddr , struct ForwardRule *p_forward_rule , unsigned long *p_client_index )
+{
+	char			port_str[ PORT_MAXLEN + 1 ] ;
+	unsigned long		match_client_index ;
+	struct ClientNetAddress	*p_match_addr = NULL ;
+	
+	memset( port_str , 0x00 , sizeof(port_str) );
+	snprintf( port_str , sizeof(port_str)-1 , "%d" , p_netaddr->port.port_int );
+	
+	for( match_client_index = 0 , p_match_addr = & (p_forward_rule->clients_addr[0])
+		; match_client_index < p_forward_rule->clients_addr_count
+		; match_client_index++ , p_match_addr++ )
+	{
+		if(	IsMatchString( p_match_addr->netaddr.ip , p_netaddr->ip , '*' , '?' ) == 0
+			&&
+			IsMatchString( p_match_addr->netaddr.port.port_str , port_str , '*' , '?' ) == 0
+		)
+		{
+			(*p_client_index) = match_client_index ;
+			return MATCH;
+		}
+	}
+	
+	return NOT_MATCH;
+}
+
 static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
 {
 	struct ForwardRule	*p_forward_rule = p_forward_session->p_forward_rule ;
@@ -143,41 +169,28 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 	return 0;
 }
 
-static void ResolveConnectingError( struct ServerEnv *penv , struct ForwardSession *p_reverse_forward_session )
+static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p_reverse_forward_session );
+
+static int ResolveConnectingError( struct ServerEnv *penv , struct ForwardSession *p_reverse_forward_session )
 {
 	struct ServerNetAddress		*p_servers_addr = NULL ;
 	
-	/*
 	int				nret = 0 ;
-	*/
-	
-	/* 关闭老套接字 */
-	/*
-	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-	*/
-	_CLOSESOCKET( p_reverse_forward_session->sock );
 	
 	/* 设置服务端不可用 */
 	p_servers_addr = p_reverse_forward_session->p_forward_rule->servers_addr + p_reverse_forward_session->server_index ;
 	p_servers_addr->server_unable = 1 ;
-	p_servers_addr->timestamp_to_enable = time(NULL) + 10 ;
+	p_servers_addr->timestamp_to_enable = time(NULL) + DEFAULT_DISABLE_TIMEOUT ;
 	
 	/* 非堵塞连接服务端 */
-	/*
-	nret = TryToConnectServer( penv , p_forward_session ) ;
+	nret = TryToConnectServer( penv , p_reverse_forward_session ) ;
 	if( nret )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "TryToConnectServer failed[%d]" , nret );
-		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
-		DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->p_reverse_forward_session->sock );
-		_CLOSESOCKET( p_forward_session->p_reverse_forward_session->sock );
-		SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
-		return;
+		return nret;
 	}
-	*/
 	
-	return;
+	return 0;
 }
 
 static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p_reverse_forward_session )
@@ -189,83 +202,82 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	
 	int			nret = 0 ;
 	
-	while(1)
+	/* 根据负载均衡算法选择服务端 */
+	nret = SelectServerAddress( penv , p_reverse_forward_session ) ;
+	if( nret )
 	{
-		/* 根据负载均衡算法选择服务端 */
-		nret = SelectServerAddress( penv , p_reverse_forward_session ) ;
-		if( nret )
+		ErrorLog( __FILE__ , __LINE__ , "SelectServerAddress failed[%d]" , nret );
+		return 1;
+	}
+	
+	/* 创建连接服务端的客户端 */
+	p_reverse_forward_session->sock = socket( AF_INET , SOCK_STREAM , IPPROTO_TCP );
+	if( p_reverse_forward_session->sock == -1 )
+	{
+		ErrorLog( __FILE__ , __LINE__ , "socket failed , errno[%d]" , errno );
+		return -1;
+	}
+	
+	SetNonBlocking( p_reverse_forward_session->sock );
+	
+	/* 连接服务端 */
+	p_servers_addr = p_reverse_forward_session->p_forward_rule->servers_addr + p_reverse_forward_session->server_index ;
+	addr_len = sizeof(struct sockaddr) ;
+	nret = connect( p_reverse_forward_session->sock , (struct sockaddr *) & (p_servers_addr->netaddr.sockaddr) , addr_len );
+	if( nret == -1 )
+	{
+		if( _ERRNO == _EINPROGRESS ) /* 正在连接 */
 		{
-			ErrorLog( __FILE__ , __LINE__ , "SelectServerAddress failed[%d]" , nret );
-			return 1;
-		}
-		
-		/* 创建连接服务端的客户端 */
-		p_reverse_forward_session->sock = socket( AF_INET , SOCK_STREAM , IPPROTO_TCP );
-		if( p_reverse_forward_session->sock == -1 )
-		{
-			ErrorLog( __FILE__ , __LINE__ , "socket failed , errno[%d]" , errno );
-			return -1;
-		}
-		
-		SetNonBlocking( p_reverse_forward_session->sock );
-		
-		/* 连接服务端 */
-		p_servers_addr = p_reverse_forward_session->p_forward_rule->servers_addr + p_reverse_forward_session->server_index ;
-		addr_len = sizeof(struct sockaddr) ;
-		nret = connect( p_reverse_forward_session->sock , (struct sockaddr *) & (p_servers_addr->netaddr.sockaddr) , addr_len );
-		if( nret == -1 )
-		{
-			if( _ERRNO == _EINPROGRESS ) /* 正在连接 */
-			{
-				p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTING ;
-				
-				InfoLog( __FILE__ , __LINE__ , "#%d#-#%d# connecting [%s:%d] ..." , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
-				
-				memset( & event , 0x00 , sizeof(struct epoll_event) );
-				event.data.ptr = p_reverse_forward_session ;
-				event.events = EPOLLOUT | EPOLLERR ;
-				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_reverse_forward_session->sock , & event );
-				
-				memset( & event , 0x00 , sizeof(struct epoll_event) );
-				event.data.ptr = p_reverse_forward_session->p_reverse_forward_session ;
-				event.events = EPOLLERR ;
-				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_reverse_forward_session->p_reverse_forward_session->sock , & event );
-				
-				break;
-			}
-			else /* 连接失败 */
-			{
-				ErrorLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] failed , errno[%d]" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int , errno );
-				ResolveConnectingError( penv , p_reverse_forward_session );
-				continue;
-			}
-		}
-		else /* 连接成功 */
-		{
-			p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
+			p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTING ;
 			
-			InfoLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] ok" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
-			
-			if( p_servers_addr->server_unable == 1 )
-				p_servers_addr->server_unable = 0 ;
-			
-			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL );
-			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->p_reverse_forward_session->sock , NULL );
-			
-			epoll_fd_index = (p_reverse_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
+			InfoLog( __FILE__ , __LINE__ , "#%d#-#%d# connecting [%s:%d] ..." , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 			
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_reverse_forward_session ;
-			event.events = EPOLLIN | EPOLLERR ;
-			epoll_ctl( penv->forward_epoll_fd_array[epoll_fd_index] , EPOLL_CTL_MOD , p_reverse_forward_session->sock , & event );
+			event.events = EPOLLOUT | EPOLLERR ;
+			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_reverse_forward_session->sock , & event );
 			
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_reverse_forward_session->p_reverse_forward_session ;
-			event.events = EPOLLIN | EPOLLERR ;
-			epoll_ctl( penv->forward_epoll_fd_array[epoll_fd_index] , EPOLL_CTL_MOD , p_reverse_forward_session->p_reverse_forward_session->sock , & event );
-			
-			break;
+			event.events = EPOLLERR ;
+			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_reverse_forward_session->p_reverse_forward_session->sock , & event );
 		}
+		else /* 连接失败 */
+		{
+			ErrorLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] failed , errno[%d]" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int , errno );
+			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_reverse_forward_session->sock );
+			_CLOSESOCKET( p_reverse_forward_session->sock );
+			nret = ResolveConnectingError( penv , p_reverse_forward_session ) ;
+			if( nret )
+			{
+				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL );
+				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->p_reverse_forward_session->sock , NULL );
+			}
+		}
+	}
+	else /* 连接成功 */
+	{
+		p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
+		
+		InfoLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] ok" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
+		
+		if( p_servers_addr->server_unable == 1 )
+			p_servers_addr->server_unable = 0 ;
+		
+		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL );
+		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->p_reverse_forward_session->sock , NULL );
+		
+		epoll_fd_index = (p_reverse_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
+		
+		memset( & event , 0x00 , sizeof(struct epoll_event) );
+		event.data.ptr = p_reverse_forward_session ;
+		event.events = EPOLLIN | EPOLLERR ;
+		epoll_ctl( penv->forward_epoll_fd_array[epoll_fd_index] , EPOLL_CTL_MOD , p_reverse_forward_session->sock , & event );
+		
+		memset( & event , 0x00 , sizeof(struct epoll_event) );
+		event.data.ptr = p_reverse_forward_session->p_reverse_forward_session ;
+		event.events = EPOLLIN | EPOLLERR ;
+		epoll_ctl( penv->forward_epoll_fd_array[epoll_fd_index] , EPOLL_CTL_MOD , p_reverse_forward_session->p_reverse_forward_session->sock , & event );
 	}
 	
 	return 0;
@@ -273,58 +285,86 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 
 static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_listen_session )
 {
+	unsigned long		client_index ;
+	int			sock ;
+	struct NetAddress	netaddr ;
+	_SOCKLEN_T		addr_len = sizeof(struct sockaddr) ;
+	
 	struct ForwardSession	*p_forward_session = NULL ;
 	struct ForwardSession	*p_reverse_forward_session = NULL ;
-	_SOCKLEN_T		addr_len = sizeof(struct sockaddr) ;
 	
 	int			nret = 0 ;
 	
-	/* 获取两个空闲会话结构 */
-	p_forward_session = GetForwardSessionUnused( penv ) ;
-	if( p_forward_session == NULL )
+	while(1)
 	{
-		ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed" );
-		return -1;
-	}
-	
-	p_reverse_forward_session = GetForwardSessionUnused( penv ) ;
-	if( p_reverse_forward_session == NULL )
-	{
-		ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed" );
-		return -1;
-	}
-	
-	p_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
-	p_forward_session->p_reverse_forward_session = p_reverse_forward_session ;
-	
-	p_reverse_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
-	p_reverse_forward_session->p_reverse_forward_session = p_forward_session ;
-	
-	/* 接收新客户端连接 */
-	p_forward_session->sock = accept( p_listen_session->sock , (struct sockaddr *) & (p_forward_session->netaddr.sockaddr) , & addr_len ) ;
-	if( p_forward_session->sock == -1 )
-	{
-		ErrorLog( __FILE__ , __LINE__ , "accept failed , errno[%d]" , errno );
-		SetForwardSessionUnused2( p_forward_session , p_reverse_forward_session );
-		return -1;
-	}
-	else
-	{
-		GetNetAddress( & (p_forward_session->netaddr) );
-		DebugLog( __FILE__ , __LINE__ , "accept [%s:%d]#%d# ok" , p_forward_session->netaddr.ip , p_forward_session->netaddr.port.port_int , p_forward_session->sock );
-	}
-	
-	SetNonBlocking( p_forward_session->sock );
-	
-	/* 非堵塞连接服务端 */
-	nret = TryToConnectServer( penv , p_reverse_forward_session ) ;
-	if( nret )
-	{
-		ErrorLog( __FILE__ , __LINE__ , "TryToConnectServer failed[%d]" , nret );
-		DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
-		_CLOSESOCKET( p_forward_session->sock );
-		SetForwardSessionUnused2( p_forward_session , p_reverse_forward_session );
-		return -1;
+		/* 接收新客户端连接 */
+		sock = accept( p_listen_session->sock , (struct sockaddr *) & (netaddr.sockaddr) , & addr_len ) ;
+		if( sock == -1 )
+		{
+			if( _ERRNO == _EWOULDBLOCK )
+				break;
+			
+			ErrorLog( __FILE__ , __LINE__ , "accept failed , errno[%d]" , errno );
+			return -1;
+		}
+		else
+		{
+			GetNetAddress( & netaddr );
+			DebugLog( __FILE__ , __LINE__ , "accept [%s:%d]#%d# ok" , netaddr.ip , netaddr.port.port_int , sock );
+		}
+		
+		SetNonBlocking( sock );
+		
+		/* 检查客户端白名单 */
+		nret = MatchClientAddr( & netaddr , p_listen_session->p_forward_rule , & client_index ) ;
+		if( nret )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "MatchClientAddr failed" );
+			DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
+			_CLOSESOCKET( sock );
+			return -1;
+		}
+		
+		/* 获取两个空闲会话结构 */
+		p_forward_session = GetForwardSessionUnused( penv ) ;
+		if( p_forward_session == NULL )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed" );
+			DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
+			_CLOSESOCKET( sock );
+			return -1;
+		}
+		
+		p_reverse_forward_session = GetForwardSessionUnused( penv ) ;
+		if( p_reverse_forward_session == NULL )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed" );
+			DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
+			_CLOSESOCKET( sock );
+			SetForwardSessionUnused( p_forward_session );
+			return -1;
+		}
+		
+		p_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
+		p_forward_session->p_reverse_forward_session = p_reverse_forward_session ;
+		
+		p_forward_session->sock = sock ;
+		memcpy( & (p_forward_session->netaddr) , & netaddr , sizeof(struct NetAddress) );
+		p_forward_session->client_index = client_index ;
+		
+		p_reverse_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
+		p_reverse_forward_session->p_reverse_forward_session = p_forward_session ;
+		
+		/* 非堵塞连接服务端 */
+		nret = TryToConnectServer( penv , p_reverse_forward_session ) ;
+		if( nret )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "TryToConnectServer failed[%d]" , nret );
+			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+			_CLOSESOCKET( p_forward_session->sock );
+			SetForwardSessionUnused2( p_forward_session , p_reverse_forward_session );
+			return -1;
+		}
 	}
 	
 	return 0;
@@ -341,15 +381,13 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	struct ServerNetAddress	*p_servers_addr = NULL ;
 	int			epoll_fd_index ;
 	
+	int			nret = 0 ;
+	
 	/* 检查非堵塞连接结果 */
 #if ( defined __linux ) || ( defined __unix )
 	addr_len = sizeof(int) ;
 	code = getsockopt( p_forward_session->sock , SOL_SOCKET , SO_ERROR , & error , & addr_len ) ;
 	if( code < 0 || error )
-	{
-		ResolveConnectingError( penv , p_forward_session );
-		return 0;
-	}
 #elif ( defined _WIN32 )
 	addr_len = sizeof(struct sockaddr_in) ;
 	nret = connect( p_forward_session->sock , ( struct sockaddr *) & (p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index]->netaddr) , addr_len ) ;
@@ -358,11 +396,20 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 		;
 	}
 	else
+#endif
         {
-		ResolveConnectingError( penv , p_forward_session );
+		ErrorLog( __FILE__ , __LINE__ , "OnConnectingServer" );
+		nret = ResolveConnectingError( penv , p_forward_session ) ;
+		if( nret )
+		{
+			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
+			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->p_reverse_forward_session->sock );
+			_CLOSESOCKET( p_forward_session->p_reverse_forward_session->sock );
+		}
+		
 		return 0;
         }
-#endif
 	
 	/* 连接成功 */
 	p_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;

@@ -75,14 +75,6 @@ void GetNetAddress( struct NetAddress *p_netaddr )
 	return;
 }
 
-/* 关闭两个套接字 */
-void _CLOSESOCKET2( int sock , int sock2 )
-{
-	_CLOSESOCKET( sock );
-	_CLOSESOCKET( sock2 );
-	return;
-}
-
 /* 转换为守护进程 */
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) )
 {
@@ -130,3 +122,58 @@ int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void
 	
 	return ServerMain( pv );
 }
+
+/* 判断字符串匹配性 */
+int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchCharacters, char cMatchOneCharacters)
+{
+	int el=strlen(pcMatchString);
+	int sl=strlen(pcObjectString);
+	char cs,ce;
+
+	int is,ie;
+	int last_xing_pos=-1;
+
+	for(is=0,ie=0;is<sl && ie<el;){
+		cs=pcObjectString[is];
+		ce=pcMatchString[ie];
+
+		if(cs!=ce){
+			if(ce==cMatchMuchCharacters){
+				last_xing_pos=ie;
+				ie++;
+			}else if(ce==cMatchOneCharacters){
+				is++;
+				ie++;
+			}else if(last_xing_pos>=0){
+				while(ie>last_xing_pos){
+					ce=pcMatchString[ie];
+					if(ce==cs)
+						break;
+					ie--;
+				}
+
+				if(ie==last_xing_pos)
+					is++;
+			}else
+				return -1;
+		}else{
+			is++;
+			ie++;
+		}
+	}
+
+	if(pcObjectString[is]==0 && pcMatchString[ie]==0)
+		return 0;
+
+	if(pcMatchString[ie]==0)
+		ie--;
+
+	if(ie>=0){
+		while(pcMatchString[ie])
+			if(pcMatchString[ie++]!=cMatchMuchCharacters)
+				return -2;
+	} 
+
+	return 0;
+}
+

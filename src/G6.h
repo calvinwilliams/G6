@@ -29,18 +29,19 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <pthread.h>
-#define _VSNPRINTF		vsnprintf
-#define _SNPRINTF		snprintf
-#define _CLOSESOCKET		close
-#define _ERRNO			errno
-#define _EWOULDBLOCK		EWOULDBLOCK
-#define _ECONNABORTED		ECONNABORTED
-#define _EINPROGRESS		EINPROGRESS
-#define _ECONNRESET		ECONNRESET
-#define _ENOTCONN		ENOTCONN
-#define _EISCONN		EISCONN
-#define _SOCKLEN_T		socklen_t
-#define _GETTIMEOFDAY(_tv_)	gettimeofday(&(_tv_),NULL)
+#define _VSNPRINTF			vsnprintf
+#define _SNPRINTF			snprintf
+#define _CLOSESOCKET			close
+#define _CLOSESOCKET2(_fd1_,_fd2_)	close(_fd1_),close(_fd2_);
+#define _ERRNO				errno
+#define _EWOULDBLOCK			EWOULDBLOCK
+#define _ECONNABORTED			ECONNABORTED
+#define _EINPROGRESS			EINPROGRESS
+#define _ECONNRESET			ECONNRESET
+#define _ENOTCONN			ENOTCONN
+#define _EISCONN			EISCONN
+#define _SOCKLEN_T			socklen_t
+#define _GETTIMEOFDAY(_tv_)		gettimeofday(&(_tv_),NULL)
 #define _LOCALTIME(_tt_,_stime_) \
 	localtime_r(&(_tt_),&(_stime_));
 #elif ( defined _WIN32 )
@@ -49,17 +50,18 @@
 #include <sys/types.h>
 #include <io.h>
 #include <windows.h>
-#define _VSNPRINTF		_vsnprintf
-#define _SNPRINTF		_snprintf
-#define _CLOSESOCKET		closesocket
-#define _ERRNO			GetLastError()
-#define _EWOULDBLOCK		WSAEWOULDBLOCK
-#define _ECONNABORTED		WSAECONNABORTED
-#define _EINPROGRESS		WSAEINPROGRESS
-#define _ECONNRESET		WSAECONNRESET
-#define _ENOTCONN		WSAENOTCONN
-#define _EISCONN		WSAEISCONN
-#define _SOCKLEN_T		int
+#define _VSNPRINTF			_vsnprintf
+#define _SNPRINTF			_snprintf
+#define _CLOSESOCKET			closesocket
+#define _CLOSESOCKET2(_fd1_,_fd2_)	closesocket(_fd1_),closesocket(_fd2_);
+#define _ERRNO				GetLastError()
+#define _EWOULDBLOCK			WSAEWOULDBLOCK
+#define _ECONNABORTED			WSAECONNABORTED
+#define _EINPROGRESS			WSAEINPROGRESS
+#define _ECONNRESET			WSAECONNRESET
+#define _ENOTCONN			WSAENOTCONN
+#define _EISCONN			WSAEISCONN
+#define _SOCKLEN_T			int
 #define _GETTIMEOFDAY(_tv_) \
 	{ \
 		SYSTEMTIME stNow ; \
@@ -136,6 +138,8 @@
 
 #define IO_BUFFER_SIZE				4096 /* 输入输出缓冲区大小 */
 
+#define DEFAULT_DISABLE_TIMEOUT			10 /* 缺省暂禁时间，单位：秒 */
+
 /* 网络地址信息结构 */
 struct NetAddress
 {
@@ -205,8 +209,8 @@ struct ForwardSession
 	unsigned char		status ; /* 会话状态 */
 	
 	struct ForwardRule	*p_forward_rule ; /* 转发规则派生 */
-	unsigned int		client_index ; /* 客户端索引 */
-	unsigned int		server_index ; /* 服务端索引 */
+	unsigned long		client_index ; /* 客户端索引 */
+	unsigned long		server_index ; /* 服务端索引 */
 	
 	/*
 	union
@@ -274,8 +278,8 @@ int SetReuseAddr( int sock );
 int SetNonBlocking( int sock );
 void SetNetAddress( struct NetAddress *p_netaddr );
 void GetNetAddress( struct NetAddress *p_netaddr );
-void _CLOSESOCKET2( int sock , int sock2 );
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) );
+int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchCharacters, char cMatchOneCharacters);
 
 /********* envirment *********/
 

@@ -47,7 +47,7 @@ static int AddListen( struct ServerEnv *penv , struct ForwardRule *p_forward_rul
 		
 		memset( & event , 0x00 , sizeof(event) );
 		event.data.ptr = p_forward_session ;
-		event.events = EPOLLIN | EPOLLERR ;
+		event.events = EPOLLIN | EPOLLERR | EPOLLET ;
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_forward_rule->forwards_addr[n].sock , & event );
 	}
 	
