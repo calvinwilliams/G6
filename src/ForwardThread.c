@@ -38,7 +38,7 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	else if( p_forward_session->io_buffer_len == -1 )
 	{
 		/* 通讯接收出错 */
-		ErrorLog( __FILE__ , __LINE__ , "recv #%d# failed , errno[%d]" , p_forward_session->sock , p_forward_session->io_buffer_len , errno );
+		ErrorLog( __FILE__ , __LINE__ , "recv #%d# failed , errno[%d]" , p_forward_session->sock , errno );
 		IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );

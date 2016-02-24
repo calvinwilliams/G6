@@ -138,7 +138,7 @@
 
 #define IO_BUFFER_SIZE				4096 /* 输入输出缓冲区大小 */
 
-#define DEFAULT_DISABLE_TIMEOUT			10 /* 缺省暂禁时间，单位：秒 */
+#define DEFAULT_DISABLE_TIMEOUT			60 /* 缺省暂禁时间，单位：秒 */
 
 /* 网络地址信息结构 */
 struct NetAddress
