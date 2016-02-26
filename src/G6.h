@@ -178,15 +178,14 @@ struct ServerNetAddress
 	
 	unsigned long		server_connection_count ; /* ·şÎñ¶ËÁ¬½ÓÊıÁ¿ */
 	
-	struct timeval		tv1 ; /* ×î½ü¶ÁÊ±¼ä´Á */
-	struct timeval		tv2 ; /* ×î½üĞ´Ê±¼ä´Á */
-	struct timeval		dtv ; /* ×î½ü¶ÁĞ´Ê±¼ä´Á²î */
+	time_t			rtt ; /* ×î½ü¶ÁÊ±¼ä´Á */
+	time_t			wtt ; /* ×î½üĞ´Ê±¼ä´Á */
 } ;
 
 /* ×ª·¢¹æÔò½á¹¹ */
 struct ForwardRule
 {
-	char				rule_id[ RULE_ID_MAXLEN + 1 ] ; /* ¹æÔòID © */
+	char				rule_id[ RULE_ID_MAXLEN + 1 ] ; /* ¹æÔòID */
 	char				load_balance_algorithm[ LOAD_BALANCE_ALGORITHM_MAXLEN + 1 ] ; /* ¸ºÔØ¾ùºâËã·¨ */
 	
 	struct ClientNetAddress		*clients_addr ; /* ¿Í»§¶ËµØÖ·½á¹¹ */
@@ -212,16 +211,6 @@ struct ForwardSession
 	struct ForwardRule	*p_forward_rule ; /* ×ª·¢¹æÔòÅÉÉú */
 	unsigned long		client_index ; /* ¿Í»§¶ËË÷Òı */
 	unsigned long		server_index ; /* ·şÎñ¶ËË÷Òı */
-	
-	/*
-	union
-	{
-		struct
-		{
-			
-		} MS ;
-	} balance_algorithm ;
-	*/
 	
 	struct NetAddress	netaddr ; /* ÍøÂçµØÖ·½á¹¹ */
 	int			sock ; /* sockÃèÊö×Ö */
@@ -263,12 +252,13 @@ struct ServerEnv
 	
 	int			*forward_thread_index ; /* ×ÓÏß³ÌĞòºÅ */
 	pthread_t		*forward_thread_tid_array ; /* ×ÓÏß³ÌTID */
-	struct PipeFds		*forward_pipe_array ; /* ¸¸×ÓÏß³ÌÃüÁî¹ÜµÀ */
 	int			*forward_epoll_fd_array ; /* ×ÓÏß³Ì×ª·¢EPOLL³Ø */
 	
 	struct ForwardSession	*forward_session_array ; /* ×ª·¢»á»°Êı×é */
 	unsigned long		forward_session_count ; /* ×ª·¢»á»°Êı×é´óĞ¡ */
 	unsigned long		forward_session_use_offsetpos ; /* ×ª·¢»á»°×î½üÊ¹ÓÃµ¥ÔªÆ«ÒÆÁ¿ */
+	
+	pthread_mutex_t		mutex ; /* ÁÙ½çÇø»¥³â */
 } ;
 
 /********* util *********/

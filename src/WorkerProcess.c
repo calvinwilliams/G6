@@ -3,7 +3,7 @@
 int WorkerProcess( struct ServerEnv *penv )
 {
 	unsigned long		n ;
-	struct epoll_event	event ;
+	//struct epoll_event	event ;
 	
 	int			nret = 0 ;
 	
@@ -23,18 +23,6 @@ int WorkerProcess( struct ServerEnv *penv )
 			return -1;
 		}
 		*(penv->forward_thread_index) = n ;
-		
-		nret = pipe( penv->forward_pipe_array[n].fds ) ;
-		if( nret == -1 )
-		{
-			ErrorLog( __FILE__ , __LINE__ , "pipe failed , errno[%d]" , errno );
-			return -1;
-		}
-		
-		memset( & event , 0x00 , sizeof(event) );
-		event.data.ptr = NULL ;
-		event.events = EPOLLIN | EPOLLERR ;
-		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , penv->forward_pipe_array[n].fds[0] , & event );
 		
 		nret = pthread_create( penv->forward_thread_tid_array+n , NULL , & _ForwardThread , (void*)penv ) ;
 		if( nret )

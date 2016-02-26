@@ -1,5 +1,18 @@
 #include "G6.h"
 
+#define DISCONNECT_PAIR	\
+	pthread_mutex_lock( & (penv->mutex) ); \
+	if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER ) \
+		p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--; \
+	else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT ) \
+		p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--; \
+	pthread_mutex_unlock( & (penv->mutex) ); \
+	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL ); \
+	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL ); \
+	DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
+	_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
+	SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session ); \
+
 static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
 {
 	struct epoll_event	*p_event = NULL ;
@@ -27,34 +40,23 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	if( p_forward_session->io_buffer_len == 0 )
 	{
 		/* 对端断开连接 */
-		if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER )
-			p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
-		else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-			p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
-		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock );
-		epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-		epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
-		DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-		_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-		SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
+		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock ); \
+		DISCONNECT_PAIR
 		return 0;
 	}
 	else if( p_forward_session->io_buffer_len == -1 )
 	{
 		/* 通讯接收出错 */
-		if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER )
-			p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
-		else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-			p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
 		ErrorLog( __FILE__ , __LINE__ , "recv #%d# failed , errno[%d]" , p_forward_session->sock , errno );
-		IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
-		epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-		epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
-		DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-		_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-		SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
+		DISCONNECT_PAIR
 		return 0;
 	}
+	
+	/* 登记最近读时间戳 */
+	pthread_mutex_lock( & (penv->mutex) );
+	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
+		time( & (p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].rtt) );
+	pthread_mutex_unlock( & (penv->mutex) );
 	
 	/* 发送通讯数据 */
 	len = send( p_forward_session->p_reverse_forward_session->sock , p_forward_session->io_buffer , p_forward_session->io_buffer_len , 0 ) ;
@@ -78,15 +80,8 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 		else
 		{
 			/* 通讯发送出错 */
-			if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER )
-				p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
-			else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-				p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
-			epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-			epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
-			DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-			_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-			SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
+			ErrorLog( __FILE__ , __LINE__ , "send #%d# failed , errno[%d]" , p_forward_session->sock , errno );
+			DISCONNECT_PAIR
 			return 0;
 		}
 	}
@@ -117,6 +112,12 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_forward_session->p_reverse_forward_session->sock , & event );
 	}
 	
+	/* 登记最近写时间戳 */
+	pthread_mutex_lock( & (penv->mutex) );
+	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
+		time( & (p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].wtt) );
+	pthread_mutex_unlock( & (penv->mutex) );
+	
 	return 0;
 }
 
@@ -136,15 +137,8 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 		else
 		{
 			/* 通讯发送出错 */
-			if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER )
-				p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
-			else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-				p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
-			epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-			epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
-			DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-			_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-			SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
+			ErrorLog( __FILE__ , __LINE__ , "send #%d# failed , errno[%d]" , p_forward_session->sock , errno );
+			DISCONNECT_PAIR
 			return 0;
 		}
 	}
@@ -174,6 +168,12 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 		p_forward_session->io_buffer_offsetpos = len ;
 	}
 	
+	/* 登记最近写时间戳 */
+	pthread_mutex_lock( & (penv->mutex) );
+	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
+		time( & (p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].wtt) );
+	pthread_mutex_unlock( & (penv->mutex) );
+	
 	return 0;
 }
 
@@ -186,8 +186,6 @@ void *ForwardThread( struct ServerEnv *penv )
 	int			event_count ;
 	int			event_index ;
 	struct epoll_event	*p_event = NULL ;
-	
-	char			command ;
 	
 	struct ForwardSession	*p_forward_session = NULL ;
 	
@@ -209,65 +207,30 @@ void *ForwardThread( struct ServerEnv *penv )
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
-			if( p_event->data.ptr == NULL ) /* 命令管道事件 */
+			DebugLog( __FILE__ , __LINE__ , "forward session event" );
+			
+			p_forward_session = p_event->data.ptr ;
+			
+			if( p_event->events & EPOLLIN ) /* 输入事件 */
 			{
-				DebugLog( __FILE__ , __LINE__ , "command pipe event" );
-				
-				if( p_event->events & EPOLLIN )
+				nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count ) ;
+				if( nret )
 				{
-					read( penv->forward_pipe_array[forward_thread_index].fds[0] , & command , 1 );
-					InfoLog( __FILE__ , __LINE__ , "read command pipe[%c]" , command );
+					ErrorLog( __FILE__ , __LINE__ , "OnForwardInput failed[%d]" , nret );
 				}
-				else if( p_event->events & EPOLLERR )
+			}
+			else if( p_event->events & EPOLLOUT ) /* 输出事件 */
+			{
+				nret = OnForwardOutput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count ) ;
+				if( nret )
 				{
-					ErrorLog( __FILE__ , __LINE__ , "command pipe EPOLLERR" );
-					pthread_exit( NULL );
-				}
-				else if( p_event->events & EPOLLHUP )
-				{
-					ErrorLog( __FILE__ , __LINE__ , "command pipe EPOLLHUP" );
-					pthread_exit( NULL );
-				}
-				else
-				{
-					ErrorLog( __FILE__ , __LINE__ , "command pipe [%d]" , p_event->events );
-					pthread_exit( NULL );
+					ErrorLog( __FILE__ , __LINE__ , "OnForwardOutput failed[%d]" , nret );
 				}
 			}
 			else
 			{
-				DebugLog( __FILE__ , __LINE__ , "forward session event" );
-				
-				p_forward_session = p_event->data.ptr ;
-				
-				if( p_event->events & EPOLLIN ) /* 输入事件 */
-				{
-					nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count ) ;
-					if( nret )
-					{
-						ErrorLog( __FILE__ , __LINE__ , "OnForwardInput failed[%d]" , nret );
-					}
-				}
-				else if( p_event->events & EPOLLOUT ) /* 输出事件 */
-				{
-					nret = OnForwardOutput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count ) ;
-					if( nret )
-					{
-						ErrorLog( __FILE__ , __LINE__ , "OnForwardOutput failed[%d]" , nret );
-					}
-				}
-				else
-				{
-					if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER )
-						p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
-					else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-						p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
-					ErrorLog( __FILE__ , __LINE__ , "forward session EPOLLERR" );
-			        	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-					DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-					_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-					SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
-				}
+				ErrorLog( __FILE__ , __LINE__ , "forward session EPOLLERR" );
+				DISCONNECT_PAIR
 			}
 		}
 	}
