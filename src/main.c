@@ -129,6 +129,14 @@ int main( int argc , char *argv[] )
 		return -nret;
 	}
 	
+	/* 创建所有侦听端口 */
+	nret = AddListeners( penv ) ;
+	if( nret )
+	{
+		printf( "AddListeners failed[%d]\n" , nret );
+		return -nret;
+	}
+	
 	/* 进入监控父进程 */
 	if( penv->cmd_para.no_daemon_flag )
 	{

@@ -1,59 +1,5 @@
 #include "G6.h"
 
-static int AddListen( struct ServerEnv *penv , struct ForwardRule *p_forward_rule )
-{
-	int			n ;
-	struct ForwardSession	*p_forward_session = NULL ;
-	struct epoll_event	event ;
-	
-	int			nret = 0 ;
-	
-	for( n = 0 ; n < p_forward_rule->forwards_addr_count ; n++ )
-	{
-		p_forward_rule->forwards_addr[n].sock = socket( AF_INET , SOCK_STREAM , IPPROTO_TCP );
-		if( p_forward_rule->forwards_addr[n].sock == -1 )
-		{
-			ErrorLog( __FILE__ , __LINE__ , "socket failed , errno[%d]" , errno );
-			return -1;
-		}
-		
-		SetNonBlocking( p_forward_rule->forwards_addr[n].sock );
-		SetReuseAddr( p_forward_rule->forwards_addr[n].sock );
-		
-		nret = bind( p_forward_rule->forwards_addr[n].sock , (struct sockaddr *) & (p_forward_rule->forwards_addr[n].netaddr.sockaddr) , sizeof(struct sockaddr) ) ;
-		if( nret )
-		{
-			ErrorLog( __FILE__ , __LINE__ , "bind[%s:%d] failed , errno[%d]" , p_forward_rule->forwards_addr[n].netaddr.ip , p_forward_rule->forwards_addr[n].netaddr.port.port_int , _ERRNO );
-			return -1;
-		}
-		
-		nret = listen( p_forward_rule->forwards_addr[n].sock , 1024 ) ;
-		if( nret )
-		{
-			ErrorLog( __FILE__ , __LINE__ , "listen[%s:%d] failed , errno[%d]" , p_forward_rule->forwards_addr[n].netaddr.ip , p_forward_rule->forwards_addr[n].netaddr.port.port_int , _ERRNO );
-			return -1;
-		}
-		
-		p_forward_session = GetForwardSessionUnused( penv ) ;
-		if( p_forward_session == NULL )
-		{
-			ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed[%d]" , nret );
-			return -1;
-		}
-		
-		p_forward_session->sock = p_forward_rule->forwards_addr[n].sock ;
-		p_forward_session->p_forward_rule = p_forward_rule ;
-		p_forward_session->status = FORWARD_SESSION_STATUS_LISTEN ;
-		
-		memset( & event , 0x00 , sizeof(event) );
-		event.data.ptr = p_forward_session ;
-		event.events = EPOLLIN | EPOLLERR | EPOLLET ;
-		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_forward_rule->forwards_addr[n].sock , & event );
-	}
-	
-	return 0;
-}
-
 static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *p_forward_rule , char *rule_id )
 {
 	char				ip_and_port[ 100 + 1 ] ;
@@ -188,13 +134,6 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		SetNetAddress( & (p_forward_addr->netaddr) );
 		
 		p_forward_rule->forwards_addr_count++;
-	}
-	
-	nret = AddListen( penv , p_forward_rule ) ;
-	if( nret )
-	{
-		ErrorLog( __FILE__ , __LINE__ , "AddListen failed[%d]" , nret );
-		return -11;
 	}
 	
 	/* 读服务端信息 */
@@ -351,7 +290,7 @@ int LoadConfig( struct ServerEnv *penv )
 	InfoLog( __FILE__ , __LINE__ , "forward_rules_count[%ld/%ld] >>>" , penv->forward_rules_count , penv->forward_rules_size );
 	for( n = 0 ; n < penv->forward_rules_count ; n++ )
 	{
-		InfoLog( __FILE__ , __LINE__ , "  rule_id[%s] load_balance_algorithm[%s] >>>"
+		InfoLog( __FILE__ , __LINE__ , "  rule_id[%s] load_balance_algorithm[%s]>>>"
 			, penv->forward_rules_array[n].rule_id , penv->forward_rules_array[n].load_balance_algorithm );
 		InfoLog( __FILE__ , __LINE__ , "  clients_addr_count[%ld/%ld] forwards_addr_count[%ld/%ld] servers_addr_count[%ld/%ld]"
 			, penv->forward_rules_array[n].clients_addr_count , penv->forward_rules_array[n].clients_addr_size

@@ -207,6 +207,7 @@ struct ForwardRule
 struct ForwardSession
 {
 	unsigned char		status ; /* 会话状态 */
+	unsigned char		type ; /* 客户端还是服务端 */
 	
 	struct ForwardRule	*p_forward_rule ; /* 转发规则派生 */
 	unsigned long		client_index ; /* 客户端索引 */
@@ -285,6 +286,7 @@ int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchChar
 
 int InitEnvirment( struct ServerEnv *penv );
 void CleanEnvirment( struct ServerEnv *penv );
+int AddListeners( struct ServerEnv *penv );
 struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv );
 void SetForwardSessionUnused( struct ForwardSession *p_forward_session );
 void SetForwardSessionUnused2( struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );

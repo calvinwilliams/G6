@@ -72,6 +72,66 @@ void CleanEnvirment( struct ServerEnv *penv )
 	return;
 }
 
+int AddListeners( struct ServerEnv *penv )
+{
+	int			m , n ;
+	struct ForwardRule	*p_forward_rule = NULL ;
+	struct ForwardSession	*p_forward_session = NULL ;
+	struct epoll_event	event ;
+	
+	int			nret = 0 ;
+	
+	for( m = 0 ; m < penv->forward_rules_count ; m++ )
+	{
+		p_forward_rule = penv->forward_rules_array + m ;
+		
+		for( n = 0 ; n < p_forward_rule->forwards_addr_count ; n++ )
+		{
+			p_forward_rule->forwards_addr[n].sock = socket( AF_INET , SOCK_STREAM , IPPROTO_TCP );
+			if( p_forward_rule->forwards_addr[n].sock == -1 )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "socket failed , errno[%d]" , errno );
+				return -1;
+			}
+			
+			SetNonBlocking( p_forward_rule->forwards_addr[n].sock );
+			SetReuseAddr( p_forward_rule->forwards_addr[n].sock );
+			
+			nret = bind( p_forward_rule->forwards_addr[n].sock , (struct sockaddr *) & (p_forward_rule->forwards_addr[n].netaddr.sockaddr) , sizeof(struct sockaddr) ) ;
+			if( nret )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "bind[%s:%d] failed , errno[%d]" , p_forward_rule->forwards_addr[n].netaddr.ip , p_forward_rule->forwards_addr[n].netaddr.port.port_int , _ERRNO );
+				return -1;
+			}
+			
+			nret = listen( p_forward_rule->forwards_addr[n].sock , 1024 ) ;
+			if( nret )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "listen[%s:%d] failed , errno[%d]" , p_forward_rule->forwards_addr[n].netaddr.ip , p_forward_rule->forwards_addr[n].netaddr.port.port_int , _ERRNO );
+				return -1;
+			}
+			
+			p_forward_session = GetForwardSessionUnused( penv ) ;
+			if( p_forward_session == NULL )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed[%d]" , nret );
+				return -1;
+			}
+			
+			p_forward_session->sock = p_forward_rule->forwards_addr[n].sock ;
+			p_forward_session->p_forward_rule = p_forward_rule ;
+			p_forward_session->status = FORWARD_SESSION_STATUS_LISTEN ;
+			
+			memset( & event , 0x00 , sizeof(event) );
+			event.data.ptr = p_forward_session ;
+			event.events = EPOLLIN | EPOLLERR | EPOLLET ;
+			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_forward_rule->forwards_addr[n].sock , & event );
+		}
+	}
+	
+	return 0;
+}
+
 struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv )
 {
 	int			n ;

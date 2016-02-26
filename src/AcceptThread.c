@@ -30,10 +30,10 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 {
 	struct ForwardRule	*p_forward_rule = p_forward_session->p_forward_rule ;
 	
+	int			n ;
+		
 	if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_MS ) ) /* 主备算法 */
 	{
-		int		n ;
-		
 		for( n = 0 ; n < p_forward_rule->servers_addr_count ; n++ )
 		{
 			if(	p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 0
@@ -61,8 +61,6 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 	}
 	else if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_RR ) ) /* 轮询算法 */
 	{
-		int		n ;
-		
 		for( n = 0 ; n < p_forward_rule->servers_addr_count ; n++ )
 		{
 			if(	p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 0
@@ -93,14 +91,34 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 	}
 	else if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_LC ) ) /* 最少连接算法 */
 	{
+		p_forward_rule->selected_addr_index = -1 ;
+		for( n = 0 ; n < p_forward_rule->servers_addr_count ; n++ )
+		{
+			if(	p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 0
+				||
+				(
+					p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 1
+					&&
+					time(NULL) >= p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].timestamp_to_enable
+				)
+			)
+			{
+				if( p_forward_rule->selected_addr_index == -1 || p_forward_rule->servers_addr[n].server_connection_count < p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_connection_count )
+					p_forward_rule->selected_addr_index = n ;
+			}
+		}
+		if( p_forward_rule->selected_addr_index == -1 )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "all servers unable" );
+			return -1;
+		}
+		p_forward_session->server_index = p_forward_rule->selected_addr_index ;
 	}
 	else if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_RT ) ) /* 最小响应时间算法 */
 	{
 	}
 	else if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_RD ) ) /* 随机算法 */
 	{
-		int		n ;
-		
 		p_forward_rule->selected_addr_index += Rand( 1 , p_forward_rule->servers_addr_count ) ;
 		if( p_forward_rule->selected_addr_index >= p_forward_rule->servers_addr_count )
 			p_forward_rule->selected_addr_index %= p_forward_rule->servers_addr_count ;
@@ -172,6 +190,8 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 		ErrorLog( __FILE__ , __LINE__ , "load_balance_algorithm[%s] invalid" , p_forward_session->p_forward_rule->load_balance_algorithm );
 		return -1;
 	}
+	
+	p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count++;
 	
 	return 0;
 }
@@ -247,6 +267,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		else /* 连接失败 */
 		{
 			ErrorLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] failed , errno[%d]" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int , errno );
+			p_reverse_forward_session->p_forward_rule->servers_addr[p_reverse_forward_session->server_index].server_connection_count--;
 			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_reverse_forward_session->sock );
 			_CLOSESOCKET( p_reverse_forward_session->sock );
 			nret = ResolveConnectingError( penv , p_reverse_forward_session ) ;
@@ -322,7 +343,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 		nret = MatchClientAddr( & netaddr , p_listen_session->p_forward_rule , & client_index ) ;
 		if( nret == NOT_MATCH )
 		{
-			ErrorLog( __FILE__ , __LINE__ , "MatchClientAddr failed" );
+			ErrorLog( __FILE__ , __LINE__ , "MatchClientAddr failed , rule_id[%s]" , p_listen_session->p_forward_rule->rule_id );
 			DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
 			_CLOSESOCKET( sock );
 			return 0;
@@ -351,12 +372,15 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 		p_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
 		p_forward_session->p_reverse_forward_session = p_reverse_forward_session ;
 		
+		p_forward_session->type = FORWARD_SESSION_TYPE_SERVER ;
 		p_forward_session->sock = sock ;
 		memcpy( & (p_forward_session->netaddr) , & netaddr , sizeof(struct NetAddress) );
 		p_forward_session->client_index = client_index ;
 		
 		p_reverse_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
 		p_reverse_forward_session->p_reverse_forward_session = p_forward_session ;
+		
+		p_reverse_forward_session->type = FORWARD_SESSION_TYPE_CLIENT ;
 		
 		memset( & event , 0x00 , sizeof(struct epoll_event) );
 		event.data.ptr = p_forward_session ;
@@ -412,6 +436,7 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 		nret = ResolveConnectingError( penv , p_forward_session->p_reverse_forward_session ) ;
 		if( nret )
 		{
+			p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 			DebugLog( __FILE__ , __LINE__ , "close #%d#-#%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
@@ -530,6 +555,7 @@ void *AcceptThread( struct ServerEnv *penv )
 						nret = ResolveConnectingError( penv , p_forward_session ) ;
 						if( nret )
 						{
+							p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
 							epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 							epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 							DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->p_reverse_forward_session->sock );
@@ -546,6 +572,7 @@ void *AcceptThread( struct ServerEnv *penv )
 					nret = ResolveConnectingError( penv , p_forward_session->p_reverse_forward_session ) ;
 					if( nret )
 					{
+						p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
 						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 						DebugLog( __FILE__ , __LINE__ , "close #%d#-#%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );

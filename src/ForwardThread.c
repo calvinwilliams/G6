@@ -27,6 +27,10 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	if( p_forward_session->io_buffer_len == 0 )
 	{
 		/* 对端断开连接 */
+		if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER )
+			p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
+		else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
+			p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
 		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock );
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
@@ -38,6 +42,10 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	else if( p_forward_session->io_buffer_len == -1 )
 	{
 		/* 通讯接收出错 */
+		if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER )
+			p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
+		else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
+			p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
 		ErrorLog( __FILE__ , __LINE__ , "recv #%d# failed , errno[%d]" , p_forward_session->sock , errno );
 		IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
@@ -70,11 +78,16 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 		else
 		{
 			/* 通讯发送出错 */
+			if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER )
+				p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
+			else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
+				p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
 			epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 			epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 			DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
 			_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
 			SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
+			return 0;
 		}
 	}
 	else if( len == p_forward_session->io_buffer_len )
@@ -123,11 +136,16 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 		else
 		{
 			/* 通讯发送出错 */
+			if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER )
+				p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
+			else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
+				p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
 			epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 			epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 			DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
 			_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
 			SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
+			return 0;
 		}
 	}
 	else if( len == p_forward_session->io_buffer_len )
@@ -238,25 +256,13 @@ void *ForwardThread( struct ServerEnv *penv )
 						ErrorLog( __FILE__ , __LINE__ , "OnForwardOutput failed[%d]" , nret );
 					}
 				}
-				else if( p_event->events & EPOLLERR )
-				{
-					ErrorLog( __FILE__ , __LINE__ , "forward session EPOLLERR" );
-			        	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-					DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-					_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-					SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
-				}
-				else if( p_event->events & EPOLLHUP )
-				{
-					ErrorLog( __FILE__ , __LINE__ , "forward session EPOLLHUP" );
-			        	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-					DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-					_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-					SetForwardSessionUnused2( p_forward_session , p_forward_session->p_reverse_forward_session );
-				}
 				else
 				{
-					ErrorLog( __FILE__ , __LINE__ , "forward session [%d]" , p_event->events );
+					if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER )
+						p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
+					else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
+						p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
+					ErrorLog( __FILE__ , __LINE__ , "forward session EPOLLERR" );
 			        	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 					DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
 					_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
