@@ -20,13 +20,13 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		return -11;
 	}
 	
-	if( strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_G )
-		&& strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_MS )
-		&& strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_RR )
-		&& strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_LC )
-		&& strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_RT )
-		&& strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_RD )
-		&& strcmp( p_forward_rule->load_balance_algorithm , LOAD_BALANCE_ALGORITHM_HS ) )
+	if( STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_G )
+		&& STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_MS )
+		&& STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_RR )
+		&& STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_LC )
+		&& STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_RT )
+		&& STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_RD )
+		&& STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_HS ) )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "rule rule_mode [%s] invalid\r\n" , p_forward_rule->load_balance_algorithm );
 		return -11;
@@ -96,6 +96,9 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		
 		if( STRCMP( ip_and_port , == , ";" ) )
 		{
+			if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_G ) )
+				return 0;
+			
 			ErrorLog( __FILE__ , __LINE__ , "unexpect end of config in forwards_addr in rule[%s]" , p_forward_rule->rule_id );
 			return -11;
 		}

@@ -400,52 +400,80 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 			return 0;
 		}
 		
-		/* 获取两个空闲会话结构 */
-		p_forward_session = GetForwardSessionUnused( penv ) ;
-		if( p_forward_session == NULL )
+		if( STRCMP( p_listen_session->p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_G ) )
 		{
-			ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed" );
-			DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
-			_CLOSESOCKET( sock );
-			return 0;
+			/* 获取空闲会话结构 */
+			p_forward_session = GetForwardSessionUnused( penv ) ;
+			if( p_forward_session == NULL )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed" );
+				DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
+				_CLOSESOCKET( sock );
+				return 0;
+			}
+			
+			/* 登记epoll池 */
+			p_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
+			p_forward_session->p_reverse_forward_session = p_reverse_forward_session ;
+			p_forward_session->status = FORWARD_SESSION_STATUS_COMMAND ;
+			p_forward_session->type = FORWARD_SESSION_TYPE_MANAGER ;
+			p_forward_session->sock = sock ;
+			memcpy( & (p_forward_session->netaddr) , & netaddr , sizeof(struct NetAddress) );
+			p_forward_session->client_index = client_index ;
+			
+			memset( & event , 0x00 , sizeof(struct epoll_event) );
+			event.data.ptr = p_forward_session ;
+			event.events = EPOLLIN | EPOLLERR ;
+			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_forward_session->sock , & event );
 		}
-		
-		p_reverse_forward_session = GetForwardSessionUnused( penv ) ;
-		if( p_reverse_forward_session == NULL )
+		else
 		{
-			ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed" );
-			DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
-			_CLOSESOCKET( sock );
-			SetForwardSessionUnused( p_forward_session );
-			return 0;
-		}
-		
-		p_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
-		p_forward_session->p_reverse_forward_session = p_reverse_forward_session ;
-		
-		p_forward_session->type = FORWARD_SESSION_TYPE_SERVER ;
-		p_forward_session->sock = sock ;
-		memcpy( & (p_forward_session->netaddr) , & netaddr , sizeof(struct NetAddress) );
-		p_forward_session->client_index = client_index ;
-		
-		p_reverse_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
-		p_reverse_forward_session->p_reverse_forward_session = p_forward_session ;
-		
-		p_reverse_forward_session->type = FORWARD_SESSION_TYPE_CLIENT ;
-		
-		memset( & event , 0x00 , sizeof(struct epoll_event) );
-		event.data.ptr = p_forward_session ;
-		event.events = EPOLLERR ;
-		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_forward_session->sock , & event );
-		
-		/* 非堵塞连接服务端 */
-		nret = TryToConnectServer( penv , p_reverse_forward_session ) ;
-		if( nret )
-		{
-			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
-			_CLOSESOCKET( p_forward_session->sock );
-			SetForwardSessionUnused2( p_forward_session , p_reverse_forward_session );
-			return 0;
+			/* 获取两个空闲会话结构 */
+			p_forward_session = GetForwardSessionUnused( penv ) ;
+			if( p_forward_session == NULL )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed" );
+				DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
+				_CLOSESOCKET( sock );
+				return 0;
+			}
+			
+			p_reverse_forward_session = GetForwardSessionUnused( penv ) ;
+			if( p_reverse_forward_session == NULL )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed" );
+				DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
+				_CLOSESOCKET( sock );
+				SetForwardSessionUnused( p_forward_session );
+				return 0;
+			}
+			
+			/* 登记epoll池 */
+			p_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
+			p_forward_session->p_reverse_forward_session = p_reverse_forward_session ;
+			p_forward_session->type = FORWARD_SESSION_TYPE_SERVER ;
+			p_forward_session->sock = sock ;
+			memcpy( & (p_forward_session->netaddr) , & netaddr , sizeof(struct NetAddress) );
+			p_forward_session->client_index = client_index ;
+			
+			p_reverse_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
+			p_reverse_forward_session->p_reverse_forward_session = p_forward_session ;
+			p_reverse_forward_session->type = FORWARD_SESSION_TYPE_CLIENT ;
+			
+			memset( & event , 0x00 , sizeof(struct epoll_event) );
+			event.data.ptr = p_forward_session ;
+			event.events = EPOLLERR ;
+			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_forward_session->sock , & event );
+			
+			/* 非堵塞连接服务端 */
+			nret = TryToConnectServer( penv , p_reverse_forward_session ) ;
+			if( nret )
+			{
+				DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+				_CLOSESOCKET( p_forward_session->sock );
+				SetForwardSessionUnused2( p_forward_session , p_reverse_forward_session );
+				return 0;
+			}
 		}
 	}
 	
@@ -522,6 +550,164 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	event.data.ptr = p_forward_session->p_reverse_forward_session ;
 	event.events = EPOLLIN | EPOLLERR ;
 	epoll_ctl( penv->forward_epoll_fd_array[epoll_fd_index] , EPOLL_CTL_ADD , p_forward_session->p_reverse_forward_session->sock , & event );
+	
+	return 0;
+}
+
+static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
+{
+	char			*cmd = NULL ;
+	
+	char			io_buffer[ IO_BUFFER_SIZE + 1 ] ;
+	int			io_buffer_len ;
+	
+	cmd = strtok( p_forward_session->io_buffer , "|" ) ;
+	if( STRCMP( cmd , == , "?" ) )
+	{
+		io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "unable\nenable\nquit\n" );
+		send( p_forward_session->sock , io_buffer , io_buffer_len , 0 );
+	}
+	else if( STRCMP( cmd , == , "quit" ) )
+	{
+		return 1;
+	}
+	else if( STRCMP( cmd , == , "unable" ) )
+	{
+		char			*ip = NULL ;
+		char			*port_str = NULL ;
+		int			port_int ;
+		char			*disable_timeout = NULL ;
+		
+		int			forward_rule_index ;
+		struct ForwardRule	*p_forward_rule = NULL ;
+		int			servers_addr_index ;
+		struct ServerNetAddress	*p_servers_addr = NULL ;
+		
+		ip = strtok( NULL , "|" ) ;
+		port_str = strtok( NULL , "|" ) ;
+		disable_timeout = strtok( NULL , "|" ) ;
+		if( ip == NULL || port_str == NULL || disable_timeout == NULL )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "(unable)|(ip)|(port)|(disable_timeout)" );
+			return -1;
+		}
+		
+		port_int = atoi(port_str) ;
+		
+		for( forward_rule_index = 0 , p_forward_rule = penv->forward_rules_array ; forward_rule_index < penv->forward_rules_count ; forward_rule_index++ , p_forward_rule++ )
+		{
+			for( servers_addr_index = 0 , p_servers_addr = p_forward_rule->servers_addr ; servers_addr_index < p_forward_rule->servers_addr_count ; servers_addr_index++ , p_servers_addr++ )
+			{
+				if( STRCMP( p_servers_addr->netaddr.ip , == , ip ) && p_servers_addr->netaddr.port.port_int == port_int )
+				{
+					p_servers_addr->server_unable = 1 ;
+					p_servers_addr->timestamp_to_enable = time(NULL) + atoi(disable_timeout) ;
+					
+					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d unabled\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
+					send( p_forward_session->sock , io_buffer , io_buffer_len , 0 );
+				}
+			}
+		}
+	}
+	else if( STRCMP( cmd , == , "enable" ) )
+	{
+		char			*ip = NULL ;
+		char			*port_str = NULL ;
+		int			port_int ;
+		
+		int			forward_rule_index ;
+		struct ForwardRule	*p_forward_rule = NULL ;
+		int			servers_addr_index ;
+		struct ServerNetAddress	*p_servers_addr = NULL ;
+		
+		ip = strtok( NULL , "|" ) ;
+		port_str = strtok( NULL , "|" ) ;
+		if( ip == NULL || port_str == NULL )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "(enable)|(ip)|(port)" );
+			return -1;
+		}
+		
+		port_int = atoi(port_str) ;
+		
+		for( forward_rule_index = 0 , p_forward_rule = penv->forward_rules_array ; forward_rule_index < penv->forward_rules_count ; forward_rule_index++ , p_forward_rule++ )
+		{
+			for( servers_addr_index = 0 , p_servers_addr = p_forward_rule->servers_addr ; servers_addr_index < p_forward_rule->servers_addr_count ; servers_addr_index++ , p_servers_addr++ )
+			{
+				if( STRCMP( p_servers_addr->netaddr.ip , == , ip ) && p_servers_addr->netaddr.port.port_int == port_int )
+				{
+					p_servers_addr->server_unable = 0 ;
+					
+					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d enabled\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
+					send( p_forward_session->sock , io_buffer , io_buffer_len , 0 );
+				}
+			}
+		}
+	}
+	else
+	{
+		ErrorLog( __FILE__ , __LINE__ , "invalid command[%s]" , cmd );
+		io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "invalid command[%s]" , cmd );
+		send( p_forward_session->sock , io_buffer , io_buffer_len , 0 );
+		return -1;
+	}
+	
+	return 0;
+}
+
+static int OnReceiveCommand( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
+{
+	int			len ;
+	char			*p = NULL ;
+	
+	int			nret = 0 ;
+	
+	/* 接收通讯数据 */
+	len = recv( p_forward_session->sock , p_forward_session->io_buffer+p_forward_session->io_buffer_len , IO_BUFFER_SIZE-p_forward_session->io_buffer_len , 0 ) ;
+	if( len == 0 )
+	{
+		/* 对端断开连接 */
+		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock );
+		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+		DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+		_CLOSESOCKET( p_forward_session->sock );
+		SetForwardSessionUnused( p_forward_session );
+		return 0;
+	}
+	else if( len == -1 )
+	{
+		/* 通讯接收出错 */
+		ErrorLog( __FILE__ , __LINE__ , "recv #%d# failed , errno[%d]" , p_forward_session->sock , errno );
+		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+		DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+		_CLOSESOCKET( p_forward_session->sock );
+		SetForwardSessionUnused( p_forward_session );
+		return 0;
+	}
+	
+	p = memchr( p_forward_session->io_buffer+p_forward_session->io_buffer_len , '\n' , len ) ;
+	if( p )
+	{
+		(*p) = '\0' ;
+		nret = ProcessCommand( penv , p_forward_session ) ;
+		if( nret )
+		{
+			if( nret < 0 )
+			ErrorLog( __FILE__ , __LINE__ , "ProcessCommand failed[%d]" , nret );
+			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+			_CLOSESOCKET( p_forward_session->sock );
+			SetForwardSessionUnused( p_forward_session );
+			return 0;
+		}
+		
+		p_forward_session->io_buffer_len = (p_forward_session->io_buffer_len+len) - (p-p_forward_session->io_buffer) ;
+		memmove( p_forward_session->io_buffer , p+1 , p_forward_session->io_buffer_len );
+	}
+	else
+	{
+		p_forward_session->io_buffer_len += len ;
+	}
 	
 	return 0;
 }
@@ -609,6 +795,14 @@ void *AcceptThread( struct ServerEnv *penv )
 				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 				DebugLog( __FILE__ , __LINE__ , "close #%d#-#%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
 				_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
+			}
+			else if( p_forward_session->status == FORWARD_SESSION_STATUS_COMMAND )
+			{
+				nret = OnReceiveCommand( penv , p_forward_session ) ;
+				if( nret )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "OnReceiveCommand failed[%d]" , nret );
+				}
 			}
 			else
 			{

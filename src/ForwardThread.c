@@ -40,7 +40,7 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	if( p_forward_session->io_buffer_len == 0 )
 	{
 		/* 对端断开连接 */
-		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock ); \
+		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock );
 		DISCONNECT_PAIR
 		return 0;
 	}
