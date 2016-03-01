@@ -575,9 +575,18 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 	int			io_buffer_len ;
 	
 	cmd = strtok( p_forward_session->io_buffer , COMMAND_SEPCHAR ) ;
-	if( STRCMP( cmd , == , "?" ) )
+	if( cmd == NULL )
 	{
-		io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "disable\nenable\nquit\n" );
+		;
+	}
+	else if( STRCMP( cmd , == , "?" ) )
+	{
+		io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1
+			, "show (rules|sessions)\n"
+			"disable (ip) (port) (disable_timeout)\n"
+			"enable (ip) (port)\n"
+			"quit\n"
+			);
 		send( sock , io_buffer , io_buffer_len , 0 );
 	}
 	else if( STRCMP( cmd , == , "quit" ) )
@@ -691,6 +700,11 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 				}
 			}
 		}
+		else
+		{
+			io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "USAGE : show (rules|sessions)\n" );
+			send( sock , io_buffer , io_buffer_len , 0 );
+		}
 	}
 	else if( STRCMP( cmd , == , "disable" ) )
 	{
@@ -709,8 +723,8 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 		disable_timeout = strtok( NULL , COMMAND_SEPCHAR ) ;
 		if( ip == NULL || port_str == NULL || disable_timeout == NULL )
 		{
-			ErrorLog( __FILE__ , __LINE__ , "(disable)|(ip)|(port)|(disable_timeout)" );
-			return -1;
+			io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "disable (ip) (port) (disable_timeout)" );
+			return 0;
 		}
 		
 		port_int = atoi(port_str) ;
@@ -745,8 +759,8 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 		port_str = strtok( NULL , COMMAND_SEPCHAR ) ;
 		if( ip == NULL || port_str == NULL )
 		{
-			ErrorLog( __FILE__ , __LINE__ , "(enable)|(ip)|(port)" );
-			return -1;
+			io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "enable (ip) (port)" );
+			return 0;
 		}
 		
 		port_int = atoi(port_str) ;
@@ -767,10 +781,9 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 	}
 	else
 	{
-		ErrorLog( __FILE__ , __LINE__ , "invalid command[%s]" , cmd );
 		io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "invalid command[%s]" , cmd );
 		send( sock , io_buffer , io_buffer_len , 0 );
-		return -1;
+		return 0;
 	}
 	
 	return 0;
@@ -810,6 +823,8 @@ static int OnReceiveCommand( struct ServerEnv *penv , struct ForwardSession *p_f
 	if( p )
 	{
 		(*p) = '\0' ;
+		if( p > p_forward_session->io_buffer && *(p-1) == '\r' )
+			*(p-1) = '\0' ;
 		nret = ProcessCommand( penv , p_forward_session ) ;
 		if( nret )
 		{
@@ -822,7 +837,7 @@ static int OnReceiveCommand( struct ServerEnv *penv , struct ForwardSession *p_f
 			return 0;
 		}
 		
-		p_forward_session->io_buffer_len = (p_forward_session->io_buffer_len+len) - (p-p_forward_session->io_buffer) ;
+		p_forward_session->io_buffer_len = (p_forward_session->io_buffer_len+len) - (p-p_forward_session->io_buffer)-1 ;
 		memmove( p_forward_session->io_buffer , p+1 , p_forward_session->io_buffer_len );
 	}
 	else
