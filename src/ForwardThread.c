@@ -3,9 +3,9 @@
 #define DISCONNECT_PAIR	\
 	pthread_mutex_lock( & (penv->mutex) ); \
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER ) \
-		p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--; \
+		p_forward_session->p_reverse_forward_session->p_forward_rule->server_addr_array[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--; \
 	else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT ) \
-		p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--; \
+		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count--; \
 	pthread_mutex_unlock( & (penv->mutex) ); \
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL ); \
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL ); \
@@ -55,7 +55,7 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	/* 登记最近读时间戳 */
 	pthread_mutex_lock( & (penv->mutex) );
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-		time( & (p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].rtt) );
+		time( & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].rtt) );
 	pthread_mutex_unlock( & (penv->mutex) );
 	
 	/* 发送通讯数据 */
@@ -115,7 +115,7 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	/* 登记最近写时间戳 */
 	pthread_mutex_lock( & (penv->mutex) );
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-		time( & (p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].wtt) );
+		time( & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt) );
 	pthread_mutex_unlock( & (penv->mutex) );
 	
 	return 0;
@@ -171,7 +171,7 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 	/* 登记最近写时间戳 */
 	pthread_mutex_lock( & (penv->mutex) );
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-		time( & (p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].wtt) );
+		time( & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt) );
 	pthread_mutex_unlock( & (penv->mutex) );
 	
 	return 0;

@@ -9,8 +9,8 @@ static int MatchClientAddr( struct NetAddress *p_netaddr , struct ForwardRule *p
 	memset( port_str , 0x00 , sizeof(port_str) );
 	snprintf( port_str , sizeof(port_str)-1 , "%d" , p_netaddr->port.port_int );
 	
-	for( match_client_index = 0 , p_match_addr = & (p_forward_rule->clients_addr[0])
-		; match_client_index < p_forward_rule->clients_addr_count
+	for( match_client_index = 0 , p_match_addr = & (p_forward_rule->client_addr_array[0])
+		; match_client_index < p_forward_rule->client_addr_count
 		; match_client_index++ , p_match_addr++ )
 	{
 		if(	IsMatchString( p_match_addr->netaddr.ip , p_netaddr->ip , '*' , '?' ) == 0
@@ -34,14 +34,14 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 		
 	if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_MS ) ) /* 主备算法 */
 	{
-		for( n = 0 ; n < p_forward_rule->servers_addr_count ; n++ )
+		for( n = 0 ; n < p_forward_rule->server_addr_count ; n++ )
 		{
-			if(	p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 0
+			if(	p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 0
 				||
 				(
-					p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 1
+					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					time(NULL) > p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].timestamp_to_enable
+					time(NULL) > p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
@@ -50,10 +50,10 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 			}
 			
 			p_forward_rule->selected_addr_index++;
-			if( p_forward_rule->selected_addr_index >= p_forward_rule->servers_addr_count )
+			if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
 				p_forward_rule->selected_addr_index = 0 ;
 		}
-		if( n >= p_forward_rule->servers_addr_count )
+		if( n >= p_forward_rule->server_addr_count )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "all servers unable" );
 			return -1;
@@ -61,29 +61,29 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 	}
 	else if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_RR ) ) /* 轮询算法 */
 	{
-		for( n = 0 ; n < p_forward_rule->servers_addr_count ; n++ )
+		for( n = 0 ; n < p_forward_rule->server_addr_count ; n++ )
 		{
-			if(	p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 0
+			if(	p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 0
 				||
 				(
-					p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 1
+					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					time(NULL) >= p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].timestamp_to_enable
+					time(NULL) >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
 				p_forward_session->server_index = p_forward_rule->selected_addr_index ;
 				p_forward_rule->selected_addr_index++;
-				if( p_forward_rule->selected_addr_index >= p_forward_rule->servers_addr_count )
+				if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
 					p_forward_rule->selected_addr_index = 0 ;
 				break;
 			}
 			
 			p_forward_rule->selected_addr_index++;
-			if( p_forward_rule->selected_addr_index >= p_forward_rule->servers_addr_count )
+			if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
 				p_forward_rule->selected_addr_index = 0 ;
 		}
-		if( n >= p_forward_rule->servers_addr_count )
+		if( n >= p_forward_rule->server_addr_count )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "all servers unable" );
 			return -1;
@@ -94,23 +94,23 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 		p_forward_session->server_index = -1 ;
 		
 		pthread_mutex_lock( & (penv->mutex) );
-		for( n = 0 ; n < p_forward_rule->servers_addr_count ; n++ )
+		for( n = 0 ; n < p_forward_rule->server_addr_count ; n++ )
 		{
-			if(	p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 0
+			if(	p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 0
 				||
 				(
-					p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 1
+					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					time(NULL) >= p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].timestamp_to_enable
+					time(NULL) >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
-				if( p_forward_session->server_index == -1 || p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count < p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_connection_count )
+				if( p_forward_session->server_index == -1 || p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count < p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_connection_count )
 					p_forward_session->server_index = p_forward_rule->selected_addr_index ;
 			}
 			
 			p_forward_rule->selected_addr_index++;
-			if( p_forward_rule->selected_addr_index >= p_forward_rule->servers_addr_count )
+			if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
 				p_forward_rule->selected_addr_index = 0 ;
 		}
 		pthread_mutex_unlock( & (penv->mutex) );
@@ -121,31 +121,31 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 		}
 		
 		p_forward_rule->selected_addr_index++;
-		if( p_forward_rule->selected_addr_index >= p_forward_rule->servers_addr_count )
-			p_forward_rule->selected_addr_index %= p_forward_rule->servers_addr_count ;
+		if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
+			p_forward_rule->selected_addr_index %= p_forward_rule->server_addr_count ;
 	}
 	else if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_RT ) ) /* 最小响应时间算法 */
 	{
 		p_forward_session->server_index = -1 ;
 		
 		pthread_mutex_lock( & (penv->mutex) );
-		for( n = 0 ; n < p_forward_rule->servers_addr_count ; n++ )
+		for( n = 0 ; n < p_forward_rule->server_addr_count ; n++ )
 		{
-			if(	p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 0
+			if(	p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 0
 				||
 				(
-					p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 1
+					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					time(NULL) >= p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].timestamp_to_enable
+					time(NULL) >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
-				if( p_forward_session->server_index == -1 || abs(p_forward_rule->servers_addr[p_forward_session->server_index].rtt-p_forward_rule->servers_addr[p_forward_session->server_index].wtt) < abs(p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].rtt-p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].wtt) )
+				if( p_forward_session->server_index == -1 || abs(p_forward_rule->server_addr_array[p_forward_session->server_index].rtt-p_forward_rule->server_addr_array[p_forward_session->server_index].wtt) < abs(p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].rtt-p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].wtt) )
 					p_forward_session->server_index = p_forward_rule->selected_addr_index ;
 			}
 			
 			p_forward_rule->selected_addr_index++;
-			if( p_forward_rule->selected_addr_index >= p_forward_rule->servers_addr_count )
+			if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
 				p_forward_rule->selected_addr_index = 0 ;
 		}
 		pthread_mutex_unlock( & (penv->mutex) );
@@ -156,23 +156,23 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 		}
 		
 		p_forward_rule->selected_addr_index++;
-		if( p_forward_rule->selected_addr_index >= p_forward_rule->servers_addr_count )
-			p_forward_rule->selected_addr_index %= p_forward_rule->servers_addr_count ;
+		if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
+			p_forward_rule->selected_addr_index %= p_forward_rule->server_addr_count ;
 	}
 	else if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_RD ) ) /* 随机算法 */
 	{
-		p_forward_rule->selected_addr_index += Rand( 1 , p_forward_rule->servers_addr_count ) ;
-		if( p_forward_rule->selected_addr_index >= p_forward_rule->servers_addr_count )
-			p_forward_rule->selected_addr_index %= p_forward_rule->servers_addr_count ;
+		p_forward_rule->selected_addr_index += Rand( 1 , p_forward_rule->server_addr_count ) ;
+		if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
+			p_forward_rule->selected_addr_index %= p_forward_rule->server_addr_count ;
 		
-		for( n = 0 ; n < p_forward_rule->servers_addr_count ; n++ )
+		for( n = 0 ; n < p_forward_rule->server_addr_count ; n++ )
 		{
-			if(	p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 0
+			if(	p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 0
 				||
 				(
-					p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 1
+					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					time(NULL) >= p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].timestamp_to_enable
+					time(NULL) >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
@@ -184,14 +184,14 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 				}
 				else
 				{
-					selected_addr_2_index = Rand( 0 , p_forward_rule->servers_addr_count - 1 ) ;
+					selected_addr_2_index = Rand( 0 , p_forward_rule->server_addr_count - 1 ) ;
 					if( selected_addr_2_index != p_forward_rule->selected_addr_index )
 					{
 						struct ServerNetAddress		tmp ;
 						
-						memcpy( & tmp , p_forward_rule->servers_addr+p_forward_rule->selected_addr_index , sizeof(struct ServerNetAddress) );
-						memcpy( p_forward_rule->servers_addr+p_forward_rule->selected_addr_index , p_forward_rule->servers_addr+selected_addr_2_index , sizeof(struct ServerNetAddress) );
-						memcpy( p_forward_rule->servers_addr+selected_addr_2_index , & tmp , sizeof(struct ServerNetAddress) );
+						memcpy( & tmp , p_forward_rule->server_addr_array+p_forward_rule->selected_addr_index , sizeof(struct ServerNetAddress) );
+						memcpy( p_forward_rule->server_addr_array+p_forward_rule->selected_addr_index , p_forward_rule->server_addr_array+selected_addr_2_index , sizeof(struct ServerNetAddress) );
+						memcpy( p_forward_rule->server_addr_array+selected_addr_2_index , & tmp , sizeof(struct ServerNetAddress) );
 					}
 					p_forward_session->server_index = selected_addr_2_index ;
 				}
@@ -199,10 +199,10 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 			}
 			
 			p_forward_rule->selected_addr_index++;
-			if( p_forward_rule->selected_addr_index >= p_forward_rule->servers_addr_count )
+			if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
 				p_forward_rule->selected_addr_index = 0 ;
 		}
-		if( n >= p_forward_rule->servers_addr_count )
+		if( n >= p_forward_rule->server_addr_count )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "all servers unable" );
 			return -1;
@@ -210,13 +210,13 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 	}
 	else if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_HS ) ) /* 哈希算法 */
 	{
-		p_forward_session->server_index = CalcHash(p_forward_rule->clients_addr[p_forward_session->client_index].netaddr.ip) % p_forward_rule->servers_addr_count ;
-		if(	p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 0
+		p_forward_session->server_index = CalcHash(p_forward_rule->client_addr_array[p_forward_session->client_index].netaddr.ip) % p_forward_rule->server_addr_count ;
+		if(	p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 0
 			||
 			(
-				p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].server_unable == 1
+				p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 				&&
-				time(NULL) >= p_forward_rule->servers_addr[p_forward_rule->selected_addr_index].timestamp_to_enable
+				time(NULL) >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 			)
 		)
 		{
@@ -234,8 +234,10 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 	}
 	
 	pthread_mutex_lock( & (penv->mutex) );
-	p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count++;
+	p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count++;
 	pthread_mutex_unlock( & (penv->mutex) );
+	
+	memcpy( & (p_forward_session->netaddr) , & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].netaddr) , sizeof(struct NetAddress) );
 	
 	return 0;
 }
@@ -249,7 +251,7 @@ static int ResolveConnectingError( struct ServerEnv *penv , struct ForwardSessio
 	int				nret = 0 ;
 	
 	/* 设置服务端不可用 */
-	p_servers_addr = p_reverse_forward_session->p_forward_rule->servers_addr + p_reverse_forward_session->server_index ;
+	p_servers_addr = p_reverse_forward_session->p_forward_rule->server_addr_array + p_reverse_forward_session->server_index ;
 	p_servers_addr->server_unable = 1 ;
 	p_servers_addr->timestamp_to_enable = time(NULL) + DEFAULT_DISABLE_TIMEOUT ;
 	
@@ -266,7 +268,6 @@ static int ResolveConnectingError( struct ServerEnv *penv , struct ForwardSessio
 
 static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p_reverse_forward_session )
 {
-	struct ServerNetAddress	*p_servers_addr = NULL ;
 	_SOCKLEN_T		addr_len ;
 	struct epoll_event	event ;
 	int			epoll_fd_index ;
@@ -292,16 +293,15 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	SetNonBlocking( p_reverse_forward_session->sock );
 	
 	/* 连接服务端 */
-	p_servers_addr = p_reverse_forward_session->p_forward_rule->servers_addr + p_reverse_forward_session->server_index ;
 	addr_len = sizeof(struct sockaddr) ;
-	nret = connect( p_reverse_forward_session->sock , (struct sockaddr *) & (p_servers_addr->netaddr.sockaddr) , addr_len );
+	nret = connect( p_reverse_forward_session->sock , (struct sockaddr *) & (p_reverse_forward_session->netaddr.sockaddr) , addr_len );
 	if( nret == -1 )
 	{
 		if( _ERRNO == _EINPROGRESS ) /* 正在连接 */
 		{
 			p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTING ;
 			
-			InfoLog( __FILE__ , __LINE__ , "#%d#-#%d# connecting [%s:%d] ..." , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
+			InfoLog( __FILE__ , __LINE__ , "#%d#-#%d# connecting [%s:%d] ..." , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int );
 			
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_reverse_forward_session ;
@@ -315,9 +315,9 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		}
 		else /* 连接失败 */
 		{
-			ErrorLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] failed , errno[%d]" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int , errno );
+			ErrorLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] failed , errno[%d]" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , errno );
 			pthread_mutex_lock( & (penv->mutex) );
-			p_reverse_forward_session->p_forward_rule->servers_addr[p_reverse_forward_session->server_index].server_connection_count--;
+			p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].server_connection_count--;
 			pthread_mutex_unlock( & (penv->mutex) );
 			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_reverse_forward_session->sock );
 			_CLOSESOCKET( p_reverse_forward_session->sock );
@@ -332,11 +332,12 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	else /* 连接成功 */
 	{
 		p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
+		p_reverse_forward_session->p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
 		
-		InfoLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] ok" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
+		InfoLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] ok" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int );
 		
-		if( p_servers_addr->server_unable == 1 )
-			p_servers_addr->server_unable = 0 ;
+		if( p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].server_unable == 1 )
+			p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].server_unable = 0 ;
 		
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL );
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->p_reverse_forward_session->sock , NULL );
@@ -414,12 +415,14 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 			
 			/* 登记epoll池 */
 			p_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
-			p_forward_session->p_reverse_forward_session = p_reverse_forward_session ;
+			p_forward_session->p_reverse_forward_session = p_listen_session ;
 			p_forward_session->status = FORWARD_SESSION_STATUS_COMMAND ;
 			p_forward_session->type = FORWARD_SESSION_TYPE_MANAGER ;
 			p_forward_session->sock = sock ;
 			memcpy( & (p_forward_session->netaddr) , & netaddr , sizeof(struct NetAddress) );
 			p_forward_session->client_index = client_index ;
+			p_forward_session->forward_index = p_listen_session->forward_index ;
+			p_forward_session->p_reverse_forward_session = p_listen_session ;
 			
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_forward_session ;
@@ -455,10 +458,12 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 			p_forward_session->sock = sock ;
 			memcpy( & (p_forward_session->netaddr) , & netaddr , sizeof(struct NetAddress) );
 			p_forward_session->client_index = client_index ;
+			p_forward_session->forward_index = p_listen_session->forward_index ;
 			
 			p_reverse_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
 			p_reverse_forward_session->p_reverse_forward_session = p_forward_session ;
 			p_reverse_forward_session->type = FORWARD_SESSION_TYPE_CLIENT ;
+			p_reverse_forward_session->forward_index = p_listen_session->forward_index ;
 			
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_forward_session ;
@@ -500,7 +505,7 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	if( code < 0 || error )
 #elif ( defined _WIN32 )
 	addr_len = sizeof(struct sockaddr_in) ;
-	nret = connect( p_forward_session->sock , ( struct sockaddr *) & (p_forward_session->p_forward_rule->servers_addr[p_forward_session->balance_algorithm.MS.server_index]->netaddr) , addr_len ) ;
+	nret = connect( p_forward_session->sock , ( struct sockaddr *) & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->balance_algorithm.MS.server_index]->netaddr) , addr_len ) ;
 	if( nret == -1 && _ERRNO == _EISCONN )
 	{
 		;
@@ -516,7 +521,7 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 		if( nret )
 		{
 			pthread_mutex_lock( & (penv->mutex) );
-			p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
+			p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count--;
 			pthread_mutex_unlock( & (penv->mutex) );
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
@@ -529,12 +534,13 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	
 	/* 连接成功 */
 	p_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
+	p_forward_session->p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
 	
-	p_servers_addr = p_forward_session->p_forward_rule->servers_addr + p_forward_session->server_index ;
+	p_servers_addr = p_forward_session->p_forward_rule->server_addr_array + p_forward_session->server_index ;
 	InfoLog( __FILE__ , __LINE__ , "#%d#-#%d# connect2 [%s:%d] ok" , p_forward_session->p_reverse_forward_session->sock , p_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 	
-	if( p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_unable == 1 )
-		p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_unable = 0 ;
+	if( p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_unable == 1 )
+		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_unable = 0 ;
 	
 	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
@@ -554,24 +560,139 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	return 0;
 }
 
+char	g_ForwardSessionTypeDesc[][7+1] = { "LISTEN" , "CLIENT" , "SERVER" , "MANAGER" } ;
+char	g_ForwardSessionStatusDesc[][10+1] = { "UNUSED" , "READY" , "LISTEN" , "CONNECTING" , "CONNECTED" , "COMMAND" } ;
+
+#define COMMAND_SEPCHAR		" \t"
+
 static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
 {
 	char			*cmd = NULL ;
+	char			*sub_cmd = NULL ;
 	
+	int			sock = p_forward_session->sock ;
 	char			io_buffer[ IO_BUFFER_SIZE + 1 ] ;
 	int			io_buffer_len ;
 	
-	cmd = strtok( p_forward_session->io_buffer , "|" ) ;
+	cmd = strtok( p_forward_session->io_buffer , COMMAND_SEPCHAR ) ;
 	if( STRCMP( cmd , == , "?" ) )
 	{
-		io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "unable\nenable\nquit\n" );
-		send( p_forward_session->sock , io_buffer , io_buffer_len , 0 );
+		io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "disable\nenable\nquit\n" );
+		send( sock , io_buffer , io_buffer_len , 0 );
 	}
 	else if( STRCMP( cmd , == , "quit" ) )
 	{
 		return 1;
 	}
-	else if( STRCMP( cmd , == , "unable" ) )
+	else if( STRCMP( cmd , == , "show" ) )
+	{
+		sub_cmd = strtok( NULL , COMMAND_SEPCHAR ) ;
+		if( sub_cmd && STRCMP( sub_cmd , == , "rules" ) )
+		{
+			int				forward_rule_index ;
+			struct ForwardRule		*p_forward_rule = NULL ;
+			int				clients_addr_index ;
+			struct ClientNetAddress		*p_clients_addr = NULL ;
+			int				forwards_addr_index ;
+			struct ForwardNetAddress	*p_forwards_addr = NULL ;
+			int				servers_addr_index ;
+			struct ServerNetAddress		*p_servers_addr = NULL ;
+			
+			for( forward_rule_index = 0 , p_forward_rule = penv->forward_rule_array ; forward_rule_index < penv->forward_rule_count ; forward_rule_index++ , p_forward_rule++ )
+			{
+				io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s | %s | " , p_forward_rule->rule_id , p_forward_rule->load_balance_algorithm );
+				send( sock , io_buffer , io_buffer_len , 0 );
+				
+				for( clients_addr_index = 0 , p_clients_addr = p_forward_rule->client_addr_array ; clients_addr_index < p_forward_rule->client_addr_count ; clients_addr_index++ , p_clients_addr++ )
+				{
+					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s:%s " , p_clients_addr->netaddr.ip , p_clients_addr->netaddr.port.port_str );
+					send( sock , io_buffer , io_buffer_len , 0 );
+				}
+				
+				io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "- " );
+				send( p_forward_session->sock , io_buffer , io_buffer_len , 0 );
+				
+				for( forwards_addr_index = 0 , p_forwards_addr = p_forward_rule->forward_addr_array ; forwards_addr_index < p_forward_rule->forward_addr_count ; forwards_addr_index++ , p_forwards_addr++ )
+				{
+					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s:%d " , p_forwards_addr->netaddr.ip , p_forwards_addr->netaddr.port.port_int );
+					send( sock , io_buffer , io_buffer_len , 0 );
+				}
+				
+				if( p_forward_rule->server_addr_count )
+				{
+					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "> " );
+					send( p_forward_session->sock , io_buffer , io_buffer_len , 0 );
+					
+					for( servers_addr_index = 0 , p_servers_addr = p_forward_rule->server_addr_array ; servers_addr_index < p_forward_rule->server_addr_count ; servers_addr_index++ , p_servers_addr++ )
+					{
+						io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s:%d " , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
+						send( sock , io_buffer , io_buffer_len , 0 );
+					}
+				}
+				
+				io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "\n" );
+				send( sock , io_buffer , io_buffer_len , 0 );
+			}
+		}
+		else if( sub_cmd && STRCMP( sub_cmd , == , "sessions" ) )
+		{
+			int				forward_session_index ;
+			struct ForwardSession		*p_forward_session = NULL ;
+			
+			for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
+			{
+				if( p_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
+				{
+					if( p_forward_session->type == FORWARD_SESSION_TYPE_LISTEN )
+					{
+						io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1
+							, "%*s | %*s | - %s:%d(#%d#)\n"
+							, (int)sizeof(g_ForwardSessionTypeDesc[0]) , g_ForwardSessionTypeDesc[p_forward_session->type]
+							, (int)sizeof(g_ForwardSessionStatusDesc[0]) , g_ForwardSessionStatusDesc[p_forward_session->status]
+							, p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].netaddr.ip
+							, p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].netaddr.port.port_int
+							, p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].sock
+							);
+						send( sock , io_buffer , io_buffer_len , 0 );
+					}
+					else if( p_forward_session->type == FORWARD_SESSION_TYPE_MANAGER )
+					{
+						io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1
+							, "%*s | %*s | %s:%d(#%d#) - %s:%d(#%d#)\n"
+							, (int)sizeof(g_ForwardSessionTypeDesc[0]) , g_ForwardSessionTypeDesc[p_forward_session->type]
+							, (int)sizeof(g_ForwardSessionStatusDesc[0]) , g_ForwardSessionStatusDesc[p_forward_session->status]
+							, p_forward_session->netaddr.ip
+							, p_forward_session->netaddr.port.port_int
+							, p_forward_session->sock
+							, p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].netaddr.ip
+							, p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].netaddr.port.port_int
+							, p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].sock
+							);
+						send( sock , io_buffer , io_buffer_len , 0 );
+					}
+					else
+					{
+						io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1
+							, "%*s | %*s | %s:%d(#%d#) - %s:%d(#%d#) > %s:%d(#%d#)\n"
+							, (int)sizeof(g_ForwardSessionTypeDesc[0]) , g_ForwardSessionTypeDesc[p_forward_session->type]
+							, (int)sizeof(g_ForwardSessionStatusDesc[0]) , g_ForwardSessionStatusDesc[p_forward_session->status]
+							, p_forward_session->netaddr.ip
+							, p_forward_session->netaddr.port.port_int
+							, p_forward_session->sock
+							, p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].netaddr.ip
+							, p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].netaddr.port.port_int
+							, p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].sock
+							, p_forward_session->p_reverse_forward_session->netaddr.ip
+							, p_forward_session->p_reverse_forward_session->netaddr.port.port_int
+							, p_forward_session->p_reverse_forward_session->sock
+							);
+						send( sock , io_buffer , io_buffer_len , 0 );
+					}
+				}
+			}
+		}
+	}
+	else if( STRCMP( cmd , == , "disable" ) )
 	{
 		char			*ip = NULL ;
 		char			*port_str = NULL ;
@@ -583,28 +704,28 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 		int			servers_addr_index ;
 		struct ServerNetAddress	*p_servers_addr = NULL ;
 		
-		ip = strtok( NULL , "|" ) ;
-		port_str = strtok( NULL , "|" ) ;
-		disable_timeout = strtok( NULL , "|" ) ;
+		ip = strtok( NULL , COMMAND_SEPCHAR ) ;
+		port_str = strtok( NULL , COMMAND_SEPCHAR ) ;
+		disable_timeout = strtok( NULL , COMMAND_SEPCHAR ) ;
 		if( ip == NULL || port_str == NULL || disable_timeout == NULL )
 		{
-			ErrorLog( __FILE__ , __LINE__ , "(unable)|(ip)|(port)|(disable_timeout)" );
+			ErrorLog( __FILE__ , __LINE__ , "(disable)|(ip)|(port)|(disable_timeout)" );
 			return -1;
 		}
 		
 		port_int = atoi(port_str) ;
 		
-		for( forward_rule_index = 0 , p_forward_rule = penv->forward_rules_array ; forward_rule_index < penv->forward_rules_count ; forward_rule_index++ , p_forward_rule++ )
+		for( forward_rule_index = 0 , p_forward_rule = penv->forward_rule_array ; forward_rule_index < penv->forward_rule_count ; forward_rule_index++ , p_forward_rule++ )
 		{
-			for( servers_addr_index = 0 , p_servers_addr = p_forward_rule->servers_addr ; servers_addr_index < p_forward_rule->servers_addr_count ; servers_addr_index++ , p_servers_addr++ )
+			for( servers_addr_index = 0 , p_servers_addr = p_forward_rule->server_addr_array ; servers_addr_index < p_forward_rule->server_addr_count ; servers_addr_index++ , p_servers_addr++ )
 			{
 				if( STRCMP( p_servers_addr->netaddr.ip , == , ip ) && p_servers_addr->netaddr.port.port_int == port_int )
 				{
 					p_servers_addr->server_unable = 1 ;
 					p_servers_addr->timestamp_to_enable = time(NULL) + atoi(disable_timeout) ;
 					
-					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d unabled\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
-					send( p_forward_session->sock , io_buffer , io_buffer_len , 0 );
+					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d unable\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
+					send( sock , io_buffer , io_buffer_len , 0 );
 				}
 			}
 		}
@@ -620,8 +741,8 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 		int			servers_addr_index ;
 		struct ServerNetAddress	*p_servers_addr = NULL ;
 		
-		ip = strtok( NULL , "|" ) ;
-		port_str = strtok( NULL , "|" ) ;
+		ip = strtok( NULL , COMMAND_SEPCHAR ) ;
+		port_str = strtok( NULL , COMMAND_SEPCHAR ) ;
 		if( ip == NULL || port_str == NULL )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "(enable)|(ip)|(port)" );
@@ -630,16 +751,16 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 		
 		port_int = atoi(port_str) ;
 		
-		for( forward_rule_index = 0 , p_forward_rule = penv->forward_rules_array ; forward_rule_index < penv->forward_rules_count ; forward_rule_index++ , p_forward_rule++ )
+		for( forward_rule_index = 0 , p_forward_rule = penv->forward_rule_array ; forward_rule_index < penv->forward_rule_count ; forward_rule_index++ , p_forward_rule++ )
 		{
-			for( servers_addr_index = 0 , p_servers_addr = p_forward_rule->servers_addr ; servers_addr_index < p_forward_rule->servers_addr_count ; servers_addr_index++ , p_servers_addr++ )
+			for( servers_addr_index = 0 , p_servers_addr = p_forward_rule->server_addr_array ; servers_addr_index < p_forward_rule->server_addr_count ; servers_addr_index++ , p_servers_addr++ )
 			{
 				if( STRCMP( p_servers_addr->netaddr.ip , == , ip ) && p_servers_addr->netaddr.port.port_int == port_int )
 				{
 					p_servers_addr->server_unable = 0 ;
 					
 					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d enabled\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
-					send( p_forward_session->sock , io_buffer , io_buffer_len , 0 );
+					send( sock , io_buffer , io_buffer_len , 0 );
 				}
 			}
 		}
@@ -648,7 +769,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 	{
 		ErrorLog( __FILE__ , __LINE__ , "invalid command[%s]" , cmd );
 		io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "invalid command[%s]" , cmd );
-		send( p_forward_session->sock , io_buffer , io_buffer_len , 0 );
+		send( sock , io_buffer , io_buffer_len , 0 );
 		return -1;
 	}
 	
@@ -776,7 +897,7 @@ void *AcceptThread( struct ServerEnv *penv )
 					if( nret )
 					{
 						pthread_mutex_lock( & (penv->mutex) );
-						p_forward_session->p_forward_rule->servers_addr[p_forward_session->server_index].server_connection_count--;
+						p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count--;
 						pthread_mutex_unlock( & (penv->mutex) );
 						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
@@ -789,7 +910,7 @@ void *AcceptThread( struct ServerEnv *penv )
 			{
 				DebugLog( __FILE__ , __LINE__ , "accepted session event" );
 				pthread_mutex_lock( & (penv->mutex) );
-				p_forward_session->p_reverse_forward_session->p_forward_rule->servers_addr[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
+				p_forward_session->p_reverse_forward_session->p_forward_rule->server_addr_array[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
 				pthread_mutex_unlock( & (penv->mutex) );
 				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );

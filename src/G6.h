@@ -116,7 +116,7 @@
 #define DEFAULT_SERVERS_INITCOUNT_IN_ONE_RULE	2
 #define DEFAULT_SERVERS_INCREASE_IN_ONE_RULE	5
 
-#define DEFAULT_FORWARD_SESSIONS_MAXCOUNT	10000	/* 缺省最大连接数量 */
+#define DEFAULT_FORWARD_SESSIONS_MAXCOUNT	1000	/* 缺省最大连接数量 */
 #define DEFAULT_FORWARD_TRANSFER_BUFSIZE	4096	/* 缺省通讯转发缓冲区大小 */
 
 #define RULE_ID_MAXLEN				64
@@ -126,17 +126,17 @@
 
 #define WAIT_EVENTS_COUNT			1024 /* 一次获取epoll事件数量 */
 
-#define FORWARD_SESSION_TYPE_CLIENT		1
-#define FORWARD_SESSION_TYPE_LISTEN		2
-#define FORWARD_SESSION_TYPE_SERVER		3
-#define FORWARD_SESSION_TYPE_MANAGER		4
+#define FORWARD_SESSION_TYPE_LISTEN		0 /* 侦听会话 */
+#define FORWARD_SESSION_TYPE_CLIENT		1 /* 作为客户端连接远端服务端会话 */
+#define FORWARD_SESSION_TYPE_SERVER		2 /* 作为服务端接受远端连接会话 */
+#define FORWARD_SESSION_TYPE_MANAGER		3 /* 作为管理服务端接受远端连接会话 */
 
 #define FORWARD_SESSION_STATUS_UNUSED		0 /* 未使用 */
 #define FORWARD_SESSION_STATUS_READY		1 /* 准备使用 */
-#define FORWARD_SESSION_STATUS_LISTEN		9 /* 侦听中 */
-#define FORWARD_SESSION_STATUS_CONNECTING	11 /* 非堵塞连接中 */
-#define FORWARD_SESSION_STATUS_CONNECTED	12 /* 连接完成 */
-#define FORWARD_SESSION_STATUS_COMMAND		91 /* 命令 */
+#define FORWARD_SESSION_STATUS_LISTEN		2 /* 侦听中 */
+#define FORWARD_SESSION_STATUS_CONNECTING	3 /* 非堵塞连接中 */
+#define FORWARD_SESSION_STATUS_CONNECTED	4 /* 连接完成 */
+#define FORWARD_SESSION_STATUS_COMMAND		5 /* 命令 */
 
 #define IO_BUFFER_SIZE				4096 /* 输入输出缓冲区大小 */
 
@@ -190,17 +190,17 @@ struct ForwardRule
 	char				rule_id[ RULE_ID_MAXLEN + 1 ] ; /* 规则ID */
 	char				load_balance_algorithm[ LOAD_BALANCE_ALGORITHM_MAXLEN + 1 ] ; /* 负载均衡算法 */
 	
-	struct ClientNetAddress		*clients_addr ; /* 客户端地址结构 */
-	unsigned long			clients_addr_size ; /* 客户端规则配置最大数量 */
-	unsigned long			clients_addr_count ; /* 客户端规则配置数量 */
+	struct ClientNetAddress		*client_addr_array ; /* 客户端地址结构 */
+	unsigned long			client_addr_size ; /* 客户端规则配置最大数量 */
+	unsigned long			client_addr_count ; /* 客户端规则配置数量 */
 	
-	struct ForwardNetAddress	*forwards_addr ; /* 转发端地址结构 */
-	unsigned long			forwards_addr_size ; /* 转发端规则配置最大数量 */
-	unsigned long			forwards_addr_count ; /* 转发端规则配置数量 */
+	struct ForwardNetAddress	*forward_addr_array ; /* 转发端地址结构 */
+	unsigned long			forward_addr_size ; /* 转发端规则配置最大数量 */
+	unsigned long			forward_addr_count ; /* 转发端规则配置数量 */
 	
-	struct ServerNetAddress		*servers_addr ; /* 服务端地址结构 */
-	unsigned long			servers_addr_size ; /* 服务端规则配置最大数量 */
-	unsigned long			servers_addr_count ; /* 服务端规则配置数量 */
+	struct ServerNetAddress		*server_addr_array ; /* 服务端地址结构 */
+	unsigned long			server_addr_size ; /* 服务端规则配置最大数量 */
+	unsigned long			server_addr_count ; /* 服务端规则配置数量 */
 	unsigned long			selected_addr_index ; /* 当前服务端索引 */
 } ;
 
@@ -210,12 +210,12 @@ struct ForwardSession
 	unsigned char		status ; /* 会话状态 */
 	unsigned char		type ; /* 客户端还是服务端 */
 	
+	int			sock ; /* sock描述字 */
+	struct NetAddress	netaddr ; /* 网络地址结构 */
 	struct ForwardRule	*p_forward_rule ; /* 转发规则派生 */
 	unsigned long		client_index ; /* 客户端索引 */
+	unsigned long		forward_index ; /* 转发端索引 */
 	unsigned long		server_index ; /* 服务端索引 */
-	
-	struct NetAddress	netaddr ; /* 网络地址结构 */
-	int			sock ; /* sock描述字 */
 	
 	char			io_buffer[ IO_BUFFER_SIZE + 1 ] ; /* 输入输出缓冲区 */
 	int			io_buffer_len ; /* 输入输出缓冲区有效数据长度 */
@@ -244,9 +244,9 @@ struct ServerEnv
 {
 	struct CommandParameter	cmd_para ; /* 命令行参数结构 */
 	
-	struct ForwardRule	*forward_rules_array ; /* 转发规则数组 */
-	unsigned long		forward_rules_size ; /* 转发规则数组大小 */
-	unsigned long		forward_rules_count ; /* 转发规则已装载数量 */
+	struct ForwardRule	*forward_rule_array ; /* 转发规则数组 */
+	unsigned long		forward_rule_size ; /* 转发规则数组大小 */
+	unsigned long		forward_rule_count ; /* 转发规则已装载数量 */
 	
 	pid_t			pid ; /* 子进程PID */
 	struct PipeFds		accept_pipe ; /* 父子进程命令管道 */
@@ -257,7 +257,7 @@ struct ServerEnv
 	int			*forward_epoll_fd_array ; /* 子线程转发EPOLL池 */
 	
 	struct ForwardSession	*forward_session_array ; /* 转发会话数组 */
-	unsigned long		forward_session_count ; /* 转发会话数组大小 */
+	//unsigned long		forward_session_count ; /* 转发会话数组大小 */
 	unsigned long		forward_session_use_offsetpos ; /* 转发会话最近使用单元偏移量 */
 	
 	pthread_mutex_t		mutex ; /* 临界区互斥 */
@@ -295,7 +295,6 @@ int _MonitorProcess( void *pv );
 
 /********* WorkerProcess *********/
 
-int WorkerProcess( struct ServerEnv *penv );
 int WorkerProcess( struct ServerEnv *penv );
 
 /********* AcceptThread *********/
