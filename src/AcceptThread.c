@@ -868,10 +868,13 @@ void *AcceptThread( struct ServerEnv *penv )
 	g_exit_flag = 0 ;
 	while( ! ( g_exit_flag == 1 && penv->forward_session_count == 0 ) )
 	{
+DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
 		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , -1 ) ;
+DebugLog( __FILE__ , __LINE__ , "event_count[%d]" , event_count );
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
+DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
 			p_forward_session = p_event->data.ptr ;
 			
 			if( p_forward_session == NULL )
@@ -894,6 +897,7 @@ void *AcceptThread( struct ServerEnv *penv )
 					int			forward_session_index ;
 					struct ForwardSession	*p_forward_session = NULL ;
 					
+DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
 					for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
 					{
 						if( p_forward_session->type == FORWARD_SESSION_TYPE_LISTEN )
@@ -904,11 +908,15 @@ void *AcceptThread( struct ServerEnv *penv )
 							SetForwardSessionUnused( penv , p_forward_session );
 						}
 					}
+DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
 					
 					write( penv->response_pipe.fds[1] , "P" , 1 );
+DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
 					
 					g_exit_flag = 1 ;
+DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
 				}
+DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
 			}
 			else if( p_forward_session->status == FORWARD_SESSION_STATUS_LISTEN )
 			{
