@@ -116,7 +116,7 @@
 #define DEFAULT_SERVERS_INITCOUNT_IN_ONE_RULE	2
 #define DEFAULT_SERVERS_INCREASE_IN_ONE_RULE	5
 
-#define DEFAULT_FORWARD_SESSIONS_MAXCOUNT	1000	/* 缺省最大连接数量 */
+#define DEFAULT_FORWARD_SESSIONS_MAXCOUNT	100	/* 缺省最大连接数量 */
 #define DEFAULT_FORWARD_TRANSFER_BUFSIZE	4096	/* 缺省通讯转发缓冲区大小 */
 
 #define RULE_ID_MAXLEN				64
@@ -126,10 +126,11 @@
 
 #define WAIT_EVENTS_COUNT			1024 /* 一次获取epoll事件数量 */
 
-#define FORWARD_SESSION_TYPE_LISTEN		0 /* 侦听会话 */
-#define FORWARD_SESSION_TYPE_CLIENT		1 /* 作为客户端连接远端服务端会话 */
-#define FORWARD_SESSION_TYPE_SERVER		2 /* 作为服务端接受远端连接会话 */
-#define FORWARD_SESSION_TYPE_MANAGER		3 /* 作为管理服务端接受远端连接会话 */
+#define FORWARD_SESSION_TYPE_UNUSED		0 /* 未使用 */
+#define FORWARD_SESSION_TYPE_LISTEN		1 /* 侦听会话 */
+#define FORWARD_SESSION_TYPE_CLIENT		2 /* 作为客户端连接远端服务端会话 */
+#define FORWARD_SESSION_TYPE_SERVER		3 /* 作为服务端接受远端连接会话 */
+#define FORWARD_SESSION_TYPE_MANAGER		4 /* 作为管理服务端接受远端连接会话 */
 
 #define FORWARD_SESSION_STATUS_UNUSED		0 /* 未使用 */
 #define FORWARD_SESSION_STATUS_READY		1 /* 准备使用 */
@@ -208,11 +209,11 @@ struct ForwardRule
 struct ForwardSession
 {
 	unsigned char		status ; /* 会话状态 */
-	unsigned char		type ; /* 客户端还是服务端 */
+	unsigned char		type ; /* 侦听端、客户端、服务端、管理服务端 */
 	
 	int			sock ; /* sock描述字 */
 	struct NetAddress	netaddr ; /* 网络地址结构 */
-	struct ForwardRule	*p_forward_rule ; /* 转发规则派生 */
+	struct ForwardRule	*p_forward_rule ; /* 转发规则 */
 	unsigned long		client_index ; /* 客户端索引 */
 	unsigned long		forward_index ; /* 转发端索引 */
 	unsigned long		server_index ; /* 服务端索引 */
@@ -240,16 +241,21 @@ struct PipeFds
 	int			fds[ 2 ] ;
 } ;
 
+extern struct ServerEnv		*g_penv ;
+extern int			g_exit_flag ;
+
 struct ServerEnv
 {
 	struct CommandParameter	cmd_para ; /* 命令行参数结构 */
+	char			**argv ;
 	
 	struct ForwardRule	*forward_rule_array ; /* 转发规则数组 */
 	unsigned long		forward_rule_size ; /* 转发规则数组大小 */
 	unsigned long		forward_rule_count ; /* 转发规则已装载数量 */
 	
 	pid_t			pid ; /* 子进程PID */
-	struct PipeFds		accept_pipe ; /* 父子进程命令管道 */
+	struct PipeFds		request_pipe ; /* 父-子进程请求命令管道 */
+	struct PipeFds		response_pipe ; /* 父-子进程响应命令管道 */
 	int			accept_epoll_fd ; /* 侦听端口epoll池 */
 	
 	int			*forward_thread_index ; /* 子线程序号 */
@@ -257,7 +263,7 @@ struct ServerEnv
 	int			*forward_epoll_fd_array ; /* 子线程转发EPOLL池 */
 	
 	struct ForwardSession	*forward_session_array ; /* 转发会话数组 */
-	//unsigned long		forward_session_count ; /* 转发会话数组大小 */
+	unsigned long		forward_session_count ; /* 转发会话数组大小 */
 	unsigned long		forward_session_use_offsetpos ; /* 转发会话最近使用单元偏移量 */
 	
 	pthread_mutex_t		mutex ; /* 临界区互斥 */
@@ -280,8 +286,8 @@ int InitEnvirment( struct ServerEnv *penv );
 void CleanEnvirment( struct ServerEnv *penv );
 int AddListeners( struct ServerEnv *penv );
 struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv );
-void SetForwardSessionUnused( struct ForwardSession *p_forward_session );
-void SetForwardSessionUnused2( struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
+void SetForwardSessionUnused( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
+void SetForwardSessionUnused2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
 
 /********* Config *********/
 

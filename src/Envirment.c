@@ -52,7 +52,25 @@ int InitEnvirment( struct ServerEnv *penv )
 
 void CleanEnvirment( struct ServerEnv *penv )
 {
-	int		n ;
+	int				forward_session_index ;
+	struct ForwardSession		*p_forward_session = NULL ;
+	
+	int				n ;
+	
+	for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
+	{
+		if( p_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
+		{
+			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+			_CLOSESOCKET( p_forward_session->sock );
+		}
+	}
+	
+	close( penv->request_pipe.fds[0] );
+	close( penv->request_pipe.fds[1] );
+	close( penv->response_pipe.fds[0] );
+	close( penv->response_pipe.fds[1] );
 	
 	close( penv->accept_epoll_fd );
 	free( penv->forward_thread_tid_array );
@@ -117,6 +135,7 @@ int AddListeners( struct ServerEnv *penv )
 			p_forward_session->sock = p_forward_rule->forward_addr_array[n].sock ;
 			p_forward_session->p_forward_rule = p_forward_rule ;
 			p_forward_session->status = FORWARD_SESSION_STATUS_LISTEN ;
+			p_forward_session->type = FORWARD_SESSION_TYPE_LISTEN ;
 			p_forward_session->forward_index = n ;
 			
 			memset( & event , 0x00 , sizeof(event) );
@@ -124,7 +143,7 @@ int AddListeners( struct ServerEnv *penv )
 			event.events = EPOLLIN | EPOLLERR | EPOLLET ;
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_forward_rule->forward_addr_array[n].sock , & event );
 			
-			InfoLog( __FILE__ , __LINE__ , "AddListeners sock[%d]session[%p]" , p_forward_rule->forward_addr_array[n].sock , p_forward_session );
+			InfoLog( __FILE__ , __LINE__ , "AddListeners sock[%s:%d][%d]" , p_forward_rule->forward_addr_array[n].netaddr.ip , p_forward_rule->forward_addr_array[n].netaddr.port.port_int , p_forward_rule->forward_addr_array[n].sock );
 		}
 	}
 	
@@ -147,6 +166,7 @@ struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv )
 			{
 				penv->forward_session_use_offsetpos = 0 ;
 			}
+			penv->forward_session_count++;
 			return p_forward_session;
 		}
 		
@@ -162,21 +182,25 @@ struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv )
 	return NULL;
 }
 
-void SetForwardSessionUnused( struct ForwardSession *p_forward_session )
+void SetForwardSessionUnused( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
 {
 	if( p_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
 		p_forward_session->status = FORWARD_SESSION_STATUS_UNUSED ;
 	
+	penv->forward_session_count--;
+	
 	return;
 }
 
-void SetForwardSessionUnused2( struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 )
+void SetForwardSessionUnused2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 )
 {
 	if( p_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
 		p_forward_session->status = FORWARD_SESSION_STATUS_UNUSED ;
 	
 	if( p_forward_session2->status != FORWARD_SESSION_STATUS_UNUSED )
 		p_forward_session2->status = FORWARD_SESSION_STATUS_UNUSED ;
+	
+	penv->forward_session_count -= 2 ;
 	
 	return;
 }

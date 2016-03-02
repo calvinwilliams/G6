@@ -1,5 +1,7 @@
 #include "G6.h"
 
+struct ServerEnv	*g_penv = NULL ;
+
 static void version()
 {
 	printf( "G6 - TCP Transfer && Load-Balance Dispenser\n" );
@@ -104,6 +106,7 @@ int main( int argc , char *argv[] )
 			exit(7);
 		}
 	}
+	penv->argv = argv ;
 	
 	if( penv->cmd_para.config_pathfilename == NULL )
 	{

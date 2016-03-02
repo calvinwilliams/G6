@@ -381,7 +381,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 				break;
 			
 			ErrorLog( __FILE__ , __LINE__ , "accept failed , errno[%d]" , errno );
-			return -1;
+			return 0;
 		}
 		else
 		{
@@ -447,7 +447,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 				ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed" );
 				DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
 				_CLOSESOCKET( sock );
-				SetForwardSessionUnused( p_forward_session );
+				SetForwardSessionUnused( penv , p_forward_session );
 				return 0;
 			}
 			
@@ -476,7 +476,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 			{
 				DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
 				_CLOSESOCKET( p_forward_session->sock );
-				SetForwardSessionUnused2( p_forward_session , p_reverse_forward_session );
+				SetForwardSessionUnused2( penv , p_forward_session , p_reverse_forward_session );
 				return 0;
 			}
 		}
@@ -805,7 +805,7 @@ static int OnReceiveCommand( struct ServerEnv *penv , struct ForwardSession *p_f
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 		DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
 		_CLOSESOCKET( p_forward_session->sock );
-		SetForwardSessionUnused( p_forward_session );
+		SetForwardSessionUnused( penv , p_forward_session );
 		return 0;
 	}
 	else if( len == -1 )
@@ -815,7 +815,7 @@ static int OnReceiveCommand( struct ServerEnv *penv , struct ForwardSession *p_f
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 		DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
 		_CLOSESOCKET( p_forward_session->sock );
-		SetForwardSessionUnused( p_forward_session );
+		SetForwardSessionUnused( penv , p_forward_session );
 		return 0;
 	}
 	
@@ -833,7 +833,7 @@ static int OnReceiveCommand( struct ServerEnv *penv , struct ForwardSession *p_f
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
 			_CLOSESOCKET( p_forward_session->sock );
-			SetForwardSessionUnused( p_forward_session );
+			SetForwardSessionUnused( penv , p_forward_session );
 			return 0;
 		}
 		
@@ -865,7 +865,8 @@ void *AcceptThread( struct ServerEnv *penv )
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.AcceptThread ---" );
 	
 	/* 主工作循环 */
-	while(1)
+	g_exit_flag = 0 ;
+	while( ! ( g_exit_flag == 1 && penv->forward_session_count == 0 ) )
 	{
 		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , -1 ) ;
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
@@ -873,7 +874,43 @@ void *AcceptThread( struct ServerEnv *penv )
 		{
 			p_forward_session = p_event->data.ptr ;
 			
-			if( p_forward_session->status == FORWARD_SESSION_STATUS_LISTEN )
+			if( p_forward_session == NULL )
+			{
+				char		command ;
+				
+				nret = read( penv->request_pipe.fds[0] , & command , 1 ) ;
+				if( nret == -1 )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "read request_pipe failed , errno[%d]" , errno );
+					exit(0);
+				}
+				else if( nret == 0 )
+				{
+					InfoLog( __FILE__ , __LINE__ , "read request_pipe close" );
+					exit(0);
+				}
+				else
+				{
+					int			forward_session_index ;
+					struct ForwardSession	*p_forward_session = NULL ;
+					
+					for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
+					{
+						if( p_forward_session->type == FORWARD_SESSION_TYPE_LISTEN )
+						{
+							epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+							DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+							_CLOSESOCKET( p_forward_session->sock );
+							SetForwardSessionUnused( penv , p_forward_session );
+						}
+					}
+					
+					write( penv->response_pipe.fds[1] , "P" , 1 );
+					
+					g_exit_flag = 1 ;
+				}
+			}
+			else if( p_forward_session->status == FORWARD_SESSION_STATUS_LISTEN )
 			{
 				DebugLog( __FILE__ , __LINE__ , "listen session event" );
 				

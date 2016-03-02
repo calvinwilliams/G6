@@ -293,7 +293,7 @@ int LoadConfig( struct ServerEnv *penv )
 	InfoLog( __FILE__ , __LINE__ , "forward_rule_count[%ld/%ld] >>>" , penv->forward_rule_count , penv->forward_rule_size );
 	for( n = 0 ; n < penv->forward_rule_count ; n++ )
 	{
-		InfoLog( __FILE__ , __LINE__ , "  rule_id[%s] load_balance_algorithm[%s]>>>"
+		InfoLog( __FILE__ , __LINE__ , "  rule_id[%s] load_balance_algorithm[%s] >>>"
 			, penv->forward_rule_array[n].rule_id , penv->forward_rule_array[n].load_balance_algorithm );
 		InfoLog( __FILE__ , __LINE__ , "  client_addr_count[%ld/%ld] forward_addr_count[%ld/%ld] server_addr_count[%ld/%ld]"
 			, penv->forward_rule_array[n].client_addr_count , penv->forward_rule_array[n].client_addr_size

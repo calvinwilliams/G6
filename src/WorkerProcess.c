@@ -3,12 +3,14 @@
 int WorkerProcess( struct ServerEnv *penv )
 {
 	unsigned long		n ;
-	//struct epoll_event	event ;
 	
 	int			nret = 0 ;
 	
 	/* 设置日志输出文件 */
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess ---" );
+	
+	signal( SIGTERM , SIG_IGN );
+	signal( SIGUSR1 , SIG_IGN );
 	
 	/* 创建转发子线程 */
 	penv->forward_thread_index = NULL ;
