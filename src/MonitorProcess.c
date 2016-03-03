@@ -6,26 +6,16 @@ static void sig_proc( int sig_no )
 {
 	if( sig_no == SIGUSR2 )
 	{
-		int			forward_session_index ;
-		struct ForwardSession	*p_forward_session = NULL ;
-		
+		pid_t			pid ;
 		char			command ;
 		
-		pid_t			pid ;
+		int			nret = 0 ;
 		
-		for( forward_session_index = 0 , p_forward_session = g_penv->forward_session_array ; forward_session_index < g_penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
+		nret = SaveListenSockets( g_penv ) ;
+		if( nret )
 		{
-			if( p_forward_session->type != FORWARD_SESSION_TYPE_UNUSED )
-			{
-				if( p_forward_session->type == FORWARD_SESSION_TYPE_LISTEN )
-				{
-					epoll_ctl( g_penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-				}
-				
-				DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
-				_CLOSESOCKET( p_forward_session->sock );
-				SetForwardSessionUnused( g_penv , p_forward_session );
-			}
+			ErrorLog( __FILE__ , __LINE__ , "SaveListenSockets faild[%d]" , nret );
+			return;
 		}
 		
 		DebugLog( __FILE__ , __LINE__ , "write request pipe Q ..." );
@@ -51,16 +41,22 @@ static void sig_proc( int sig_no )
 		}
 		
 		g_exit_flag = 1 ;
-		DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
+		DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
 	}
 	else if( sig_no == SIGTERM )
 	{
 		char			command ;
 		
+		DebugLog( __FILE__ , __LINE__ , "write request pipe Q ..." );
 		write( g_penv->request_pipe.fds[1] , "Q" , 1 );
+		DebugLog( __FILE__ , __LINE__ , "write request pipe Q ok" );
+		
+		DebugLog( __FILE__ , __LINE__ , "read response pipe ..." );
 		read( g_penv->request_pipe.fds[0] , & command , 1 );
+		DebugLog( __FILE__ , __LINE__ , "read response pipe ok %c" , command );
 		
 		g_exit_flag = 1 ;
+		DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
 	}
 	
 	return;

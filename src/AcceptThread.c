@@ -917,7 +917,7 @@ void *AcceptThread( struct ServerEnv *penv )
 						DebugLog( __FILE__ , __LINE__ , "write response pipe P ok" );
 						
 						g_exit_flag = 1 ;
-						DebugLog( __FILE__ , __LINE__ , "g_exit_flag[%d]" , g_exit_flag );
+						DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
 					}
 				}
 			}
