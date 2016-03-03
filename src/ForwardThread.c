@@ -13,7 +13,7 @@
 	_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
 	SetForwardSessionUnused2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
 	if( penv->forward_session_count == 0 ) \
-		write( g_penv->request_pipe.fds[1] , "C" , 1 ); \
+		write( g_penv->accept_request_pipe.fds[1] , "C" , 1 ); \
 
 static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
 {
@@ -197,42 +197,67 @@ void *ForwardThread( struct ServerEnv *penv )
 	forward_epoll_fd = penv->forward_epoll_fd_array[forward_thread_index] ;
 	{ int *tmp = penv->forward_thread_index ; penv->forward_thread_index = NULL ; free( tmp ); }
 	
+	close( penv->forward_request_pipe[forward_thread_index].fds[1] );
+	close( penv->forward_response_pipe[forward_thread_index].fds[0] );
+	
 	/* 设置日志输出文件 */
 	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
 	SetLogLevel( penv->cmd_para.log_level );
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.ForwardThread.%d ---" , forward_thread_index+1 );
 	
 	/* 主工作循环 */
-	while(1)
+	while( ! ( g_exit_flag == 1 && penv->forward_session_count == 0 ) )
 	{
 		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , -1 ) ;
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
-			DebugLog( __FILE__ , __LINE__ , "forward session event" );
-			
 			p_forward_session = p_event->data.ptr ;
 			
-			if( p_event->events & EPOLLIN ) /* 输入事件 */
+			if( p_forward_session == NULL )
 			{
-				nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count ) ;
-				if( nret )
+				char		command ;
+				
+				DebugLog( __FILE__ , __LINE__ , "pipe session event" );
+				
+				nret = read( penv->forward_request_pipe[forward_thread_index].fds[0] , & command , 1 ) ;
+				if( nret == -1 )
 				{
-					ErrorLog( __FILE__ , __LINE__ , "OnForwardInput failed[%d]" , nret );
+					ErrorLog( __FILE__ , __LINE__ , "read request pipe failed , errno[%d]" , errno );
+					exit(0);
 				}
-			}
-			else if( p_event->events & EPOLLOUT ) /* 输出事件 */
-			{
-				nret = OnForwardOutput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count ) ;
-				if( nret )
+				else if( nret == 0 )
 				{
-					ErrorLog( __FILE__ , __LINE__ , "OnForwardOutput failed[%d]" , nret );
+					InfoLog( __FILE__ , __LINE__ , "read request pipe close" );
+					
+					close( penv->forward_response_pipe[forward_thread_index].fds[1] );
 				}
 			}
 			else
 			{
-				ErrorLog( __FILE__ , __LINE__ , "forward session EPOLLERR" );
-				DISCONNECT_PAIR
+				DebugLog( __FILE__ , __LINE__ , "forward session event" );
+				
+				if( p_event->events & EPOLLIN ) /* 输入事件 */
+				{
+					nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count ) ;
+					if( nret )
+					{
+						ErrorLog( __FILE__ , __LINE__ , "OnForwardInput failed[%d]" , nret );
+					}
+				}
+				else if( p_event->events & EPOLLOUT ) /* 输出事件 */
+				{
+					nret = OnForwardOutput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count ) ;
+					if( nret )
+					{
+						ErrorLog( __FILE__ , __LINE__ , "OnForwardOutput failed[%d]" , nret );
+					}
+				}
+				else
+				{
+					ErrorLog( __FILE__ , __LINE__ , "forward session EPOLLERR" );
+					DISCONNECT_PAIR
+				}
 			}
 		}
 	}
@@ -242,6 +267,8 @@ void *ForwardThread( struct ServerEnv *penv )
 
 void *_ForwardThread( void *pv )
 {
-	return ForwardThread( (struct ServerEnv *)pv );
+	ForwardThread( (struct ServerEnv *)pv );
+	
+	pthread_exit(NULL);
 }
 

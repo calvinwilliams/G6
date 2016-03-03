@@ -259,12 +259,14 @@ struct ServerEnv
 	unsigned long			forward_rule_count ; /* 转发规则已装载数量 */
 	
 	pid_t				pid ; /* 子进程PID */
-	struct PipeFds			request_pipe ; /* 父-子进程请求命令管道 */
-	struct PipeFds			response_pipe ; /* 父-子进程响应命令管道 */
+	struct PipeFds			accept_request_pipe ; /* 父-子进程请求命令管道 */
+	struct PipeFds			accept_response_pipe ; /* 父-子进程响应命令管道 */
 	int				accept_epoll_fd ; /* 侦听端口epoll池 */
 	
 	int				*forward_thread_index ; /* 子线程序号 */
 	pthread_t			*forward_thread_tid_array ; /* 子线程TID */
+	struct PipeFds			*forward_request_pipe ; /* 父-子线程请求命令管道 */
+	struct PipeFds			*forward_response_pipe ; /* 父-子线程响应命令管道 */
 	int				*forward_epoll_fd_array ; /* 子线程转发EPOLL池 */
 	
 	struct ForwardSession		*forward_session_array ; /* 转发会话数组 */
@@ -294,7 +296,8 @@ int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchChar
 int InitEnvirment( struct ServerEnv *penv );
 void CleanEnvirment( struct ServerEnv *penv );
 int SaveListenSockets( struct ServerEnv *penv );
-int LoadListenSockets( struct ServerEnv *penv );
+int LoadOldListenSockets( struct ServerEnv *penv );
+int CleanOldListenSockets( struct ServerEnv *penv );
 int AddListeners( struct ServerEnv *penv );
 struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv );
 #define IsForwardSessionUsed(_p_forward_session_)	((_p_forward_session_)->status!=FORWARD_SESSION_STATUS_UNUSED?1:0)

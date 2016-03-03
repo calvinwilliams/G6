@@ -2,7 +2,9 @@
 
 int WorkerProcess( struct ServerEnv *penv )
 {
-	unsigned long		n ;
+	unsigned long		forward_thread_index ;
+	
+	char			command ;
 	
 	int			nret = 0 ;
 	
@@ -14,7 +16,7 @@ int WorkerProcess( struct ServerEnv *penv )
 	
 	/* 创建转发子线程 */
 	penv->forward_thread_index = NULL ;
-	for( n = 0 ; n < penv->cmd_para.forward_thread_size ; n++ )
+	for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
 	{
 		while( penv->forward_thread_index ) sleep(1);
 		
@@ -24,9 +26,9 @@ int WorkerProcess( struct ServerEnv *penv )
 			ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
 			return -1;
 		}
-		*(penv->forward_thread_index) = n ;
+		*(penv->forward_thread_index) = forward_thread_index ;
 		
-		nret = pthread_create( penv->forward_thread_tid_array+n , NULL , & _ForwardThread , (void*)penv ) ;
+		nret = pthread_create( penv->forward_thread_tid_array+forward_thread_index , NULL , & _ForwardThread , (void*)penv ) ;
 		if( nret )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "pthread_create forward thread failed , errno[%d]" , errno );
@@ -34,11 +36,23 @@ int WorkerProcess( struct ServerEnv *penv )
 		}
 		else
 		{
-			InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_create [%lu]" , pthread_self() , penv->forward_thread_tid_array[n] );
+			close( penv->forward_request_pipe[forward_thread_index].fds[0] );
+			close( penv->forward_response_pipe[forward_thread_index].fds[1] );
+			InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_create [%lu]" , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
 		}
 	}
 	
 	_AcceptThread( (void*)penv );
+	
+	for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
+	{
+		close( penv->forward_request_pipe[forward_thread_index].fds[1] );
+		read( penv->forward_response_pipe[forward_thread_index].fds[0] , & command , 1 );
+		
+		InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_join [%lu] ..." , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
+		pthread_join( penv->forward_thread_tid_array[forward_thread_index] , NULL );
+		InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_join [%lu] ok" , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
+	}
 	
 	return 0;
 }

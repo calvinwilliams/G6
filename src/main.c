@@ -1,10 +1,14 @@
 #include "G6.h"
 
+char			__G6_VERSION[] = "1.0.0" ;
+char			*__G6_VERSION_1_0_0 = __G6_VERSION ;
+
 struct ServerEnv	*g_penv = NULL ;
 
 static void version()
 {
-	printf( "G6 - TCP Transfer && Load-Balance Dispenser\n" );
+	printf( "G6 v%s build %s %s\n" , __G6_VERSION , __DATE__ , __TIME__ );
+	printf( "TCP Transfer && Load-Balance Dispenser\n" );
 	printf( "Copyright by calvin 2016\n" );
 	return;
 }
@@ -114,7 +118,7 @@ int main( int argc , char *argv[] )
 		exit(7);
 	}
 	
-	InfoLog( __FILE__ , __LINE__ , "--- G5 begin ---" );
+	InfoLog( __FILE__ , __LINE__ , "--- G5 begin --- v%s build %s %s" , __G6_VERSION , __DATE__ , __TIME__ );
 	
 	/* 初始化环境 */
 	nret = InitEnvirment( penv ) ;
@@ -156,7 +160,7 @@ int main( int argc , char *argv[] )
 	/* 清理环境 */
 	CleanEnvirment( penv );
 	
-	InfoLog( __FILE__ , __LINE__ , "--- G5 finish ---" );
+	InfoLog( __FILE__ , __LINE__ , "--- G5 finish --- v%s build %s %s" , __G6_VERSION , __DATE__ , __TIME__ );
 	
 	return -nret;
 }

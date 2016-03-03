@@ -880,8 +880,9 @@ void *AcceptThread( struct ServerEnv *penv )
 			{
 				char		command ;
 				
-				DebugLog( __FILE__ , __LINE__ , "read request pipe ..." );
-				nret = read( penv->request_pipe.fds[0] , & command , 1 ) ;
+				DebugLog( __FILE__ , __LINE__ , "pipe session event" );
+				
+				nret = read( penv->accept_request_pipe.fds[0] , & command , 1 ) ;
 				if( nret == -1 )
 				{
 					ErrorLog( __FILE__ , __LINE__ , "read request pipe failed , errno[%d]" , errno );
@@ -889,36 +890,26 @@ void *AcceptThread( struct ServerEnv *penv )
 				}
 				else if( nret == 0 )
 				{
-					InfoLog( __FILE__ , __LINE__ , "read request pipe close" );
-					exit(0);
-				}
-				else
-				{
-					DebugLog( __FILE__ , __LINE__ , "read request pipe ok %c" , command );
+					int			forward_session_index ;
+					struct ForwardSession	*p_forward_session = NULL ;
 					
-					if( command == 'Q' )
+					InfoLog( __FILE__ , __LINE__ , "read request pipe close" );
+					
+					for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
 					{
-						int			forward_session_index ;
-						struct ForwardSession	*p_forward_session = NULL ;
-						
-						for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
+						if( p_forward_session->type == FORWARD_SESSION_TYPE_LISTEN )
 						{
-							if( p_forward_session->type == FORWARD_SESSION_TYPE_LISTEN )
-							{
-								epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-								DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
-								_CLOSESOCKET( p_forward_session->sock );
-								SetForwardSessionUnused( penv , p_forward_session );
-							}
+							epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+							DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+							_CLOSESOCKET( p_forward_session->sock );
+							SetForwardSessionUnused( penv , p_forward_session );
 						}
-						
-						DebugLog( __FILE__ , __LINE__ , "write response pipe P ..." );
-						write( penv->response_pipe.fds[1] , "P" , 1 );
-						DebugLog( __FILE__ , __LINE__ , "write response pipe P ok" );
-						
-						g_exit_flag = 1 ;
-						DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
 					}
+					
+					close( penv->accept_response_pipe.fds[1] );
+					
+					g_exit_flag = 1 ;
+					DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
 				}
 			}
 			else if( p_forward_session->status == FORWARD_SESSION_STATUS_LISTEN )
