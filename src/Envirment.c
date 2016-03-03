@@ -59,11 +59,12 @@ void CleanEnvirment( struct ServerEnv *penv )
 	
 	for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
 	{
-		if( p_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
+		if( IsForwardSessionUsed( p_forward_session ) )
 		{
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
 			_CLOSESOCKET( p_forward_session->sock );
+			SetForwardSessionUnused( penv , p_forward_session );
 		}
 	}
 	
@@ -157,7 +158,7 @@ struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv )
 	
 	for( n = 0 ; n < penv->cmd_para.forward_session_size ; n++ )
 	{
-		if( p_forward_session->status == FORWARD_SESSION_STATUS_UNUSED )
+		if( IsForwardSessionUsed( p_forward_session ) )
 		{
 			memset( p_forward_session , 0x00 , sizeof(struct ForwardSession) );
 			p_forward_session->status = FORWARD_SESSION_STATUS_READY ;

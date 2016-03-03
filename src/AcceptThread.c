@@ -291,6 +291,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	}
 	
 	SetNonBlocking( p_reverse_forward_session->sock );
+	SetCloseExec( p_reverse_forward_session->sock );
 	
 	/* 连接服务端 */
 	addr_len = sizeof(struct sockaddr) ;
@@ -390,6 +391,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 		}
 		
 		SetNonBlocking( sock );
+		SetCloseExec( sock );
 		
 		/* 检查客户端白名单 */
 		nret = MatchClientAddr( & netaddr , p_listen_session->p_forward_rule , & client_index ) ;
@@ -650,7 +652,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 			
 			for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
 			{
-				if( p_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
+				if( IsForwardSessionUsed( p_forward_session ) )
 				{
 					if( p_forward_session->type == FORWARD_SESSION_TYPE_LISTEN )
 					{

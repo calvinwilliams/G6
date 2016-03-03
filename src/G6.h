@@ -273,19 +273,24 @@ struct ServerEnv
 
 int Rand( int min, int max );
 unsigned long CalcHash( char *str );
-int SetReuseAddr( int sock );
-int SetNonBlocking( int sock );
+void SetReuseAddr( int sock );
+void SetNonBlocking( int sock );
+void SetCloseExec( int sock );
+void SetCloseExec2( int sock , int sock2 );
+void SetCloseExec3( int sock , int sock2 , int sock3 );
+void SetCloseExec4( int sock , int sock2 , int sock3 , int sock4 );
 void SetNetAddress( struct NetAddress *p_netaddr );
 void GetNetAddress( struct NetAddress *p_netaddr );
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) );
 int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchCharacters, char cMatchOneCharacters);
 
-/********* envirment *********/
+/********* Envirment *********/
 
 int InitEnvirment( struct ServerEnv *penv );
 void CleanEnvirment( struct ServerEnv *penv );
 int AddListeners( struct ServerEnv *penv );
 struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv );
+#define IsForwardSessionUsed(_p_forward_session_)	((_p_forward_session_)->status!=FORWARD_SESSION_STATUS_UNUSED?1:0)
 void SetForwardSessionUnused( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
 void SetForwardSessionUnused2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
 

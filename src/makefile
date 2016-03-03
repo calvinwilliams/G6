@@ -9,7 +9,7 @@
 #@ c_FILE
 c_FILE		=	\
 			LOGC.c \
-			util.c \
+			Util.c \
 			main.c \
 			Envirment.c \
 			Config.c \

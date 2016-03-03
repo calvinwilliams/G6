@@ -21,6 +21,7 @@ static void sig_proc( int sig_no )
 				{
 					epoll_ctl( g_penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 				}
+				
 				DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
 				_CLOSESOCKET( p_forward_session->sock );
 				SetForwardSessionUnused( g_penv , p_forward_session );
@@ -42,7 +43,7 @@ static void sig_proc( int sig_no )
 		}
 		else if( pid == 0 )
 		{
-			CleanEnvirment( g_penv );
+			//CleanEnvirment( g_penv );
 			
 			execvp( "G6" , g_penv->argv );
 			
@@ -101,6 +102,7 @@ int MonitorProcess( struct ServerEnv *penv )
 			ErrorLog( __FILE__ , __LINE__ , "pipe failed , errno[%d]" , errno );
 			return -1;
 		}
+		SetCloseExec2( penv->request_pipe.fds[0] , penv->request_pipe.fds[1] );
 		
 		_PIPE2 :
 		nret = pipe( penv->response_pipe.fds ) ;
@@ -110,8 +112,11 @@ int MonitorProcess( struct ServerEnv *penv )
 				goto _PIPE2;
 			
 			ErrorLog( __FILE__ , __LINE__ , "pipe failed , errno[%d]" , errno );
+			close( penv->request_pipe.fds[0] );
+			close( penv->request_pipe.fds[1] );
 			return -1;
 		}
+		SetCloseExec4( penv->request_pipe.fds[0] , penv->request_pipe.fds[1] , penv->response_pipe.fds[0] , penv->response_pipe.fds[1] );
 		
 		/* 将管道读端加入到侦听端口epoll池 */
 		memset( & event , 0x00 , sizeof(event) );
@@ -158,9 +163,7 @@ int MonitorProcess( struct ServerEnv *penv )
 		
 		/* 监控子进程结束 */
 		_WAITPID :
-DebugLog( __FILE__ , __LINE__ , "waitpid..." );
 		pid = waitpid( -1 , & status , 0 );
-DebugLog( __FILE__ , __LINE__ , "pid[%ld] = waitpid" , pid );
 		if( pid == -1 )
 		{
 			if( errno == EINTR )
