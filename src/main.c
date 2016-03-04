@@ -46,6 +46,8 @@ int main( int argc , char *argv[] )
 	/* 设置日志输出文件 */
 	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
 	SetLogLevel( penv->cmd_para.log_level );
+	SETPID
+	SETTID
 	
 	/* 分析命令行参数 */
 	if( argc == 1 )

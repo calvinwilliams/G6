@@ -107,6 +107,8 @@ int MonitorProcess( struct ServerEnv *penv )
 	int			nret = 0 ;
 	
 	/* 设置日志输出文件 */
+	SETPID
+	SETTID
 	InfoLog( __FILE__ , __LINE__ , "--- G6.MonitorProcess ---" );
 	
 	/* 设置信号句柄 */
@@ -141,6 +143,9 @@ int MonitorProcess( struct ServerEnv *penv )
 		}
 		else if( penv->pid == 0 )
 		{
+			SETPID
+			SETTID
+			
 			InfoLog( __FILE__ , __LINE__ , "child : [%ld]fork[%ld]" , getppid() , getpid() );
 			
 			close( penv->accept_request_pipe.fds[1] );

@@ -88,7 +88,14 @@ extern "C" {
 void SetLogFile( char *format , ... );
 void CloseLogFile();
 void SetLogLevel( int log_level );
-struct timeval *GetTimeval();
+
+extern TLS struct timeval	g_time_tv ;
+extern TLS unsigned long	g_pid ;
+extern TLS unsigned long	g_tid ;
+
+#define GETTIMEVAL		g_time_tv
+#define SETPID			g_pid = PROCESSID ;
+#define SETTID			g_tid = THREADID ;
 
 int WriteLog( int log_level , char *c_filename , long c_fileline , char *format , ... );
 int FatalLog( char *c_filename , long c_fileline , char *format , ... );

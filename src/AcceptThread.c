@@ -41,7 +41,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 				(
 					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					GetTimeval()->tv_sec > p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
+					GETTIMEVAL.tv_sec > p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
@@ -68,7 +68,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 				(
 					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					GetTimeval()->tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
+					GETTIMEVAL.tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
@@ -101,7 +101,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 				(
 					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					GetTimeval()->tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
+					GETTIMEVAL.tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
@@ -136,7 +136,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 				(
 					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					GetTimeval()->tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
+					GETTIMEVAL.tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
@@ -172,7 +172,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 				(
 					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					GetTimeval()->tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
+					GETTIMEVAL.tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
@@ -216,7 +216,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 			(
 				p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 				&&
-				GetTimeval()->tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
+				GETTIMEVAL.tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 			)
 		)
 		{
@@ -253,7 +253,7 @@ static int ResolveConnectingError( struct ServerEnv *penv , struct ForwardSessio
 	/* 设置服务端不可用 */
 	p_servers_addr = p_reverse_forward_session->p_forward_rule->server_addr_array + p_reverse_forward_session->server_index ;
 	p_servers_addr->server_unable = 1 ;
-	p_servers_addr->timestamp_to_enable = GetTimeval()->tv_sec + DEFAULT_DISABLE_TIMEOUT ;
+	p_servers_addr->timestamp_to_enable = GETTIMEVAL.tv_sec + DEFAULT_DISABLE_TIMEOUT ;
 	
 	/* 非堵塞连接服务端 */
 	nret = TryToConnectServer( penv , p_reverse_forward_session ) ;
@@ -738,7 +738,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 				if( STRCMP( p_servers_addr->netaddr.ip , == , ip ) && p_servers_addr->netaddr.port.port_int == port_int )
 				{
 					p_servers_addr->server_unable = 1 ;
-					p_servers_addr->timestamp_to_enable = GetTimeval()->tv_sec + atoi(disable_timeout) ;
+					p_servers_addr->timestamp_to_enable = GETTIMEVAL.tv_sec + atoi(disable_timeout) ;
 					
 					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d unable\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 					send( sock , io_buffer , io_buffer_len , 0 );

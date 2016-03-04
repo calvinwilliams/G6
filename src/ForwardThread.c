@@ -57,7 +57,7 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	/* 登记最近读时间戳 */
 	pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].rtt = GetTimeval()->tv_sec ;
+		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].rtt = GETTIMEVAL.tv_sec ;
 	pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 	
 	/* 发送通讯数据 */
@@ -117,7 +117,7 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	/* 登记最近写时间戳 */
 	pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt = GetTimeval()->tv_sec ;
+		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt = GETTIMEVAL.tv_sec ;
 	pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 	
 	return 0;
@@ -173,7 +173,7 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 	/* 登记最近写时间戳 */
 	pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt = GetTimeval()->tv_sec ;
+		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt = GETTIMEVAL.tv_sec ;
 	pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 	
 	return 0;
@@ -277,6 +277,9 @@ void *_ForwardThread( void *pv )
 {
 	unsigned long	*p_forward_thread_index = (unsigned long *)pv ;
 	unsigned long	forward_thread_index = (*p_forward_thread_index) ;
+	
+	SETPID
+	SETTID
 	
 	free( p_forward_thread_index );
 	ForwardThread( forward_thread_index );

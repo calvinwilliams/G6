@@ -23,6 +23,8 @@ TLS char		g_log_pathfilename[ MAXLEN_FILENAME + 1 ] = "" ;
 TLS int			g_log_level = LOGLEVEL_INFO ;
 TLS int			g_file_fd = -1 ;
 TLS struct timeval	g_time_tv = { 0 , 0 } ;
+TLS unsigned long	g_pid = 0 ;
+TLS unsigned long	g_tid = 0 ;
 
 const char log_level_itoa[][6] = { "DEBUG" , "INFO" , "WARN" , "ERROR" , "FATAL" } ;
 
@@ -72,12 +74,6 @@ void SetLogLevel( int log_level )
 	g_log_level = log_level ;
 	
 	return;
-}
-
-/* 获取内部状态 */
-struct timeval *GetTimeval()
-{
-	return &g_time_tv;
 }
 
 /* 输出日志 */
@@ -135,7 +131,7 @@ static int WriteLogBase( int log_level , char *c_filename , long c_fileline , ch
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
 	len = SNPRINTF( log_bufptr , log_buf_remain_len , " | %-5s" , log_level_itoa[log_level] ) ;
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
-	len = SNPRINTF( log_bufptr , log_buf_remain_len , " | %lu:%lu:%s:%ld | " , PROCESSID , THREADID , p_c_filename , c_fileline ) ;
+	len = SNPRINTF( log_bufptr , log_buf_remain_len , " | %lu:%lu:%s:%ld | " , g_pid , g_tid , p_c_filename , c_fileline ) ;
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
 	len = VSNPRINTF( log_bufptr , log_buf_remain_len , format , valist );
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
