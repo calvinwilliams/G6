@@ -86,7 +86,9 @@ extern "C" {
 #endif
 
 void SetLogFile( char *format , ... );
+void CloseLogFile();
 void SetLogLevel( int log_level );
+struct timeval *GetTimeval();
 
 int WriteLog( int log_level , char *c_filename , long c_fileline , char *format , ... );
 int FatalLog( char *c_filename , long c_fileline , char *format , ... );

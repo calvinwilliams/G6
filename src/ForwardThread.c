@@ -57,7 +57,7 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	/* 登记最近读时间戳 */
 	pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-		time( & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].rtt) );
+		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].rtt = GetTimeval()->tv_sec ;
 	pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 	
 	/* 发送通讯数据 */
@@ -117,7 +117,7 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	/* 登记最近写时间戳 */
 	pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-		time( & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt) );
+		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt = GetTimeval()->tv_sec ;
 	pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 	
 	return 0;
@@ -173,7 +173,7 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 	/* 登记最近写时间戳 */
 	pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-		time( & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt) );
+		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt = GetTimeval()->tv_sec ;
 	pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 	
 	return 0;
@@ -184,7 +184,6 @@ void *ForwardThread( unsigned long forward_thread_index )
 	struct ServerEnv	*penv = g_penv ;
 	int			forward_epoll_fd ;
 	
-	int			timeout ;
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
 	int			event_count ;
 	int			event_index ;
@@ -194,7 +193,6 @@ void *ForwardThread( unsigned long forward_thread_index )
 	
 	int			nret = 0 ;
 	
-InfoLog( __FILE__ , __LINE__ , "ZZZZZZZZZZZZZZZZZZZZ - penv[%p] forward_thread_index[%lu]" , penv , forward_thread_index );
 	forward_epoll_fd = penv->forward_epoll_fd_array[forward_thread_index] ;
 	
 	/* 设置日志输出文件 */
@@ -203,15 +201,11 @@ InfoLog( __FILE__ , __LINE__ , "ZZZZZZZZZZZZZZZZZZZZ - penv[%p] forward_thread_i
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.ForwardThread.%d ---" , forward_thread_index+1 );
 	
 	/* 主工作循环 */
-	while( ! ( g_exit_flag == 1 && penv->forward_session_count == 0 ) )
+	while( ! ( g_exit_flag == 1000 && penv->forward_session_count == 0 ) )
 	{
-		if( g_exit_flag == 1 )
-			timeout = 1000 ;
-		else
-			timeout = -1 ;
-		
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]..." , penv->forward_request_pipe[forward_thread_index].fds[0] );
-		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
+		CloseLogFile();
+		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , g_exit_flag ) ;
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
@@ -235,6 +229,16 @@ InfoLog( __FILE__ , __LINE__ , "ZZZZZZZZZZZZZZZZZZZZ - penv[%p] forward_thread_i
 				{
 					ErrorLog( __FILE__ , __LINE__ , "read request pipe close" );
 					exit(0);
+				}
+				else
+				{
+					if( command == 'L' )
+					{
+						CloseLogFile();
+					}
+					else if( command == 'Q' )
+					{
+					}
 				}
 			}
 			else
@@ -275,7 +279,6 @@ void *_ForwardThread( void *pv )
 	unsigned long	forward_thread_index = (*p_forward_thread_index) ;
 	
 	free( p_forward_thread_index );
-InfoLog( __FILE__ , __LINE__ , "YYYYYYYYYYYYYYYY - forward_thread_index[%lu]" , forward_thread_index );
 	ForwardThread( forward_thread_index );
 	
 	InfoLog( __FILE__ , __LINE__ , "pthread_exit" );

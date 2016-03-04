@@ -19,12 +19,28 @@
 	} \
 
 /* 日志文件名 */
-TLS char	g_log_pathfilename[ MAXLEN_FILENAME + 1 ] = "" ;
-TLS int		g_log_level = LOGLEVEL_INFO ;
+TLS char		g_log_pathfilename[ MAXLEN_FILENAME + 1 ] = "" ;
+TLS int			g_log_level = LOGLEVEL_INFO ;
+TLS int			g_file_fd = -1 ;
+TLS struct timeval	g_time_tv = { 0 , 0 } ;
 
 const char log_level_itoa[][6] = { "DEBUG" , "INFO" , "WARN" , "ERROR" , "FATAL" } ;
 
-/* 设置日志文件名 */
+/* 打开日志文件 */
+static int OpenLogFile()
+{
+#if ( defined __linux__ ) || ( defined __unix ) || ( defined _AIX )
+	g_file_fd = OPEN( g_log_pathfilename , O_CREAT | O_WRONLY | O_APPEND , S_IRWXU | S_IRWXG | S_IRWXO ) ;
+#elif ( defined _WIN32 )
+	g_file_fd = OPEN( g_log_pathfilename , _O_CREAT | _O_WRONLY | _O_APPEND | _O_BINARY , _S_IREAD | _S_IWRITE ) ;
+#endif
+	if( g_file_fd == -1 )
+		return -1;
+	
+	return 0;
+}
+
+/* 设置日志文件名，并打开文件 */
 void SetLogFile( char *format , ... )
 {
 	va_list		valist ;
@@ -33,7 +49,21 @@ void SetLogFile( char *format , ... )
 	VSNPRINTF( g_log_pathfilename , sizeof(g_log_pathfilename)-1 , format , valist );
 	va_end( valist );
 	
+	if( g_file_fd != -1 )
+	{
+		CLOSE( g_file_fd );
+	}
+	
+	OpenLogFile();
+	
 	return;
+}
+
+/* 关闭日志文件 */
+void CloseLogFile()
+{
+	CLOSE( g_file_fd );
+	g_file_fd = -1 ;
 }
 
 /* 设置日志等级 */
@@ -44,13 +74,18 @@ void SetLogLevel( int log_level )
 	return;
 }
 
+/* 获取内部状态 */
+struct timeval *GetTimeval()
+{
+	return &g_time_tv;
+}
+
 /* 输出日志 */
 static int WriteLogBase( int log_level , char *c_filename , long c_fileline , char *format , va_list valist )
 {
 	char		c_filename_copy[ MAXLEN_FILENAME + 1 ] ;
 	char		*p_c_filename = NULL ;
 	
-	struct timeval	tv ;
 	struct tm	stime ;
 	
 	char		log_buffer[ 1024 + 1 ] ;
@@ -58,6 +93,8 @@ static int WriteLogBase( int log_level , char *c_filename , long c_fileline , ch
 	size_t		log_buflen ;
 	size_t		log_buf_remain_len ;
 	size_t		len ;
+	
+	int		nret = 0 ;
 	
 	/* 处理源代码文件名 */
 	memset( c_filename_copy , 0x00 , sizeof(c_filename_copy) );
@@ -70,13 +107,14 @@ static int WriteLogBase( int log_level , char *c_filename , long c_fileline , ch
 
 	/* 填充行日志 */
 #if ( defined __linux__ ) || ( defined __unix ) || ( defined _AIX )
-	gettimeofday( & tv , NULL );
-	localtime_r( &(tv.tv_sec) , & stime );
+	gettimeofday( & g_time_tv , NULL );
+	localtime_r( &(g_time_tv.tv_sec) , & stime );
 #elif ( defined _WIN32 )
 	{
 	SYSTEMTIME	stNow ;
 	GetLocalTime( & stNow );
-	tv.tv_usec = stNow.wMilliseconds * 1000 ;
+	time( & (g_time_tv.tv_sec) );
+	g_time_tv.tv_usec = stNow.wMilliseconds * 1000 ;
 	stime.tm_year = stNow.wYear - 1900 ;
 	stime.tm_mon = stNow.wMonth - 1 ;
 	stime.tm_mday = stNow.wDay ;
@@ -93,7 +131,7 @@ static int WriteLogBase( int log_level , char *c_filename , long c_fileline , ch
 	
 	len = strftime( log_bufptr , log_buf_remain_len , "%Y-%m-%d %H:%M:%S" , & stime ) ;
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
-	len = SNPRINTF( log_bufptr , log_buf_remain_len , ".%06ld" , (long)(tv.tv_usec) ) ;
+	len = SNPRINTF( log_bufptr , log_buf_remain_len , ".%06ld" , (long)(g_time_tv.tv_usec) ) ;
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
 	len = SNPRINTF( log_bufptr , log_buf_remain_len , " | %-5s" , log_level_itoa[log_level] ) ;
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
@@ -111,19 +149,14 @@ static int WriteLogBase( int log_level , char *c_filename , long c_fileline , ch
 	}
 	else if( g_log_pathfilename[0] )
 	{
-		int		fd ;
+		if( g_file_fd == -1 )
+		{
+			nret = OpenLogFile() ;
+			if( nret )
+				return nret;
+		}
 		
-#if ( defined __linux__ ) || ( defined __unix ) || ( defined _AIX )
-		fd = OPEN( g_log_pathfilename , O_CREAT | O_WRONLY | O_APPEND , S_IRWXU | S_IRWXG | S_IRWXO ) ;
-#elif ( defined _WIN32 )
-		fd = OPEN( g_log_pathfilename , _O_CREAT | _O_WRONLY | _O_APPEND | _O_BINARY , _S_IREAD | _S_IWRITE ) ;
-#endif
-		if( fd == -1 )
-			return -1;
-		
-		WRITE( fd , log_buffer , log_buflen );
-		
-		CLOSE( fd );
+		WRITE( g_file_fd , log_buffer , log_buflen );
 	}
 	
 	return 0;
@@ -223,6 +256,8 @@ static int WriteHexLogBase( int log_level , char *c_filename , long c_fileline ,
 	
 	int		row_offset , col_offset ;
 	
+	int		nret = 0 ;
+	
 	if( buf == NULL && buflen <= 0 )
 		return 0;
 	if( buflen > sizeof(hexlog_buffer) - 1 )
@@ -298,19 +333,14 @@ static int WriteHexLogBase( int log_level , char *c_filename , long c_fileline ,
 	}
 	else if( g_log_pathfilename[0] )
 	{
-		int		fd ;
+		if( g_file_fd == -1 )
+		{
+			nret = OpenLogFile() ;
+			if( nret )
+				return nret;
+		}
 		
-#if ( defined __linux__ ) || ( defined __unix ) || ( defined _AIX )
-		fd = OPEN( g_log_pathfilename , O_CREAT | O_WRONLY | O_APPEND , S_IRWXU | S_IRWXG | S_IRWXO ) ;
-#elif ( defined _WIN32 )
-		fd = OPEN( g_log_pathfilename , _O_CREAT | _O_WRONLY | _O_APPEND | _O_BINARY , _S_IREAD | _S_IWRITE ) ;
-#endif
-		if( fd == -1 )
-			return -1;
-		
-		WRITE( fd , hexlog_buffer , hexlog_buflen );
-		
-		CLOSE( fd );
+		WRITE( g_file_fd , hexlog_buffer , hexlog_buflen );
 	}
 	
 	return 0;

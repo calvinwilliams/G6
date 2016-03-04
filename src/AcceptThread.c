@@ -41,7 +41,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 				(
 					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					time(NULL) > p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
+					GetTimeval()->tv_sec > p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
@@ -68,7 +68,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 				(
 					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					time(NULL) >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
+					GetTimeval()->tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
@@ -101,7 +101,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 				(
 					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					time(NULL) >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
+					GetTimeval()->tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
@@ -136,7 +136,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 				(
 					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					time(NULL) >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
+					GetTimeval()->tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
@@ -172,7 +172,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 				(
 					p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 					&&
-					time(NULL) >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
+					GetTimeval()->tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 				)
 			)
 			{
@@ -216,7 +216,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 			(
 				p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 1
 				&&
-				time(NULL) >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
+				GetTimeval()->tv_sec >= p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].timestamp_to_enable
 			)
 		)
 		{
@@ -253,7 +253,7 @@ static int ResolveConnectingError( struct ServerEnv *penv , struct ForwardSessio
 	/* 设置服务端不可用 */
 	p_servers_addr = p_reverse_forward_session->p_forward_rule->server_addr_array + p_reverse_forward_session->server_index ;
 	p_servers_addr->server_unable = 1 ;
-	p_servers_addr->timestamp_to_enable = time(NULL) + DEFAULT_DISABLE_TIMEOUT ;
+	p_servers_addr->timestamp_to_enable = GetTimeval()->tv_sec + DEFAULT_DISABLE_TIMEOUT ;
 	
 	/* 非堵塞连接服务端 */
 	nret = TryToConnectServer( penv , p_reverse_forward_session ) ;
@@ -387,7 +387,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 		else
 		{
 			GetNetAddress( & netaddr );
-			DebugLog( __FILE__ , __LINE__ , "accept [%s:%d]#%d# ok" , netaddr.ip , netaddr.port.port_int , sock );
+			InfoLog( __FILE__ , __LINE__ , "accept [%s:%d]#%d# ok" , netaddr.ip , netaddr.port.port_int , sock );
 		}
 		
 		SetNonBlocking( sock );
@@ -738,7 +738,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 				if( STRCMP( p_servers_addr->netaddr.ip , == , ip ) && p_servers_addr->netaddr.port.port_int == port_int )
 				{
 					p_servers_addr->server_unable = 1 ;
-					p_servers_addr->timestamp_to_enable = time(NULL) + atoi(disable_timeout) ;
+					p_servers_addr->timestamp_to_enable = GetTimeval()->tv_sec + atoi(disable_timeout) ;
 					
 					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d unable\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 					send( sock , io_buffer , io_buffer_len , 0 );
@@ -852,7 +852,6 @@ static int OnReceiveCommand( struct ServerEnv *penv , struct ForwardSession *p_f
 
 void *AcceptThread( struct ServerEnv *penv )
 {
-	int			timeout ;
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
 	int			event_count ;
 	int			event_index ;
@@ -868,16 +867,12 @@ void *AcceptThread( struct ServerEnv *penv )
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.AcceptThread ---" );
 	
 	/* 主工作循环 */
-	g_exit_flag = 0 ;
-	while( ! ( g_exit_flag == 1 && penv->forward_session_count == 0 ) )
+	g_exit_flag = -1 ;
+	while( ! ( g_exit_flag == 1000 && penv->forward_session_count == 0 ) )
 	{
-		if( g_exit_flag == 1 )
-			timeout = 1000 ;
-		else
-			timeout = -1 ;
-		
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]..." , penv->accept_request_pipe.fds[0] );
-		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
+		CloseLogFile();
+		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , g_exit_flag ) ;
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
@@ -904,26 +899,42 @@ void *AcceptThread( struct ServerEnv *penv )
 				}
 				else
 				{
-					int			forward_session_index ;
-					struct ForwardSession	*p_forward_session = NULL ;
-					
-					for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
+					if( command == 'L' )
 					{
-						if( p_forward_session->type == FORWARD_SESSION_TYPE_LISTEN )
+						unsigned long		forward_thread_index ;
+						
+						CloseLogFile();
+						
+						for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
 						{
-							epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-							DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
-							_CLOSESOCKET( p_forward_session->sock );
-							SetForwardSessionUnused( penv , p_forward_session );
+							InfoLog( __FILE__ , __LINE__ , "write forward_request_pipe L ..." );
+							nret = write( penv->forward_request_pipe[forward_thread_index].fds[1] , "L" , 1 ) ;
+							InfoLog( __FILE__ , __LINE__ , "write forward_request_pipe L done[%d]" , nret );
 						}
 					}
-					
-					g_exit_flag = 1 ;
-					DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
-					
-					InfoLog( __FILE__ , __LINE__ , "write accept_response_pipe Q ..." );
-					nret = write( penv->accept_response_pipe.fds[1] , "Q" , 1 ) ;
-					InfoLog( __FILE__ , __LINE__ , "write accept_response_pipe Q done[%d]" , nret );
+					else if( command == 'Q' )
+					{
+						int			forward_session_index ;
+						struct ForwardSession	*p_forward_session = NULL ;
+						
+						for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
+						{
+							if( p_forward_session->type == FORWARD_SESSION_TYPE_LISTEN )
+							{
+								epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+								DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+								_CLOSESOCKET( p_forward_session->sock );
+								SetForwardSessionUnused( penv , p_forward_session );
+							}
+						}
+						
+						g_exit_flag = 1000 ;
+						DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
+						
+						InfoLog( __FILE__ , __LINE__ , "write accept_response_pipe Q ..." );
+						nret = write( penv->accept_response_pipe.fds[1] , "Q" , 1 ) ;
+						InfoLog( __FILE__ , __LINE__ , "write accept_response_pipe Q done[%d]" , nret );
+					}
 				}
 			}
 			else if( p_forward_session->status == FORWARD_SESSION_STATUS_LISTEN )

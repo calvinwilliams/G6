@@ -38,7 +38,7 @@ int main( int argc , char *argv[] )
 	/* 初始化命令行参数 */
 	memset( & (penv->cmd_para) , 0x00 , sizeof(struct CommandParameter) );
 	penv->cmd_para.config_pathfilename = NULL ;
-	penv->cmd_para.forward_thread_size = sysconf(_SC_NPROCESSORS_ONLN) ;
+	penv->cmd_para.forward_thread_size = sysconf(_SC_NPROCESSORS_ONLN) * 2 ;
 	penv->cmd_para.forward_session_size = DEFAULT_FORWARD_SESSIONS_MAXCOUNT ;
 	penv->cmd_para.log_level = LOGLEVEL_INFO ;
 	penv->cmd_para.no_daemon_flag = 0 ;

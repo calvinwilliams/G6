@@ -1,6 +1,7 @@
 #include "G6.h"
 
-int			g_exit_flag = 0 ;
+int			g_exit_flag = -1 ;
+int			g_SIGUSR1_flag = 0 ;
 int			g_SIGUSR2_flag = 0 ;
 int			g_SIGTERM_flag = 0 ;
 
@@ -8,7 +9,11 @@ static void sig_set_flag( int sig_no )
 {
 	InfoLog( __FILE__ , __LINE__ , "recv signal[%d]" , sig_no );
 	
-	if( sig_no == SIGUSR2 )
+	if( sig_no == SIGUSR1 )
+	{
+		g_SIGUSR1_flag = 1 ;
+	}
+	else if( sig_no == SIGUSR2 )
 	{
 		g_SIGUSR2_flag = 1 ;
 	}
@@ -22,7 +27,17 @@ static void sig_set_flag( int sig_no )
 
 static void sig_proc()
 {
-	if( g_SIGUSR2_flag == 1 )
+	int		nret = 0 ;
+	
+	if( g_SIGUSR1_flag == 1 )
+	{
+		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe L ..." );
+		nret = write( g_penv->accept_request_pipe.fds[1] , "L" , 1 ) ;
+		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe L done[%d]" , nret );
+		
+		g_SIGUSR1_flag = 0 ;
+	}
+	else if( g_SIGUSR2_flag == 1 )
 	{
 		pid_t		pid ;
 		char		command ;
@@ -57,7 +72,7 @@ static void sig_proc()
 		}
 		
 		g_SIGUSR2_flag = 0 ;
-		g_exit_flag = 1 ;
+		g_exit_flag = 1000 ;
 		DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
 	}
 	else if( g_SIGTERM_flag == 1 )
@@ -75,7 +90,7 @@ static void sig_proc()
 		InfoLog( __FILE__ , __LINE__ , "read accept_response_pipe done[%d][%c]" , nret , command );
 		
 		g_SIGTERM_flag = 0 ;
-		g_exit_flag = 1 ;
+		g_exit_flag = 1000 ;
 		DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
 	}
 	
@@ -102,13 +117,13 @@ int MonitorProcess( struct ServerEnv *penv )
 	signal( SIGCLD , SIG_DFL );
 	signal( SIGCHLD , SIG_DFL );
 	signal( SIGPIPE , SIG_IGN );
-	signal( SIGUSR1 , SIG_IGN );
 	g_penv = penv ;
 	sigaction( SIGTERM , & act , NULL );
+	sigaction( SIGUSR1 , & act , NULL );
 	sigaction( SIGUSR2 , & act , NULL );
 	
 	/* 主工作循环 */
-	while( g_exit_flag == 0 )
+	while( g_exit_flag == -1 )
 	{
 		/* 创建子进程 */
 		_FORK :
@@ -145,6 +160,8 @@ int MonitorProcess( struct ServerEnv *penv )
 			close( penv->accept_response_pipe.fds[1] );
 		}
 		
+		CloseLogFile();
+		
 		/* 监控子进程结束 */
 		_WAITPID :
 		pid = waitpid( -1 , & status , 0 );
@@ -177,7 +194,7 @@ int MonitorProcess( struct ServerEnv *penv )
 				, penv->pid , WEXITSTATUS(status) , WIFSIGNALED(status) , WTERMSIG(status) , WCOREDUMP(status) );
 		}
 		
-		if( g_exit_flag == 0 )
+		if( g_exit_flag == -1 )
 			sleep(1);
 	}
 	

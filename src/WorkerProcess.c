@@ -14,7 +14,6 @@ int WorkerProcess( struct ServerEnv *penv )
 	signal( SIGUSR1 , SIG_IGN );
 	signal( SIGUSR2 , SIG_IGN );
 	g_penv = penv ;
-InfoLog( __FILE__ , __LINE__ , "XXXXXXXX - penv[%p]" , penv );
 	
 	/* 创建转发子线程 */
 	for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
