@@ -3,10 +3,7 @@
 int WorkerProcess( struct ServerEnv *penv )
 {
 	unsigned long		forward_thread_index ;
-	
-	/*
-	char			command ;
-	*/
+	unsigned long		*p_forward_thread_index = NULL ;
 	
 	int			nret = 0 ;
 	
@@ -16,23 +13,21 @@ int WorkerProcess( struct ServerEnv *penv )
 	signal( SIGTERM , SIG_IGN );
 	signal( SIGUSR1 , SIG_IGN );
 	signal( SIGUSR2 , SIG_IGN );
+	g_penv = penv ;
+InfoLog( __FILE__ , __LINE__ , "XXXXXXXX - penv[%p]" , penv );
 	
 	/* 创建转发子线程 */
-	penv->forward_thread_index = NULL ;
 	for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
 	{
-		while( penv->forward_thread_index )
-			usleep(100);
-		
-		penv->forward_thread_index = (int*)malloc( sizeof(int) ) ;
-		if( penv->forward_thread_index == NULL )
+		p_forward_thread_index = (unsigned long *)malloc( sizeof(unsigned long) ) ;
+		if( p_forward_thread_index == NULL )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
-			return -1;
+			exit(9);
 		}
-		*(penv->forward_thread_index) = forward_thread_index ;
+		(*p_forward_thread_index) = forward_thread_index ;
 		
-		nret = pthread_create( penv->forward_thread_tid_array+forward_thread_index , NULL , & _ForwardThread , (void*)penv ) ;
+		nret = pthread_create( penv->forward_thread_tid_array+forward_thread_index , NULL , & _ForwardThread , (void*)p_forward_thread_index ) ;
 		if( nret )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "pthread_create forward thread failed , errno[%d]" , errno );

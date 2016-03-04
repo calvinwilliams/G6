@@ -13,7 +13,7 @@
 	_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
 	SetForwardSessionUnused2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
 	if( penv->forward_session_count == 0 ) \
-		write( g_penv->accept_request_pipe.fds[1] , "C" , 1 ); \
+		write( penv->accept_request_pipe.fds[1] , "C" , 1 ); \
 
 static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
 {
@@ -179,9 +179,9 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 	return 0;
 }
 
-void *ForwardThread( struct ServerEnv *penv )
+void *ForwardThread( unsigned long forward_thread_index )
 {
-	int			forward_thread_index ;
+	struct ServerEnv	*penv = g_penv ;
 	int			forward_epoll_fd ;
 	
 	int			timeout ;
@@ -194,9 +194,8 @@ void *ForwardThread( struct ServerEnv *penv )
 	
 	int			nret = 0 ;
 	
-	forward_thread_index = *(penv->forward_thread_index) ;
+InfoLog( __FILE__ , __LINE__ , "ZZZZZZZZZZZZZZZZZZZZ - penv[%p] forward_thread_index[%lu]" , penv , forward_thread_index );
 	forward_epoll_fd = penv->forward_epoll_fd_array[forward_thread_index] ;
-	{ int *tmp = penv->forward_thread_index ; penv->forward_thread_index = 0 ; free( tmp ); }
 	
 	/* 设置日志输出文件 */
 	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
@@ -272,7 +271,12 @@ void *ForwardThread( struct ServerEnv *penv )
 
 void *_ForwardThread( void *pv )
 {
-	ForwardThread( (struct ServerEnv *)pv );
+	unsigned long	*p_forward_thread_index = (unsigned long *)pv ;
+	unsigned long	forward_thread_index = (*p_forward_thread_index) ;
+	
+	free( p_forward_thread_index );
+InfoLog( __FILE__ , __LINE__ , "YYYYYYYYYYYYYYYY - forward_thread_index[%lu]" , forward_thread_index );
+	ForwardThread( forward_thread_index );
 	
 	InfoLog( __FILE__ , __LINE__ , "pthread_exit" );
 	pthread_exit(NULL);

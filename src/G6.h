@@ -263,7 +263,6 @@ struct ServerEnv
 	struct PipeFds			accept_response_pipe ; /* 父-子进程响应命令管道 */
 	int				accept_epoll_fd ; /* 侦听端口epoll池 */
 	
-	int				*forward_thread_index ; /* 子线程序号 */
 	pthread_t			*forward_thread_tid_array ; /* 子线程TID */
 	struct PipeFds			*forward_request_pipe ; /* 父-子线程请求命令管道 */
 	struct PipeFds			*forward_response_pipe ; /* 父-子线程响应命令管道 */
@@ -326,7 +325,7 @@ void *_AcceptThread( void *pv );
 
 /********* ForwardThread *********/
 
-void *ForwardThread( struct ServerEnv *penv );
+void *ForwardThread( unsigned long forward_thread_index );
 void *_ForwardThread( void *pv );
 
 #endif
