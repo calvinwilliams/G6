@@ -20,7 +20,7 @@ c_FILE		=	\
 
 ###### 目标文件、安装目录配置区
 include makeinstall
-BIN		=	G6
+BIN		=	G6	t
 BININST		=	$(_BININST)
 
 ###### 编译选项
@@ -49,4 +49,7 @@ include $(MKTPLDIR)/makeobj_$(MKTPLOS).inc
 ###### 目标文件依赖关系
 G6		:	$(c_FILE_o)
 	$(CC) -o $@ $(c_FILE_o) $(LFLAGS)
+
+t		:	t.o
+	$(CC) -o t t.o $(LFLAGS)
 
