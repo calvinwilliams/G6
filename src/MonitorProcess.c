@@ -4,6 +4,8 @@ int			g_exit_flag = 0 ;
 
 static void sig_proc( int sig_no )
 {
+	int		nret = 0 ;
+	
 	InfoLog( __FILE__ , __LINE__ , "recv signal[%d]" , sig_no );
 	
 	if( sig_no == SIGUSR2 )
@@ -20,8 +22,13 @@ static void sig_proc( int sig_no )
 			return;
 		}
 		
-		write( g_penv->accept_request_pipe.fds[1] , "Q" , 1 );
-		read( g_penv->accept_response_pipe.fds[0] , & command , 1 );
+		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q ..." );
+		nret = write( g_penv->accept_request_pipe.fds[1] , "Q" , 1 ) ;
+		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q done[%d]" , nret );
+		
+		InfoLog( __FILE__ , __LINE__ , "read accept_response_pipe ..." );
+		nret = read( g_penv->accept_response_pipe.fds[0] , & command , 1 ) ;
+		InfoLog( __FILE__ , __LINE__ , "read accept_response_pipe done[%d][%c]" , nret , command );
 		
 		pid = fork() ;
 		if( pid == -1 )
@@ -42,8 +49,13 @@ static void sig_proc( int sig_no )
 	{
 		char			command ;
 		
-		write( g_penv->accept_request_pipe.fds[1] , "Q" , 1 );
-		read( g_penv->accept_response_pipe.fds[0] , & command , 1 );
+		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q ..." );
+		nret = write( g_penv->accept_request_pipe.fds[1] , "Q" , 1 ) ;
+		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q done[%d]" , nret );
+		
+		InfoLog( __FILE__ , __LINE__ , "read accept_response_pipe ..." );
+		nret = read( g_penv->accept_response_pipe.fds[0] , & command , 1 ) ;
+		InfoLog( __FILE__ , __LINE__ , "read accept_response_pipe done[%d][%c]" , nret , command );
 		
 		g_exit_flag = 1 ;
 		DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );

@@ -882,7 +882,9 @@ void *AcceptThread( struct ServerEnv *penv )
 				
 				DebugLog( __FILE__ , __LINE__ , "pipe session event" );
 				
+				InfoLog( __FILE__ , __LINE__ , "read accept_request_pipe ..." );
 				nret = read( penv->accept_request_pipe.fds[0] , & command , 1 ) ;
+				InfoLog( __FILE__ , __LINE__ , "read accept_request_pipe done[%d][%c]" , nret , command );
 				if( nret == -1 )
 				{
 					ErrorLog( __FILE__ , __LINE__ , "read request pipe failed , errno[%d]" , errno );
@@ -898,8 +900,6 @@ void *AcceptThread( struct ServerEnv *penv )
 					int			forward_session_index ;
 					struct ForwardSession	*p_forward_session = NULL ;
 					
-					InfoLog( __FILE__ , __LINE__ , "read request pipe %c" , command );
-					
 					for( forward_session_index = 0 , p_forward_session = penv->forward_session_array ; forward_session_index < penv->cmd_para.forward_session_size ; forward_session_index++ , p_forward_session++ )
 					{
 						if( p_forward_session->type == FORWARD_SESSION_TYPE_LISTEN )
@@ -911,7 +911,9 @@ void *AcceptThread( struct ServerEnv *penv )
 						}
 					}
 					
-					write( penv->accept_response_pipe.fds[1] , "Q" , 1 );
+					InfoLog( __FILE__ , __LINE__ , "write accept_response_pipe Q ..." );
+					nret = write( penv->accept_response_pipe.fds[1] , "Q" , 1 ) ;
+					InfoLog( __FILE__ , __LINE__ , "write accept_response_pipe Q done[%d]" , nret );
 					
 					g_exit_flag = 1 ;
 					DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );

@@ -45,8 +45,13 @@ int WorkerProcess( struct ServerEnv *penv )
 	
 	for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
 	{
-		write( penv->forward_request_pipe[forward_thread_index].fds[1] , "Q" , 1 );
-		read( penv->forward_response_pipe[forward_thread_index].fds[0] , & command , 1 );
+		InfoLog( __FILE__ , __LINE__ , "write forward_request_pipe Q ..." );
+		nret = write( penv->forward_request_pipe[forward_thread_index].fds[1] , "Q" , 1 ) ;
+		InfoLog( __FILE__ , __LINE__ , "write forward_request_pipe Q done[%d]" , nret );
+		
+		InfoLog( __FILE__ , __LINE__ , "read forward_response_pipe ..." );
+		nret = read( penv->forward_response_pipe[forward_thread_index].fds[0] , & command , 1 ) ;
+		InfoLog( __FILE__ , __LINE__ , "read forward_response_pipe done[%d][%c]" , nret , command );
 		
 		InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_join [%lu] ..." , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
 		pthread_join( penv->forward_thread_tid_array[forward_thread_index] , NULL );

@@ -217,7 +217,9 @@ void *ForwardThread( struct ServerEnv *penv )
 				
 				DebugLog( __FILE__ , __LINE__ , "pipe session event" );
 				
+				InfoLog( __FILE__ , __LINE__ , "read forward_request_pipe ..." );
 				nret = read( penv->forward_request_pipe[forward_thread_index].fds[0] , & command , 1 ) ;
+				InfoLog( __FILE__ , __LINE__ , "read forward_request_pipe done[%d][%c]" , nret , command );
 				if( nret == -1 )
 				{
 					ErrorLog( __FILE__ , __LINE__ , "read request pipe failed , errno[%d]" , errno );
@@ -230,9 +232,9 @@ void *ForwardThread( struct ServerEnv *penv )
 				}
 				else
 				{
-					InfoLog( __FILE__ , __LINE__ , "read request pipe %c" , command );
-					
+					InfoLog( __FILE__ , __LINE__ , "write forward_response_pipe Q ..." );
 					write( penv->forward_response_pipe[forward_thread_index].fds[1] , "Q" , 1 );
+					InfoLog( __FILE__ , __LINE__ , "write forward_response_pipe Q done[%d]" , nret );
 				}
 			}
 			else

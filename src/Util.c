@@ -105,8 +105,8 @@ void GetNetAddress( struct NetAddress *p_netaddr )
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) )
 {
 	int pid;
-	int sig;
 	/*
+	int sig;
 	int fd;
 	*/
 	
@@ -123,7 +123,9 @@ int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void
 	}
 
 	setsid() ;
+	/*
 	signal( SIGHUP,SIG_IGN );
+*/
 
 	pid=fork();
 	switch( pid )
@@ -143,8 +145,10 @@ int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void
 	
 	umask( 0 ) ;
 	
+	/*
 	for( sig=0 ; sig<30 ; sig++ )
 		signal( sig , SIG_DFL );
+	*/
 	
 	/*
 	for( fd=0 ; fd<=2 ; fd++ )
