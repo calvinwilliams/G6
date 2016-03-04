@@ -26,6 +26,7 @@ int main()
 	while( g_exit_flag == 0 )
 	{
 		sleep(1);
+		
 		if( g_spwan_flag == 1 )
 		{
 			pid_t	pid ;

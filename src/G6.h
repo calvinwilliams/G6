@@ -273,7 +273,8 @@ struct ServerEnv
 	unsigned long			forward_session_count ; /* 转发会话数组大小 */
 	unsigned long			forward_session_use_offsetpos ; /* 转发会话最近使用单元偏移量 */
 	
-	pthread_mutex_t			mutex ; /* 临界区互斥 */
+	pthread_mutex_t			forward_session_count_mutex ; /* 转发会话数量 临界区互斥 */
+	pthread_mutex_t			server_connection_count_mutex ; /* 服务端连接数量 临界区互斥 */
 } ;
 
 /********* util *********/

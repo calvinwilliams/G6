@@ -93,7 +93,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 	{
 		p_forward_session->server_index = -1 ;
 		
-		pthread_mutex_lock( & (penv->mutex) );
+		pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 		for( n = 0 ; n < p_forward_rule->server_addr_count ; n++ )
 		{
 			if(	p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 0
@@ -113,7 +113,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 			if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
 				p_forward_rule->selected_addr_index = 0 ;
 		}
-		pthread_mutex_unlock( & (penv->mutex) );
+		pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 		if( p_forward_session->server_index == -1 )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "all servers unable" );
@@ -128,7 +128,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 	{
 		p_forward_session->server_index = -1 ;
 		
-		pthread_mutex_lock( & (penv->mutex) );
+		pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 		for( n = 0 ; n < p_forward_rule->server_addr_count ; n++ )
 		{
 			if(	p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_unable == 0
@@ -148,7 +148,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 			if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
 				p_forward_rule->selected_addr_index = 0 ;
 		}
-		pthread_mutex_unlock( & (penv->mutex) );
+		pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 		if( p_forward_session->server_index == -1 )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "all servers unable" );
@@ -233,9 +233,9 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 		return -1;
 	}
 	
-	pthread_mutex_lock( & (penv->mutex) );
+	pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 	p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count++;
-	pthread_mutex_unlock( & (penv->mutex) );
+	pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 	
 	memcpy( & (p_forward_session->netaddr) , & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].netaddr) , sizeof(struct NetAddress) );
 	
@@ -317,9 +317,9 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		else /* Á¬½ÓÊ§°Ü */
 		{
 			ErrorLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] failed , errno[%d]" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , errno );
-			pthread_mutex_lock( & (penv->mutex) );
+			pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 			p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].server_connection_count--;
-			pthread_mutex_unlock( & (penv->mutex) );
+			pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_reverse_forward_session->sock );
 			_CLOSESOCKET( p_reverse_forward_session->sock );
 			nret = ResolveConnectingError( penv , p_reverse_forward_session ) ;
@@ -522,9 +522,9 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 		nret = ResolveConnectingError( penv , p_forward_session->p_reverse_forward_session ) ;
 		if( nret )
 		{
-			pthread_mutex_lock( & (penv->mutex) );
+			pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 			p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count--;
-			pthread_mutex_unlock( & (penv->mutex) );
+			pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 			DebugLog( __FILE__ , __LINE__ , "close #%d#-#%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
@@ -852,6 +852,7 @@ static int OnReceiveCommand( struct ServerEnv *penv , struct ForwardSession *p_f
 
 void *AcceptThread( struct ServerEnv *penv )
 {
+	int			timeout ;
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
 	int			event_count ;
 	int			event_index ;
@@ -870,7 +871,13 @@ void *AcceptThread( struct ServerEnv *penv )
 	g_exit_flag = 0 ;
 	while( ! ( g_exit_flag == 1 && penv->forward_session_count == 0 ) )
 	{
-		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , -1 ) ;
+		if( g_exit_flag == 1 )
+			timeout = 1000 ;
+		else
+			timeout = -1 ;
+		
+		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]..." , penv->accept_request_pipe.fds[0] );
+		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
@@ -911,12 +918,12 @@ void *AcceptThread( struct ServerEnv *penv )
 						}
 					}
 					
+					g_exit_flag = 1 ;
+					DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
+					
 					InfoLog( __FILE__ , __LINE__ , "write accept_response_pipe Q ..." );
 					nret = write( penv->accept_response_pipe.fds[1] , "Q" , 1 ) ;
 					InfoLog( __FILE__ , __LINE__ , "write accept_response_pipe Q done[%d]" , nret );
-					
-					g_exit_flag = 1 ;
-					DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
 				}
 			}
 			else if( p_forward_session->status == FORWARD_SESSION_STATUS_LISTEN )
@@ -957,9 +964,9 @@ void *AcceptThread( struct ServerEnv *penv )
 					nret = ResolveConnectingError( penv , p_forward_session ) ;
 					if( nret )
 					{
-						pthread_mutex_lock( & (penv->mutex) );
+						pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 						p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count--;
-						pthread_mutex_unlock( & (penv->mutex) );
+						pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 						DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->p_reverse_forward_session->sock );
@@ -970,9 +977,9 @@ void *AcceptThread( struct ServerEnv *penv )
 			else if( p_forward_session->status == FORWARD_SESSION_STATUS_READY )
 			{
 				DebugLog( __FILE__ , __LINE__ , "accepted session event" );
-				pthread_mutex_lock( & (penv->mutex) );
+				pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 				p_forward_session->p_reverse_forward_session->p_forward_rule->server_addr_array[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--;
-				pthread_mutex_unlock( & (penv->mutex) );
+				pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 				DebugLog( __FILE__ , __LINE__ , "close #%d#-#%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );

@@ -1,12 +1,12 @@
 #include "G6.h"
 
 #define DISCONNECT_PAIR	\
-	pthread_mutex_lock( & (penv->mutex) ); \
+	pthread_mutex_lock( & (penv->server_connection_count_mutex) ); \
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER ) \
 		p_forward_session->p_reverse_forward_session->p_forward_rule->server_addr_array[p_forward_session->p_reverse_forward_session->server_index].server_connection_count--; \
 	else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT ) \
 		p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count--; \
-	pthread_mutex_unlock( & (penv->mutex) ); \
+	pthread_mutex_unlock( & (penv->server_connection_count_mutex) ); \
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL ); \
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL ); \
 	DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
@@ -55,10 +55,10 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	}
 	
 	/* 登记最近读时间戳 */
-	pthread_mutex_lock( & (penv->mutex) );
+	pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
 		time( & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].rtt) );
-	pthread_mutex_unlock( & (penv->mutex) );
+	pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 	
 	/* 发送通讯数据 */
 	len = send( p_forward_session->p_reverse_forward_session->sock , p_forward_session->io_buffer , p_forward_session->io_buffer_len , 0 ) ;
@@ -115,10 +115,10 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	}
 	
 	/* 登记最近写时间戳 */
-	pthread_mutex_lock( & (penv->mutex) );
+	pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
 		time( & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt) );
-	pthread_mutex_unlock( & (penv->mutex) );
+	pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 	
 	return 0;
 }
@@ -171,10 +171,10 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 	}
 	
 	/* 登记最近写时间戳 */
-	pthread_mutex_lock( & (penv->mutex) );
+	pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
 		time( & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt) );
-	pthread_mutex_unlock( & (penv->mutex) );
+	pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 	
 	return 0;
 }
@@ -184,6 +184,7 @@ void *ForwardThread( struct ServerEnv *penv )
 	int			forward_thread_index ;
 	int			forward_epoll_fd ;
 	
+	int			timeout ;
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
 	int			event_count ;
 	int			event_index ;
@@ -195,7 +196,7 @@ void *ForwardThread( struct ServerEnv *penv )
 	
 	forward_thread_index = *(penv->forward_thread_index) ;
 	forward_epoll_fd = penv->forward_epoll_fd_array[forward_thread_index] ;
-	{ int *tmp = penv->forward_thread_index ; penv->forward_thread_index = NULL ; free( tmp ); }
+	{ int *tmp = penv->forward_thread_index ; penv->forward_thread_index = 0 ; free( tmp ); }
 	
 	/* 设置日志输出文件 */
 	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
@@ -205,7 +206,13 @@ void *ForwardThread( struct ServerEnv *penv )
 	/* 主工作循环 */
 	while( ! ( g_exit_flag == 1 && penv->forward_session_count == 0 ) )
 	{
-		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , -1 ) ;
+		if( g_exit_flag == 1 )
+			timeout = 1000 ;
+		else
+			timeout = -1 ;
+		
+		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]..." , penv->forward_request_pipe[forward_thread_index].fds[0] );
+		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
@@ -229,12 +236,6 @@ void *ForwardThread( struct ServerEnv *penv )
 				{
 					ErrorLog( __FILE__ , __LINE__ , "read request pipe close" );
 					exit(0);
-				}
-				else
-				{
-					InfoLog( __FILE__ , __LINE__ , "write forward_response_pipe Q ..." );
-					write( penv->forward_response_pipe[forward_thread_index].fds[1] , "Q" , 1 );
-					InfoLog( __FILE__ , __LINE__ , "write forward_response_pipe Q done[%d]" , nret );
 				}
 			}
 			else
@@ -273,6 +274,7 @@ void *_ForwardThread( void *pv )
 {
 	ForwardThread( (struct ServerEnv *)pv );
 	
+	InfoLog( __FILE__ , __LINE__ , "pthread_exit" );
 	pthread_exit(NULL);
 }
 

@@ -109,7 +109,8 @@ int InitEnvirment( struct ServerEnv *penv )
 	}
 	memset( penv->forward_session_array , 0x00 , sizeof(struct ForwardSession) * penv->cmd_para.forward_session_size );
 	
-	pthread_mutex_init( & (penv->mutex) , NULL );
+	pthread_mutex_init( & (penv->forward_session_count_mutex) , NULL );
+	pthread_mutex_init( & (penv->server_connection_count_mutex) , NULL );
 	
 	return 0;
 }
@@ -159,7 +160,8 @@ void CleanEnvirment( struct ServerEnv *penv )
 	free( penv->forward_response_pipe );
 	free( penv->forward_epoll_fd_array );
 	
-	pthread_mutex_destroy( & (penv->mutex) );
+	pthread_mutex_destroy( & (penv->forward_session_count_mutex) );
+	pthread_mutex_destroy( & (penv->server_connection_count_mutex) );
 	
 	return;
 }
@@ -420,7 +422,11 @@ struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv )
 			{
 				penv->forward_session_use_offsetpos = 0 ;
 			}
+			
+			pthread_mutex_lock( & (penv->forward_session_count_mutex) );
 			penv->forward_session_count++;
+			pthread_mutex_unlock( & (penv->forward_session_count_mutex) );
+			
 			return p_forward_session;
 		}
 		
@@ -441,7 +447,9 @@ void SetForwardSessionUnused( struct ServerEnv *penv , struct ForwardSession *p_
 	if( p_forward_session->status != FORWARD_SESSION_STATUS_UNUSED )
 		p_forward_session->status = FORWARD_SESSION_STATUS_UNUSED ;
 	
+	pthread_mutex_lock( & (penv->forward_session_count_mutex) );
 	penv->forward_session_count--;
+	pthread_mutex_unlock( & (penv->forward_session_count_mutex) );
 	
 	return;
 }
@@ -454,7 +462,9 @@ void SetForwardSessionUnused2( struct ServerEnv *penv , struct ForwardSession *p
 	if( p_forward_session2->status != FORWARD_SESSION_STATUS_UNUSED )
 		p_forward_session2->status = FORWARD_SESSION_STATUS_UNUSED ;
 	
+	pthread_mutex_lock( & (penv->forward_session_count_mutex) );
 	penv->forward_session_count -= 2 ;
+	pthread_mutex_unlock( & (penv->forward_session_count_mutex) );
 	
 	return;
 }
