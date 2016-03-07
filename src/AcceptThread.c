@@ -251,7 +251,7 @@ static int ResolveConnectingError( struct ServerEnv *penv , struct ForwardSessio
 	/* 设置服务端不可用 */
 	p_servers_addr = p_reverse_forward_session->p_forward_rule->server_addr_array + p_reverse_forward_session->server_index ;
 	p_servers_addr->server_unable = 1 ;
-	p_servers_addr->timestamp_to_enable = GETTIMEVAL.tv_sec + DEFAULT_DISABLE_TIMEOUT ;
+	p_servers_addr->timestamp_to_enable = GETTIMEVAL.tv_sec + penv->timeout ;
 	
 	/* 非堵塞连接服务端 */
 	nret = TryToConnectServer( penv , p_reverse_forward_session ) ;
@@ -483,6 +483,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 			p_reverse_forward_session->type = FORWARD_SESSION_TYPE_CLIENT ;
 			p_reverse_forward_session->forward_index = p_listen_session->forward_index ;
 			
+DebugLog( __FILE__ , __LINE__ , "111 - p_forward_session[%p]#%d# p_reverse_forward_session[%p]" , p_forward_session , p_forward_session->sock , p_reverse_forward_session );
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_forward_session ;
 			event.events = EPOLLERR ;

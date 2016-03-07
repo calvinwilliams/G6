@@ -276,7 +276,18 @@ int LoadConfig( struct ServerEnv *penv )
 					return -1;
 				}
 				
-				if( STRCMP( property_name , == , "max_ip" ) )
+				if( STRCMP( property_name , == , "timeout" ) )
+				{
+					nret = fscanf( fp , "%u" , &(penv->timeout) ) ;
+					if( nret == EOF )
+					{
+						ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+						return -1;
+					}
+					
+					InfoLog( __FILE__ , __LINE__ , "set timeout[%u]" , penv->timeout );
+				}
+				else if( STRCMP( property_name , == , "max_ip" ) )
 				{
 					nret = fscanf( fp , "%u" , &(penv->ip_connection_stat.max_ip) ) ;
 					if( nret == EOF )

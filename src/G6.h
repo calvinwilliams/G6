@@ -142,7 +142,7 @@
 
 #define IO_BUFFER_SIZE				4096 /* 输入输出缓冲区大小 */
 
-#define DEFAULT_ALIVE_TIMEOUT			30 /* 缺省存活时间，单位：秒 */
+#define DEFAULT_ALIVE_TIMEOUT			10 /* 缺省存活时间，单位：秒 */
 #define DEFAULT_DISABLE_TIMEOUT			60 /* 缺省暂禁时间，单位：秒 */
 
 #define G6_LISTEN_SOCKFDS			"G6_LISTEN_SOCKFDS"
@@ -265,7 +265,7 @@ struct IpConnection
 	unsigned int	connection_count ; /* 连接数量 */
 } ;
 
-#define DEFAULT_IP_CONNECTION_ARRAY_SIZE	1
+#define DEFAULT_IP_CONNECTION_ARRAY_SIZE	2
 
 struct IpConnectionStat
 {
@@ -286,6 +286,9 @@ struct ServerEnv
 	struct ForwardNetAddress	*old_forward_addr_array ; /* 用于平滑升级的老进程侦听端口信息 */
 	unsigned int			old_forward_addr_count ;
 	
+	unsigned int			timeout ;
+	struct rb_root			timeout_rbtree ; /* 超时 红黑树 */
+	
 	struct IpConnectionStat		ip_connection_stat ; /* IP-CONNECTION统计信息，也用于连接限制 */
 	
 	struct ForwardRule		*forward_rule_array ; /* 转发规则数组 */
@@ -305,8 +308,6 @@ struct ServerEnv
 	struct PipeFds			*forward_request_pipe ; /* 父子线程请求命令管道 */
 	struct PipeFds			*forward_response_pipe ; /* 父子线程响应命令管道 */
 	int				*forward_epoll_fd_array ; /* 数据收发epoll池 */
-	
-	struct rb_root			timeout_rbtree ; /* 超时 红黑树 */
 	
 	pthread_mutex_t			ip_connection_stat_mutex ; /* IP-CONNECTION统计 临界区互斥 */
 	pthread_mutex_t			forward_session_count_mutex ; /* 通讯会话数量 临界区互斥 */
@@ -332,6 +333,7 @@ int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchChar
 /********* Envirment *********/
 
 int InitEnvirment( struct ServerEnv *penv );
+int InitEnvirment2( struct ServerEnv *penv );
 void CleanEnvirment( struct ServerEnv *penv );
 int SaveListenSockets( struct ServerEnv *penv );
 int LoadOldListenSockets( struct ServerEnv *penv );

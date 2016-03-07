@@ -8,22 +8,6 @@ int InitEnvirment( struct ServerEnv *penv )
 	
 	int			nret = 0 ;
 	
-	/* 创建IP-CONNECTION统计数组 */
-	if( penv->ip_connection_stat.max_ip > 0 || penv->ip_connection_stat.max_connections > 0 || penv->ip_connection_stat.max_connections_per_ip > 0 )
-	{
-		penv->ip_connection_stat.ip_connection_stat_size = DEFAULT_IP_CONNECTION_ARRAY_SIZE ;
-		penv->ip_connection_stat.ip_connection_array = (struct IpConnection *)malloc( sizeof(struct IpConnection) * penv->ip_connection_stat.ip_connection_stat_size ) ;
-		if( penv->ip_connection_stat.ip_connection_array == NULL )
-		{
-			ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
-			return -1;
-		}
-		memset( penv->ip_connection_stat.ip_connection_array , 0x00 , sizeof(struct IpConnection) * penv->ip_connection_stat.ip_connection_stat_size );
-		
-		penv->ip_connection_stat.ip_count = 0 ;
-		penv->ip_connection_stat.connection_count = 0 ;
-	}
-	
 	/* 创建线程ID数组 */
 	penv->forward_thread_tid_array = (pthread_t *)malloc( sizeof(pthread_t) * penv->cmd_para.forward_thread_size ) ;
 	if( penv->forward_thread_tid_array == NULL )
@@ -142,6 +126,27 @@ int InitEnvirment( struct ServerEnv *penv )
 	pthread_mutex_init( & (penv->forward_session_count_mutex) , NULL );
 	pthread_mutex_init( & (penv->server_connection_count_mutex) , NULL );
 	pthread_mutex_init( & (penv->timeout_rbtree_mutex) , NULL );
+	
+	return 0;
+}
+
+int InitEnvirment2( struct ServerEnv *penv )
+{
+	/* 创建IP-CONNECTION统计数组 */
+	if( penv->ip_connection_stat.max_ip > 0 || penv->ip_connection_stat.max_connections > 0 || penv->ip_connection_stat.max_connections_per_ip > 0 )
+	{
+		penv->ip_connection_stat.ip_connection_stat_size = DEFAULT_IP_CONNECTION_ARRAY_SIZE ;
+		penv->ip_connection_stat.ip_connection_array = (struct IpConnection *)malloc( sizeof(struct IpConnection) * penv->ip_connection_stat.ip_connection_stat_size ) ;
+		if( penv->ip_connection_stat.ip_connection_array == NULL )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
+			return -1;
+		}
+		memset( penv->ip_connection_stat.ip_connection_array , 0x00 , sizeof(struct IpConnection) * penv->ip_connection_stat.ip_connection_stat_size );
+		
+		penv->ip_connection_stat.ip_count = 0 ;
+		penv->ip_connection_stat.connection_count = 0 ;
+	}
 	
 	return 0;
 }
@@ -611,7 +616,9 @@ int GetLastestTimeout( struct ServerEnv *penv )
 void RemoveTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
 {
 	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
+	
 	rb_erase( &(p_forward_session->timeout_rbnode) , & (penv->timeout_rbtree) );
+	
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 	
 	return;
@@ -619,12 +626,15 @@ void RemoveTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_fo
 
 void RemoveTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 )
 {
-	RemoveTimeoutTreeNode( penv , p_forward_session );
-	RemoveTimeoutTreeNode( penv , p_forward_session2 );
+	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
+	
+	rb_erase( &(p_forward_session->timeout_rbnode) , & (penv->timeout_rbtree) );
+	rb_erase( &(p_forward_session2->timeout_rbnode) , & (penv->timeout_rbtree) );
+	
+	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 	
 	return;
 }
-
 
 static int _AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int )
 {
@@ -632,15 +642,76 @@ static int _AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionSta
 	unsigned int		ip_connection_index ;
 	struct IpConnection	*p_ip_connection = NULL ;
 	
+DebugLog( __FILE__ , __LINE__ , "p_ip_connection_stat->ip_count[%u] ->connection_count[%u] ip_connection_stat_size[%i]" , p_ip_connection_stat->ip_count , p_ip_connection_stat->connection_count , p_ip_connection_stat->ip_connection_stat_size );
+	ip_connection_index = ip_int % (p_ip_connection_stat->ip_connection_stat_size) ;
+	p_ip_connection = p_ip_connection_stat->ip_connection_array+ip_connection_index ;
+	for( n = 0 ; n < p_ip_connection_stat->ip_connection_stat_size ; n++ )
+	{
+DebugLog( __FILE__ , __LINE__ , "n[%u] used_flag[%d] p_ip_connection->ip_int[%u] ip_int[%u]" , n , p_ip_connection->used_flag , p_ip_connection->ip_int , ip_int );
+		if( p_ip_connection->used_flag == 0 )
+		{
+			if( p_ip_connection_stat->max_ip > 0 && p_ip_connection_stat->ip_count+1 > p_ip_connection_stat->max_ip )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "ip count limit" );
+				return -1;
+			}
+			
+			p_ip_connection->used_flag = 1 ;
+			p_ip_connection->ip_int = ip_int ;
+			p_ip_connection->connection_count = 1 ;
+			
+			p_ip_connection_stat->ip_count++;
+			p_ip_connection_stat->connection_count++;
+			
+			pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
+			return 0;
+		}
+		else if( p_ip_connection->ip_int == ip_int )
+		{
+			if( p_ip_connection_stat->max_connections_per_ip > 0 && p_ip_connection->connection_count+1 > p_ip_connection_stat->max_connections_per_ip )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "connections_per_ip count limit" );
+				return -1;
+			}
+			
+			p_ip_connection->connection_count++;
+			
+			p_ip_connection_stat->connection_count++;
+		}
+		
+		ip_connection_index++;
+		p_ip_connection++;
+		if( ip_connection_index >= p_ip_connection_stat->ip_connection_stat_size )
+		{
+			ip_connection_index = 0 ;
+			p_ip_connection = p_ip_connection_stat->ip_connection_array ;
+		}
+	}
+	
+	ErrorLog( __FILE__ , __LINE__ , "internal error" );
+	return -9;
+}
+
+int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int )
+{
 	int			nret = 0 ;
+	
+	pthread_mutex_lock( & (penv->ip_connection_stat_mutex) );
+	
+	if( penv->ip_connection_stat.ip_connection_stat_size == 0 )
+	{
+		pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
+		return 0;
+	}
 	
 	if( p_ip_connection_stat->max_connections > 0 && p_ip_connection_stat->connection_count+1 > p_ip_connection_stat->max_connections )
 	{
-		ErrorLog( __FILE__ , __LINE__ , "connections limit" );
+		ErrorLog( __FILE__ , __LINE__ , "connections count limit" );
+		pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
 		return -1;
 	}
 	
-	if( (p_ip_connection_stat->connection_count+1)*2 > p_ip_connection_stat->ip_connection_stat_size )
+	if( p_ip_connection_stat->connection_count+1 > p_ip_connection_stat->ip_connection_stat_size/2 )
 	{
 		struct IpConnectionStat		new_ip_connection_stat ;
 		unsigned int			connection_index ;
@@ -657,75 +728,29 @@ static int _AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionSta
 		if( new_ip_connection_stat.ip_connection_array == NULL )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
+			pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
 			return -1;
 		}
 		memset( new_ip_connection_stat.ip_connection_array , 0x00 , sizeof(struct IpConnection) * new_ip_connection_stat.ip_connection_stat_size );
 		
 		for( connection_index = 0 , p_ip_connection = p_ip_connection_stat->ip_connection_array ; connection_index < p_ip_connection_stat->connection_count ; connection_index++ , p_ip_connection++ )
 		{
-			nret = _AddIpConnectionStat( penv , & new_ip_connection_stat , p_ip_connection->ip_int ) ;
-			if( nret )
+			if( p_ip_connection->used_flag == 1 )
 			{
-				ErrorLog( __FILE__ , __LINE__ , "AddIpConnectionStat failed[%d]" , nret );
-				return -1;
+				nret = _AddIpConnectionStat( penv , & new_ip_connection_stat , p_ip_connection->ip_int ) ;
+				if( nret )
+				{
+					ErrorLog( __FILE__ , __LINE__ , "AddIpConnectionStat failed[%d]" , nret );
+					pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
+					return -1;
+				}
 			}
 		}
 		
+		free( p_ip_connection_stat->ip_connection_array );
 		memcpy( p_ip_connection_stat , & new_ip_connection_stat , sizeof(struct IpConnectionStat) );
 	}
 	
-	ip_connection_index = ip_int % (p_ip_connection_stat->ip_connection_stat_size) ;
-	p_ip_connection = p_ip_connection_stat->ip_connection_array+ip_connection_index ;
-	for( n = 0 ; n < p_ip_connection_stat->connection_count ; n++ )
-	{
-		if( p_ip_connection->used_flag == 0 )
-		{
-			if( p_ip_connection_stat->max_ip > 0 && p_ip_connection_stat->ip_count+1 > p_ip_connection_stat->max_ip )
-			{
-				ErrorLog( __FILE__ , __LINE__ , "ips limit" );
-				return -1;
-			}
-			
-			p_ip_connection->ip_int = ip_int ;
-			p_ip_connection->connection_count = 1 ;
-			pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
-			return 0;
-		}
-		else if( p_ip_connection->ip_int == ip_int )
-		{
-			if( p_ip_connection_stat->max_connections_per_ip > 0 && p_ip_connection->connection_count+1 > p_ip_connection_stat->max_connections_per_ip )
-			{
-				ErrorLog( __FILE__ , __LINE__ , "connections_per_ip limit" );
-				return -1;
-			}
-			
-			p_ip_connection->connection_count++;
-		}
-		
-		ip_connection_index++;
-		p_ip_connection++;
-		if( ip_connection_index >= p_ip_connection_stat->connection_count )
-		{
-			ip_connection_index = 0 ;
-			p_ip_connection = p_ip_connection_stat->ip_connection_array ;
-		}
-	}
-	
-	return 1;
-}
-
-int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int )
-{
-	int		nret = 0 ;
-	
-	pthread_mutex_lock( & (penv->ip_connection_stat_mutex) );
-	
-	if( penv->ip_connection_stat.ip_connection_stat_size == 0 )
-	{
-		pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
-		return 0;
-	}
-		
 	nret = _AddIpConnectionStat( penv , p_ip_connection_stat , ip_int ) ;
 	
 	pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
@@ -749,13 +774,20 @@ int RemoveIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_
 	
 	ip_connection_index = ip_int % (p_ip_connection_stat->ip_connection_stat_size) ;
 	p_ip_connection = p_ip_connection_stat->ip_connection_array+ip_connection_index ;
-	for( n = 0 ; n < p_ip_connection_stat->connection_count ; n++ )
+	for( n = 0 ; n < p_ip_connection_stat->ip_connection_stat_size ; n++ )
 	{
 		if( p_ip_connection->used_flag == 1 && p_ip_connection->ip_int == ip_int )
 		{
 			p_ip_connection->connection_count--;
+			
+			p_ip_connection_stat->connection_count--;
+			
 			if( p_ip_connection->connection_count == 0 )
+			{
 				p_ip_connection->used_flag = 0 ;
+				
+				p_ip_connection_stat->ip_count--;
+			}
 			
 			pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
 			return 0;
@@ -763,7 +795,7 @@ int RemoveIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_
 		
 		ip_connection_index++;
 		p_ip_connection++;
-		if( ip_connection_index >= p_ip_connection_stat->connection_count )
+		if( ip_connection_index >= p_ip_connection_stat->ip_connection_stat_size )
 		{
 			ip_connection_index = 0 ;
 			p_ip_connection = p_ip_connection_stat->ip_connection_array ;

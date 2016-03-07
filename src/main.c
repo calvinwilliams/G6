@@ -43,6 +43,12 @@ int main( int argc , char *argv[] )
 	penv->cmd_para.log_level = LOGLEVEL_INFO ;
 	penv->cmd_para.no_daemon_flag = 0 ;
 	
+	/* 初始化其它参数 */
+	penv->timeout = DEFAULT_DISABLE_TIMEOUT ;
+	penv->ip_connection_stat.max_ip = 0 ;
+	penv->ip_connection_stat.max_connections = 0 ;
+	penv->ip_connection_stat.max_connections_per_ip = 0 ;
+	
 	/* 设置日志输出文件 */
 	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
 	SetLogLevel( penv->cmd_para.log_level );
@@ -135,6 +141,14 @@ int main( int argc , char *argv[] )
 	if( nret )
 	{
 		printf( "LoadConfig failed[%d]\n" , nret );
+		return -nret;
+	}
+	
+	/* 初始化环境2 */
+	nret = InitEnvirment2( penv ) ;
+	if( nret )
+	{
+		printf( "InitEnvirment2 failed[%d]\n" , nret );
 		return -nret;
 	}
 	

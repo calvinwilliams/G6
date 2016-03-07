@@ -1,4 +1,4 @@
-( timeout = 60 , max_ip = 1 , max_connections = 10 , max_connections_per_ip = 10 ) ;
+( max_ip = 1 , max_connections = 0 , max_connections_per_ip = 0 ) ;
 
 my_rule_id 	G
 	127.0.0.1:*
@@ -50,10 +50,11 @@ my_rule6_id	HS
 	;
 
 my_rule8_id	HS
-	*:*
+	192.168.6.7:*
+	192.168.6.54:*
 	-
-	172.16.69.110:8618
+	192.168.6.54:8618
 	>
-	172.16.69.110:8818
+	127.0.0.1:8818
 	;
 
