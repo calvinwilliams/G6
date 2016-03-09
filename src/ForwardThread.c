@@ -1,5 +1,12 @@
 #include "G6.h"
 
+#define DISCONNECT \
+	RemoveTimeoutTreeNode( penv , p_forward_session ); \
+	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL ); \
+	DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock ); \
+	_CLOSESOCKET( p_forward_session->sock ); \
+	SetForwardSessionUnused( penv , p_forward_session ); \
+
 #define DISCONNECT_PAIR	\
 	RemoveTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER ) \
@@ -46,15 +53,13 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	{
 		/* 对端断开连接 */
 		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock );
-		DISCONNECT_PAIR
-		return 0;
+		return -1;
 	}
 	else if( p_forward_session->io_buffer_len == -1 )
 	{
 		/* 通讯接收出错 */
 		ErrorLog( __FILE__ , __LINE__ , "recv #%d# failed , errno[%d]" , p_forward_session->sock , errno );
-		DISCONNECT_PAIR
-		return 0;
+		return -1;
 	}
 	
 	/* 登记最近读时间戳 */
@@ -86,8 +91,7 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 		{
 			/* 通讯发送出错 */
 			ErrorLog( __FILE__ , __LINE__ , "send #%d# failed , errno[%d]" , p_forward_session->sock , errno );
-			DISCONNECT_PAIR
-			return 0;
+			return -1;
 		}
 	}
 	else if( len == p_forward_session->io_buffer_len )
@@ -143,8 +147,7 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 		{
 			/* 通讯发送出错 */
 			ErrorLog( __FILE__ , __LINE__ , "send #%d# failed , errno[%d]" , p_forward_session->sock , errno );
-			DISCONNECT_PAIR
-			return 0;
+			return -1;
 		}
 	}
 	else if( len == p_forward_session->io_buffer_len )
@@ -181,6 +184,29 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 	
 	return 0;
 }
+
+#if 0
+static int OnHeartBeatInput( struct ServerEnv *penv , struct ForwardSession *p_forward_session , int forward_epoll_fd )
+{
+	/* 接收通讯数据 */
+	p_forward_session->io_buffer_offsetpos = 0 ;
+	p_forward_session->io_buffer_len = recv( p_forward_session->sock , p_forward_session->io_buffer , IO_BUFFER_SIZE , 0 ) ;
+	if( p_forward_session->io_buffer_len == 0 )
+	{
+		/* 对端断开连接 */
+		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock );
+		return -1;
+	}
+	else if( p_forward_session->io_buffer_len == -1 )
+	{
+		/* 通讯接收出错 */
+		ErrorLog( __FILE__ , __LINE__ , "recv #%d# failed , errno[%d]" , p_forward_session->sock , errno );
+		return -1;
+	}
+	
+	return 0;
+}
+#endif
 
 void *ForwardThread( unsigned long forward_thread_index )
 {
@@ -275,14 +301,42 @@ void *ForwardThread( unsigned long forward_thread_index )
 					}
 				}
 			}
+#if 0
+			else if( p_forward_session->type == FORWARD_SESSION_TYPE_HEARTBEAT )
+			{
+				DebugLog( __FILE__ , __LINE__ , "heartbeat session event" );
+				
+				UpdateTimeoutNode( penv , p_forward_session , time(NULL) + penv->timeout );
+				
+				if( p_event->events & EPOLLIN ) /* 输入事件 */
+				{
+					nret = OnHeartBeatInput( penv , p_forward_session , forward_epoll_fd ) ;
+					if( nret )
+					{
+						struct ServerNetAddress		*p_server_addr = NULL ;
+						ErrorLog( __FILE__ , __LINE__ , "OnHeartBeatInput failed[%d]" , nret );
+						p_server_addr = p_forward_session->p_forward_rule->server_addr_array + p_forward_session->server_index ;
+						p_server_addr->server_unable = 1 ;
+						p_server_addr->timestamp_to_enable = UINTMAX_MAX ;
+						DISCONNECT
+					}
+				}
+				else
+				{
+					struct ServerNetAddress		*p_server_addr = NULL ;
+					ErrorLog( __FILE__ , __LINE__ , "heartbeat session EPOLLERR" );
+					p_server_addr = p_forward_session->p_forward_rule->server_addr_array + p_forward_session->server_index ;
+					p_server_addr->server_unable = 1 ;
+					p_server_addr->timestamp_to_enable = UINTMAX_MAX ;
+					DISCONNECT
+				}
+			}
+#endif
 			else
 			{
 				DebugLog( __FILE__ , __LINE__ , "forward session event" );
 				
-				pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
-				p_forward_session->timeout_timestamp = time(NULL) + DEFAULT_ALIVE_TIMEOUT ;
-				p_forward_session->p_reverse_forward_session->timeout_timestamp = time(NULL) + DEFAULT_ALIVE_TIMEOUT ;
-				pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
+				UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , time(NULL) + penv->timeout );
 				
 				if( p_event->events & EPOLLIN ) /* 输入事件 */
 				{
@@ -290,6 +344,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 					if( nret )
 					{
 						ErrorLog( __FILE__ , __LINE__ , "OnForwardInput failed[%d]" , nret );
+						DISCONNECT_PAIR
 					}
 				}
 				else if( p_event->events & EPOLLOUT ) /* 输出事件 */
@@ -298,6 +353,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 					if( nret )
 					{
 						ErrorLog( __FILE__ , __LINE__ , "OnForwardOutput failed[%d]" , nret );
+						DISCONNECT_PAIR
 					}
 				}
 				else

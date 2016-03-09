@@ -71,6 +71,152 @@ static int GetToken( char *result , FILE *fp , char *format , ... )
 	return 0;
 }
 
+typedef int funcLoadCustomProperty( void *p1 , void *p2 , void *p3 , char *property_name , char *property_value );
+
+static int LoadProperty( FILE *fp , funcLoadCustomProperty *pfuncLoadCustomProperty , void *p1 , void *p2 , void *p3 )
+{
+	char		property_name[ 64 + 1 ] ;
+	char		sepchar[ 2 + 1 ] ;
+	char		property_value[ 64 + 1 ] ;
+	
+	int		nret = 0 ;
+	
+	while(1)
+	{
+		nret = GetToken( property_name , fp , "%64s" , property_name ) ;
+		if( nret == EOF )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+			return -1;
+		}
+		if( STRCMP( property_name , == , ")" ) )
+		{
+			break;
+		}
+		
+		nret = GetToken( sepchar , fp , "%1s" , sepchar ) ;
+		if( nret == EOF )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+			return -1;
+		}
+		if( STRCMP( sepchar , != , "=" ) )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "invalid config after property[%s]" , property_name );
+			return -1;
+		}
+		
+		nret = GetToken( property_value , fp , "%64s" , property_value ) ;
+		if( nret == EOF )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+			return -1;
+		}
+		
+		nret = pfuncLoadCustomProperty( p1 , p2 , p3 , property_name , property_value ) ;
+		if( nret )
+			return nret;
+		
+		nret = GetToken( sepchar , fp , "%1s" , sepchar ) ;
+		if( nret == EOF )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
+			return -1;
+		}
+		if( STRCMP( sepchar , == , ")" ) )
+		{
+			break;
+		}
+		else if( STRCMP( sepchar , != , "," ) )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "invalid config after property[%s]" , property_name );
+			return -1;
+		}
+	}
+	
+	return 0;
+}
+
+funcLoadCustomProperty LoadCustomProperty_ForwardRuleProperties ;
+int LoadCustomProperty_ForwardRuleProperties( void *p1 , void *p2 , void *p3 , char *property_name , char *property_value )
+{
+	char			*postfix = NULL ;
+	
+	struct ForwardRule	*p_forward_rule = (struct ForwardRule *)p1 ;
+	
+	if( STRCMP( property_name , == , "heartbeat" ) )
+	{
+		p_forward_rule->server_heartbeat = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "s" ) || STRCMP( postfix , == , "S" ) )
+			{
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_forward_rule->server_heartbeat *= 60 ;
+			}
+			else if( STRCMP( postfix , == , "h" ) || STRCMP( postfix , == , "H" ) )
+			{
+				p_forward_rule->server_heartbeat *= 3600 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+		
+		p_forward_rule->heartbeat_flag = 1 ;
+	}
+	else
+	{
+		ErrorLog( __FILE__ , __LINE__ , "invalid property[%s]" , property_name );
+		return -1;
+	}
+	
+	return 0;
+}
+
+funcLoadCustomProperty LoadCustomProperty_ForwardRule_ServerAddrProperties ;
+int LoadCustomProperty_ForwardRule_ServerAddrProperties( void *p1 , void *p2 , void *p3 , char *property_name , char *property_value )
+{
+	char			*postfix = NULL ;
+	
+	struct ServerNetAddress	*p_server_addr = (struct ServerNetAddress *)p2 ;
+	
+	if( STRCMP( property_name , == , "heartbeat" ) )
+	{
+		p_server_addr->heartbeat = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "s" ) || STRCMP( postfix , == , "S" ) )
+			{
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_server_addr->heartbeat *= 60 ;
+			}
+			else if( STRCMP( postfix , == , "h" ) || STRCMP( postfix , == , "H" ) )
+			{
+				p_server_addr->heartbeat *= 3600 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else
+	{
+		ErrorLog( __FILE__ , __LINE__ , "invalid property[%s]" , property_name );
+		return -1;
+	}
+	
+	return 0;
+}
+
 static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *p_forward_rule , char *rule_id )
 {
 	char				ip_and_port[ 100 + 1 ] ;
@@ -221,6 +367,24 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 			return -11;
 		}
 		
+		if( STRCMP( ip_and_port , == , "(" ) )
+		{
+			if( p_forward_rule->server_addr_count == 0 )
+			{
+				nret = LoadProperty( fp , & LoadCustomProperty_ForwardRuleProperties , p_forward_rule , NULL , NULL ) ;
+				if( nret )
+					return nret;
+			}
+			else
+			{
+				nret = LoadProperty( fp , & LoadCustomProperty_ForwardRule_ServerAddrProperties , p_forward_rule , p_forward_rule->server_addr_array + p_forward_rule->server_addr_count - 1 , NULL ) ;
+				if( nret )
+					return nret;
+			}
+			
+			continue;
+		}
+		
 		if( STRCMP( ip_and_port , == , ";" ) )
 			break;
 		
@@ -254,6 +418,19 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		}
 		
 		SetNetAddress( & (p_server_addr->netaddr) );
+		
+		if( p_server_addr->heartbeat == 0 && p_forward_rule->server_heartbeat > 0 )
+		{
+			p_server_addr->heartbeat = p_forward_rule->server_heartbeat ;
+		}
+		
+		if( p_server_addr->heartbeat > 0 )
+		{
+			p_server_addr->server_unable = 1 ;
+			p_server_addr->timestamp_to_enable = UINTMAX_MAX ;
+			
+			p_forward_rule->heartbeat_flag = 1 ;
+		}
 		
 		p_forward_rule->server_addr_count++;
 	}
@@ -289,12 +466,111 @@ static void LogOneRule( struct ServerEnv *penv , struct ForwardRule *p_forward_r
 	/* 服务端配置信息 */
 	for( server_addr_index = 0 , p_server_addr = p_forward_rule->server_addr_array ; server_addr_index < p_forward_rule->server_addr_count ; server_addr_index++ , p_server_addr++ )
 	{
-		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%d]" , p_server_addr->netaddr.ip , p_server_addr->netaddr.port.port_int );
+		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%d] (heartbeat=[%u])" , p_server_addr->netaddr.ip , p_server_addr->netaddr.port.port_int , p_server_addr->heartbeat );
 	}
 	
 	InfoLog( __FILE__ , __LINE__ , "    ;" );
 	
 	return;
+}
+
+funcLoadCustomProperty LoadCustomProperty_GlobalProperties ;
+int LoadCustomProperty_GlobalProperties( void *p1 , void *p2 , void *p3 , char *property_name , char *property_value )
+{
+	char			*postfix = NULL ;
+	
+	struct ServerEnv	*penv = (struct ServerEnv *)p1 ;
+	
+	if( STRCMP( property_name , == , "timeout" ) )
+	{
+		penv->timeout = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "s" ) || STRCMP( postfix , == , "S" ) )
+			{
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				penv->timeout *= 60 ;
+			}
+			else if( STRCMP( postfix , == , "h" ) || STRCMP( postfix , == , "H" ) )
+			{
+				penv->timeout *= 3600 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else if( STRCMP( property_name , == , "max_ip" ) )
+	{
+		penv->ip_connection_stat.max_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				penv->ip_connection_stat.max_ip *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				penv->ip_connection_stat.max_ip *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else if( STRCMP( property_name , == , "max_connections" ) )
+	{
+		penv->ip_connection_stat.max_connections = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				penv->ip_connection_stat.max_connections *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				penv->ip_connection_stat.max_connections *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else if( STRCMP( property_name , == , "max_connections_per_ip" ) )
+	{
+		penv->ip_connection_stat.max_connections_per_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				penv->ip_connection_stat.max_connections_per_ip *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				penv->ip_connection_stat.max_connections_per_ip *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else
+	{
+		ErrorLog( __FILE__ , __LINE__ , "invalid property[%s]" , property_name );
+		return -1;
+	}
+	
+	return 0;
 }
 
 int LoadConfig( struct ServerEnv *penv )
@@ -323,156 +599,11 @@ int LoadConfig( struct ServerEnv *penv )
 		
 		if( STRCMP( rule_id , == , "(" ) )
 		{
-			char	property_name[ 64 + 1 ] ;
-			char	sepchar[ 2 + 1 ] ;
-			char	property_value[ 10 + 1 + 1 ] ;
-			char	*postfix = NULL ;
+			char		sepchar[ 2 + 1 ] ;
 			
-			while(1)
-			{
-				nret = GetToken( property_name , fp , "%64s" , property_name ) ;
-				if( nret == EOF )
-				{
-					ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
-					return -1;
-				}
-				if( STRCMP( property_name , == , ")" ) )
-				{
-					break;
-				}
-				
-				nret = GetToken( sepchar , fp , "%1s" , sepchar ) ;
-				if( nret == EOF )
-				{
-					ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
-					return -1;
-				}
-				if( STRCMP( sepchar , != , "=" ) )
-				{
-					ErrorLog( __FILE__ , __LINE__ , "invalid config after property[%s]" , property_name );
-					return -1;
-				}
-				
-				nret = GetToken( property_value , fp , "%11s" , property_value ) ;
-				if( nret == EOF )
-				{
-					ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
-					return -1;
-				}
-				
-				if( STRCMP( property_name , == , "timeout" ) )
-				{
-					penv->timeout = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
-					if( postfix && postfix[0] )
-					{
-						if( STRCMP( postfix , == , "s" ) || STRCMP( postfix , == , "S" ) )
-						{
-						}
-						else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
-						{
-							penv->timeout *= 60 ;
-						}
-						else if( STRCMP( postfix , == , "h" ) || STRCMP( postfix , == , "H" ) )
-						{
-							penv->timeout *= 3600 ;
-						}
-						else
-						{
-							ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
-							return -1;
-						}
-					}
-					
-					InfoLog( __FILE__ , __LINE__ , "set timeout[%u]" , penv->timeout );
-				}
-				else if( STRCMP( property_name , == , "max_ip" ) )
-				{
-					penv->ip_connection_stat.max_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
-					if( postfix && postfix[0] )
-					{
-						if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
-						{
-							penv->ip_connection_stat.max_ip *= 1000 ;
-						}
-						else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
-						{
-							penv->ip_connection_stat.max_ip *= 1000*1000 ;
-						}
-						else
-						{
-							ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
-							return -1;
-						}
-					}
-					
-					InfoLog( __FILE__ , __LINE__ , "set max_ip[%u]" , penv->ip_connection_stat.max_ip );
-				}
-				else if( STRCMP( property_name , == , "max_connections" ) )
-				{
-					penv->ip_connection_stat.max_connections = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
-					if( postfix && postfix[0] )
-					{
-						if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
-						{
-							penv->ip_connection_stat.max_connections *= 1000 ;
-						}
-						else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
-						{
-							penv->ip_connection_stat.max_connections *= 1000*1000 ;
-						}
-						else
-						{
-							ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
-							return -1;
-						}
-					}
-					
-					InfoLog( __FILE__ , __LINE__ , "set max_connections[%u]" , penv->ip_connection_stat.max_connections );
-				}
-				else if( STRCMP( property_name , == , "max_connections_per_ip" ) )
-				{
-					penv->ip_connection_stat.max_connections_per_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
-					if( postfix && postfix[0] )
-					{
-						if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
-						{
-							penv->ip_connection_stat.max_connections_per_ip *= 1000 ;
-						}
-						else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
-						{
-							penv->ip_connection_stat.max_connections_per_ip *= 1000*1000 ;
-						}
-						else
-						{
-							ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
-							return -1;
-						}
-					}
-					
-					InfoLog( __FILE__ , __LINE__ , "set max_connections_per_ip[%u]" , penv->ip_connection_stat.max_connections_per_ip );
-				}
-				else
-				{
-					ErrorLog( __FILE__ , __LINE__ , "invalid property[%s]" , property_name );
-					return -1;
-				}
-				
-				nret = GetToken( sepchar , fp , "%1s" , sepchar ) ;
-				if( nret == EOF )
-				{
-					ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
-					return -1;
-				}
-				if( STRCMP( sepchar , == , ")" ) )
-				{
-					break;
-				}
-				else if( STRCMP( sepchar , != , "," ) )
-				{
-					ErrorLog( __FILE__ , __LINE__ , "invalid config after property[%s]" , property_name );
-					return -1;
-				}
-			}
+			nret = LoadProperty( fp , & LoadCustomProperty_GlobalProperties , penv , NULL , NULL ) ;
+			if( nret )
+				return nret;
 			
 			nret = GetToken( sepchar , fp , "%1s" , sepchar ) ;
 			if( nret == EOF )
@@ -482,7 +613,7 @@ int LoadConfig( struct ServerEnv *penv )
 			}
 			if( STRCMP( sepchar , != , ";" ) )
 			{
-				ErrorLog( __FILE__ , __LINE__ , "invalid config after property[%s]" , property_name );
+				ErrorLog( __FILE__ , __LINE__ , "expect ';' after properties" );
 				return -11;
 			}
 			
@@ -529,9 +660,13 @@ int LoadConfig( struct ServerEnv *penv )
 	if( nret != EOF )
 		return nret;
 	
-	InfoLog( __FILE__ , __LINE__ , "LoadOneRule ok" );
-	
 	/* 输出已装载转发规则到日志 */
+	InfoLog( __FILE__ , __LINE__ , "Global properties >>>" );
+	InfoLog( __FILE__ , __LINE__ , "  timeout[%u]" , penv->timeout );
+	InfoLog( __FILE__ , __LINE__ , "  max_ip[%u]" , penv->ip_connection_stat.max_ip );
+	InfoLog( __FILE__ , __LINE__ , "  max_connections[%u]" , penv->ip_connection_stat.max_connections );
+	InfoLog( __FILE__ , __LINE__ , "  max_connections_per_ip[%u]" , penv->ip_connection_stat.max_connections_per_ip );
+	
 	InfoLog( __FILE__ , __LINE__ , "forward_rule_count[%ld/%ld] >>>" , penv->forward_rule_count , penv->forward_rule_size );
 	for( forward_rule_index = 0 , p_forward_rule = penv->forward_rule_array ; forward_rule_index < penv->forward_rule_count ; forward_rule_index++ , p_forward_rule++ )
 	{

@@ -132,6 +132,9 @@
 #define FORWARD_SESSION_TYPE_CLIENT		2 /* 作为客户端连接远端服务端会话 */
 #define FORWARD_SESSION_TYPE_SERVER		3 /* 作为服务端接受远端连接会话 */
 #define FORWARD_SESSION_TYPE_MANAGER		4 /* 作为管理服务端接受远端连接会话 */
+#if 0
+#define FORWARD_SESSION_TYPE_HEARTBEAT		5 /* 作为服务端接受远端服务端心跳连接会话 */
+#endif
 
 #define FORWARD_SESSION_STATUS_UNUSED		0 /* 未使用 */
 #define FORWARD_SESSION_STATUS_READY		1 /* 准备使用 */
@@ -194,6 +197,8 @@ struct ServerNetAddress
 	
 	time_t			rtt ; /* 最近读时间戳 */
 	time_t			wtt ; /* 最近写时间戳 */
+	
+	unsigned int		heartbeat ; /* 心跳周期 */
 } ;
 
 /* 转发规则结构 */
@@ -209,6 +214,9 @@ struct ForwardRule
 	struct ForwardNetAddress	*forward_addr_array ; /* 转发端地址结构 */
 	unsigned int			forward_addr_size ; /* 转发端规则配置最大数量 */
 	unsigned int			forward_addr_count ; /* 转发端规则配置数量 */
+	
+	unsigned int			server_heartbeat ;
+	unsigned char			heartbeat_flag ;
 	
 	struct ServerNetAddress		*server_addr_array ; /* 服务端地址结构 */
 	unsigned int			server_addr_size ; /* 服务端规则配置最大数量 */
@@ -335,19 +343,26 @@ int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchChar
 int InitEnvirment( struct ServerEnv *penv );
 int InitEnvirment2( struct ServerEnv *penv );
 void CleanEnvirment( struct ServerEnv *penv );
+
 int SaveListenSockets( struct ServerEnv *penv );
 int LoadOldListenSockets( struct ServerEnv *penv );
 int CleanOldListenSockets( struct ServerEnv *penv );
+
 int AddListeners( struct ServerEnv *penv );
+
 struct ForwardSession *GetForwardSessionUnused( struct ServerEnv *penv );
 #define IsForwardSessionUsed(_p_forward_session_)	((_p_forward_session_)->status!=FORWARD_SESSION_STATUS_UNUSED?1:0)
 void SetForwardSessionUnused( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
 void SetForwardSessionUnused2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
+
 int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
 int AddTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
-int GetLastestTimeout( struct ServerEnv *penv );
 void RemoveTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session );
 void RemoveTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 );
+int GetLastestTimeout( struct ServerEnv *penv );
+int UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout );
+int UpdateTimeoutNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 , unsigned int timeout );
+
 int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int );
 int RemoveIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int );
 
