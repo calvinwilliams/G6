@@ -5,7 +5,7 @@
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL ); \
 	DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock ); \
 	_CLOSESOCKET( p_forward_session->sock ); \
-	SetForwardSessionUnused( penv , p_forward_session ); \
+	SetForwardSessionUnused( penv , p_forward_session );
 
 #define DISCONNECT_PAIR	\
 	RemoveTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
@@ -23,7 +23,7 @@
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL ); \
 	DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
 	_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
-	SetForwardSessionUnused2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
+	SetForwardSessionUnused2( penv , p_forward_session , p_forward_session->p_reverse_forward_session );
 
 static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
 {
@@ -53,7 +53,7 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	{
 		/* 对端断开连接 */
 		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock );
-		return -1;
+		return 1;
 	}
 	else if( p_forward_session->io_buffer_len == -1 )
 	{
@@ -247,24 +247,17 @@ void *ForwardThread( unsigned long forward_thread_index )
 		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		
-		while( event_count == 0 )
+		if( event_count == 0 )
 		{
-			struct rb_node		*p_node = NULL ;
-			struct ForwardSession	*p_forward_session = NULL ;
-			
-			p_node = rb_first( & (penv->timeout_rbtree) ); 
-			if (p_node == NULL)
-				break;
-			
-			p_forward_session = rb_entry( p_node , struct ForwardSession , timeout_rbnode );
-			if( p_forward_session->timeout_timestamp - GETTIMEVAL.tv_sec <= 0 )
+			while(1)
 			{
+				p_forward_session = GetExpireTimeoutNode( penv ) ;
+				if( p_forward_session == NULL )
+					break;
+				
 				ErrorLog( __FILE__ , __LINE__ , "forward session TIMEOUT" );
 				DISCONNECT_PAIR
-				continue;
 			}
-			
-			break;
 		}
 		
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
@@ -317,7 +310,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 						ErrorLog( __FILE__ , __LINE__ , "OnHeartBeatInput failed[%d]" , nret );
 						p_server_addr = p_forward_session->p_forward_rule->server_addr_array + p_forward_session->server_index ;
 						p_server_addr->server_unable = 1 ;
-						p_server_addr->timestamp_to_enable = UINTMAX_MAX ;
+						p_server_addr->timestamp_to = UINTMAX_MAX ;
 						DISCONNECT
 					}
 				}
@@ -327,7 +320,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 					ErrorLog( __FILE__ , __LINE__ , "heartbeat session EPOLLERR" );
 					p_server_addr = p_forward_session->p_forward_rule->server_addr_array + p_forward_session->server_index ;
 					p_server_addr->server_unable = 1 ;
-					p_server_addr->timestamp_to_enable = UINTMAX_MAX ;
+					p_server_addr->timestamp_to = UINTMAX_MAX ;
 					DISCONNECT
 				}
 			}
@@ -341,9 +334,13 @@ void *ForwardThread( unsigned long forward_thread_index )
 				if( p_event->events & EPOLLIN ) /* 输入事件 */
 				{
 					nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count ) ;
-					if( nret )
+					if( nret < 0 )
 					{
 						ErrorLog( __FILE__ , __LINE__ , "OnForwardInput failed[%d]" , nret );
+						DISCONNECT_PAIR
+					}
+					else if( nret > 0 )
+					{
 						DISCONNECT_PAIR
 					}
 				}

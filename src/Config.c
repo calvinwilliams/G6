@@ -166,8 +166,6 @@ int LoadCustomProperty_ForwardRuleProperties( void *p1 , void *p2 , void *p3 , c
 				return -1;
 			}
 		}
-		
-		p_forward_rule->heartbeat_flag = 1 ;
 	}
 	else
 	{
@@ -212,6 +210,12 @@ int LoadCustomProperty_ForwardRule_ServerAddrProperties( void *p1 , void *p2 , v
 	{
 		ErrorLog( __FILE__ , __LINE__ , "invalid property[%s]" , property_name );
 		return -1;
+	}
+	
+	if( p_server_addr->heartbeat > 0 )
+	{
+		p_server_addr->server_unable = 1 ;
+		p_server_addr->timestamp_to = 0 ;
 	}
 	
 	return 0;
@@ -419,17 +423,9 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		
 		SetNetAddress( & (p_server_addr->netaddr) );
 		
-		if( p_server_addr->heartbeat == 0 && p_forward_rule->server_heartbeat > 0 )
+		if( p_forward_rule->server_addr_array[p_forward_rule->server_addr_count].heartbeat == 0 && p_forward_rule->server_heartbeat > 0 )
 		{
-			p_server_addr->heartbeat = p_forward_rule->server_heartbeat ;
-		}
-		
-		if( p_server_addr->heartbeat > 0 )
-		{
-			p_server_addr->server_unable = 1 ;
-			p_server_addr->timestamp_to_enable = UINTMAX_MAX ;
-			
-			p_forward_rule->heartbeat_flag = 1 ;
+			p_forward_rule->server_addr_array[p_forward_rule->server_addr_count].heartbeat = p_forward_rule->server_heartbeat ;
 		}
 		
 		p_forward_rule->server_addr_count++;

@@ -544,12 +544,13 @@ void SetForwardSessionUnused2( struct ServerEnv *penv , struct ForwardSession *p
 
 int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
 {
-        struct rb_node		**pp_new_node = &(penv->timeout_rbtree.rb_node) ;
+        struct rb_node		**pp_new_node = NULL ;
         struct rb_node		*p_parent = NULL ;
         struct ForwardSession	*p = NULL ;
 
 	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 	
+	pp_new_node = & (penv->timeout_rbtree.rb_node) ;
         while( *pp_new_node )
         {
                 p = container_of( *pp_new_node , struct ForwardSession , timeout_rbnode );
@@ -641,7 +642,7 @@ int UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward
 {
 	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 	
-	p_forward_session->timeout_timestamp = time(NULL) + timeout ;
+	p_forward_session->timeout_timestamp = timeout ;
 	rb_insert_color( &(p_forward_session->timeout_rbnode) , &(penv->timeout_rbtree) );
 	
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
@@ -653,15 +654,41 @@ int UpdateTimeoutNode2( struct ServerEnv *penv , struct ForwardSession *p_forwar
 {
 	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
 	
-	p_forward_session->timeout_timestamp = time(NULL) + timeout ;
+	p_forward_session->timeout_timestamp = timeout ;
 	rb_insert_color( &(p_forward_session->timeout_rbnode) , &(penv->timeout_rbtree) );
 	
-	p_forward_session2->timeout_timestamp = time(NULL) + timeout ;
+	p_forward_session2->timeout_timestamp = timeout ;
 	rb_insert_color( &(p_forward_session2->timeout_rbnode) , &(penv->timeout_rbtree) );
 	
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 	
 	return 0;
+}
+
+struct ForwardSession *GetExpireTimeoutNode( struct ServerEnv *penv )
+{
+	struct rb_node		*p_node = NULL ;
+	struct ForwardSession	*p_forward_session = NULL ;
+	
+	pthread_mutex_lock( & (penv->timeout_rbtree_mutex) );
+	
+	p_node = rb_first( & (penv->timeout_rbtree) ); 
+	if (p_node == NULL)
+	{
+		pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
+		return NULL;
+	}
+	
+	p_forward_session = rb_entry( p_node , struct ForwardSession , timeout_rbnode );
+	if( p_forward_session->timeout_timestamp - GETTIMEVAL.tv_sec <= 0 )
+	{
+		pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
+		return p_forward_session;
+	}
+	
+	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
+	
+	return NULL;
 }
 
 static int _AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int )

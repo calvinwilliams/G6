@@ -190,15 +190,15 @@ struct ServerNetAddress
 {
 	struct NetAddress	netaddr ; /* 网络地址结构 */
 	
+	unsigned int		heartbeat ; /* 心跳周期 */
+	
 	unsigned char		server_unable ; /* 服务端可用标志 */
-	time_t			timestamp_to_enable ; /* 恢复正常秒戳 */
+	time_t			timestamp_to ; /* 恢复正常秒戳 */
 	
 	unsigned int		server_connection_count ; /* 服务端连接数量 */
 	
 	time_t			rtt ; /* 最近读时间戳 */
 	time_t			wtt ; /* 最近写时间戳 */
-	
-	unsigned int		heartbeat ; /* 心跳周期 */
 } ;
 
 /* 转发规则结构 */
@@ -216,7 +216,6 @@ struct ForwardRule
 	unsigned int			forward_addr_count ; /* 转发端规则配置数量 */
 	
 	unsigned int			server_heartbeat ;
-	unsigned char			heartbeat_flag ;
 	
 	struct ServerNetAddress		*server_addr_array ; /* 服务端地址结构 */
 	unsigned int			server_addr_size ; /* 服务端规则配置最大数量 */
@@ -362,6 +361,7 @@ void RemoveTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_f
 int GetLastestTimeout( struct ServerEnv *penv );
 int UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session , unsigned int timeout );
 int UpdateTimeoutNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 , unsigned int timeout );
+struct ForwardSession *GetExpireTimeoutNode( struct ServerEnv *penv );
 
 int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int );
 int RemoveIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int );
