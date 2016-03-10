@@ -99,7 +99,6 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 		/* 一次全发完 */
 		InfoLog( __FILE__ , __LINE__ , "transfer #%d# [%d]bytes to #%d#" , p_forward_session->sock , len , p_forward_session->p_reverse_forward_session->sock );
 		p_forward_session->io_buffer_len = 0 ;
-DebugLog( __FILE__ , __LINE__ , "OnForwardInput - 111" );
 	}
 	else
 	{
@@ -290,6 +289,10 @@ void *ForwardThread( unsigned long forward_thread_index )
 					{
 						DISCONNECT_PAIR
 					}
+					else
+					{
+						UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , time(NULL) + penv->timeout );
+					}
 				}
 				else if( p_event->events & EPOLLOUT ) /* 输出事件 */
 				{
@@ -299,6 +302,10 @@ void *ForwardThread( unsigned long forward_thread_index )
 						ErrorLog( __FILE__ , __LINE__ , "OnForwardOutput failed[%d]" , nret );
 						DISCONNECT_PAIR
 					}
+					else
+					{
+						UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , time(NULL) + penv->timeout );
+					}
 				}
 				else
 				{
@@ -306,8 +313,6 @@ void *ForwardThread( unsigned long forward_thread_index )
 					DISCONNECT_PAIR
 					continue;
 				}
-				
-				UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , time(NULL) + penv->timeout );
 			}
 		}
 	}

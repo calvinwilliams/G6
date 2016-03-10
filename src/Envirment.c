@@ -544,7 +544,6 @@ void SetForwardSessionUnused2( struct ServerEnv *penv , struct ForwardSession *p
 
 static void _RemoveTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
 {
-DebugLog( __FILE__ , __LINE__ , "_RemoveTimeoutTreeNode[%p] - 111" , p_forward_session );
 	rb_erase( & (p_forward_session->timeout_rbnode) , & (penv->timeout_rbtree) );
 	return;
 }
@@ -578,7 +577,6 @@ static int _AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *
         struct rb_node		*p_parent = NULL ;
         struct ForwardSession	*p = NULL ;
 	
-DebugLog( __FILE__ , __LINE__ , "_AddTimeoutTreeNode[%p] - 111" , p_forward_session );
 	pp_new_node = & (penv->timeout_rbtree.rb_node) ;
         while( *pp_new_node )
         {
@@ -593,11 +591,8 @@ DebugLog( __FILE__ , __LINE__ , "_AddTimeoutTreeNode[%p] - 111" , p_forward_sess
                         pp_new_node = &((*pp_new_node)->rb_left) ;
         }
 	
-DebugLog( __FILE__ , __LINE__ , "_AddTimeoutTreeNode - 444" );
         rb_link_node( & (p_forward_session->timeout_rbnode) , p_parent , pp_new_node );
-DebugLog( __FILE__ , __LINE__ , "_AddTimeoutTreeNode - 555" );
         rb_insert_color( & (p_forward_session->timeout_rbnode) , &(penv->timeout_rbtree) );
-DebugLog( __FILE__ , __LINE__ , "_AddTimeoutTreeNode - 666" );
 	
 	return 0;
 }

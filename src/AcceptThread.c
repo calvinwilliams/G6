@@ -316,6 +316,8 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		
 		forward_thread_index = (p_reverse_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
 		
+		AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_reverse_forward_session->p_reverse_forward_session );
+		
 		memset( & event , 0x00 , sizeof(struct epoll_event) );
 		event.data.ptr = p_reverse_forward_session ;
 		event.events = EPOLLIN | EPOLLERR ;
@@ -325,10 +327,6 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		event.data.ptr = p_reverse_forward_session->p_reverse_forward_session ;
 		event.events = EPOLLIN | EPOLLERR ;
 		epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_MOD , p_reverse_forward_session->p_reverse_forward_session->sock , & event );
-		
-DebugLog( __FILE__ , __LINE__ , "TryToConnectServer - 111 - AddTimeoutTreeNode2" );
-		AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_reverse_forward_session->p_reverse_forward_session );
-DebugLog( __FILE__ , __LINE__ , "TryToConnectServer - 222 - AddTimeoutTreeNode2" );
 		
 		nret = write( penv->forward_request_pipe[forward_thread_index].fds[1] , "L" , 1 ) ;
 	}
@@ -421,75 +419,6 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 		}
 		else
 		{
-#if 0
-			if( p_listen_session->p_forward_rule->heartbeat_flag == 1 )
-			{
-				unsigned int		server_addr_index ;
-				struct ServerNetAddress	*p_server_addr = NULL ;
-				unsigned int		flag ;
-				
-				flag = 0 ;
-				for( server_addr_index = 0 , p_server_addr = p_listen_session->p_forward_rule->server_addr_array ; server_addr_index < p_listen_session->p_forward_rule->server_addr_count ; server_addr_index++ , p_server_addr++ )
-				{
-					if( p_server_addr->heartbeat > 0 && p_server_addr->netaddr.sockaddr.sin_addr.s_addr == netaddr.sockaddr.sin_addr.s_addr )
-					{
-						unsigned int		forward_thread_index ;
-						
-						for( server_addr_index = 0 , p_server_addr = p_listen_session->p_forward_rule->server_addr_array ; server_addr_index < p_listen_session->p_forward_rule->server_addr_count ; server_addr_index++ , p_server_addr++ )
-						{
-							if( p_server_addr->netaddr.sockaddr.sin_addr.s_addr == netaddr.sockaddr.sin_addr.s_addr )
-							{
-							}
-						}
-						
-						
-						
-						
-						
-						
-						p_server_addr->server_unable = 0 ;
-						
-						/* 获取一个空闲会话结构 */
-						p_forward_session = GetForwardSessionUnused( penv ) ;
-						if( p_forward_session == NULL )
-						{
-							ErrorLog( __FILE__ , __LINE__ , "GetForwardSessionUnused failed" );
-							DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
-							_CLOSESOCKET( sock );
-							break;
-						}
-						
-						/* 登记epoll池 */
-						p_forward_session->p_forward_rule = p_listen_session->p_forward_rule ;
-						p_forward_session->p_reverse_forward_session = NULL ;
-						p_forward_session->type = FORWARD_SESSION_TYPE_HEARTBEAT ;
-						p_forward_session->sock = sock ;
-						memcpy( & (p_forward_session->netaddr) , & netaddr , sizeof(struct NetAddress) );
-						p_forward_session->forward_index = p_listen_session->forward_index ;
-						p_forward_session->server_index = server_addr_index ;
-						
-						p_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
-						p_forward_session->timeout_timestamp = time(NULL) + p_server_addr->heartbeat ;
-						
-						AddTimeoutTreeNode( penv , p_forward_session );
-						
-						forward_thread_index = (p_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
-						
-						memset( & event , 0x00 , sizeof(struct epoll_event) );
-						event.data.ptr = p_forward_session ;
-						event.events = EPOLLIN | EPOLLERR ;
-						epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_ADD , p_forward_session->sock , & event );
-						
-						write( penv->forward_request_pipe[forward_thread_index].fds[1] , " " , 1 );
-						
-						flag = 1 ;
-					}
-				}
-				if( flag == 1 )
-					continue;
-			}
-#endif
-			
 			/* 获取两个空闲会话结构 */
 			p_forward_session = GetForwardSessionUnused( penv ) ;
 			if( p_forward_session == NULL )
@@ -608,6 +537,8 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	
 	forward_thread_index = (p_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
 	
+	AddTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session );
+	
 	memset( & event , 0x00 , sizeof(struct epoll_event) );
 	event.data.ptr = p_forward_session ;
 	event.events = EPOLLIN | EPOLLERR ;
@@ -617,10 +548,6 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	event.data.ptr = p_forward_session->p_reverse_forward_session ;
 	event.events = EPOLLIN | EPOLLERR ;
 	epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_ADD , p_forward_session->p_reverse_forward_session->sock , & event );
-	
-DebugLog( __FILE__ , __LINE__ , "OnConnectingServer - 111 - AddTimeoutTreeNode2" );
-	AddTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session );
-DebugLog( __FILE__ , __LINE__ , "OnConnectingServer - 222 - AddTimeoutTreeNode2" );
 	
 	write( penv->forward_request_pipe[forward_thread_index].fds[1] , " " , 1 );
 	
