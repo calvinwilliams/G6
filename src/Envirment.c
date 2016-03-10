@@ -126,6 +126,7 @@ int InitEnvirment( struct ServerEnv *penv )
 	pthread_mutex_init( & (penv->forward_session_count_mutex) , NULL );
 	pthread_mutex_init( & (penv->server_connection_count_mutex) , NULL );
 	pthread_mutex_init( & (penv->timeout_rbtree_mutex) , NULL );
+	pthread_mutex_init( & (penv->time_cache_mutex) , NULL );
 	
 	return 0;
 }
@@ -206,6 +207,7 @@ void CleanEnvirment( struct ServerEnv *penv )
 	pthread_mutex_destroy( & (penv->forward_session_count_mutex) );
 	pthread_mutex_destroy( & (penv->server_connection_count_mutex) );
 	pthread_mutex_destroy( & (penv->timeout_rbtree_mutex) );
+	pthread_mutex_destroy( & (penv->time_cache_mutex) );
 	
 	return;
 }
@@ -720,7 +722,7 @@ struct ForwardSession *GetExpireTimeoutNode( struct ServerEnv *penv )
 	}
 	
 	p_forward_session = rb_entry( p_node , struct ForwardSession , timeout_rbnode );
-	if( p_forward_session->timeout_timestamp - GETTIMEVAL.tv_sec <= 0 )
+	if( p_forward_session->timeout_timestamp - g_time_tv.tv_sec <= 0 )
 	{
 		pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 		return p_forward_session;

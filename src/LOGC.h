@@ -90,10 +90,10 @@ void CloseLogFile();
 void SetLogLevel( int log_level );
 
 extern TLS struct timeval	g_time_tv ;
+extern TLS char			g_date_and_time[ 10 + 1 + 8 + 1 ] ;
 extern TLS unsigned long	g_pid ;
 extern TLS unsigned long	g_tid ;
 
-#define GETTIMEVAL		g_time_tv
 #define SETPID			g_pid = PROCESSID ;
 #define SETTID			g_tid = THREADID ;
 

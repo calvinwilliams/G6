@@ -14,10 +14,11 @@ c_FILE		=	\
 			main.c \
 			Envirment.c \
 			Config.c \
-			AcceptThread.c \
-			ForwardThread.c \
 			MonitorProcess.c \
 			WorkerProcess.c \
+			AcceptThread.c \
+			ForwardThread.c \
+			TimeThread.c \
 
 ###### 目标文件、安装目录配置区
 include makeinstall

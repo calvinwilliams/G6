@@ -8,12 +8,24 @@ int WorkerProcess( struct ServerEnv *penv )
 	int			nret = 0 ;
 	
 	/* 设置日志输出文件 */
+	INIT_TIME
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess ---" );
 	
 	signal( SIGTERM , SIG_IGN );
 	signal( SIGUSR1 , SIG_IGN );
 	signal( SIGUSR2 , SIG_IGN );
-	g_penv = penv ;
+	
+	/* 创建时间管理线程 */
+	nret = pthread_create( & (penv->time_thread_tid) , NULL , & _TimeThread , NULL ) ;
+	if( nret )
+	{
+		ErrorLog( __FILE__ , __LINE__ , "pthread_create time thread failed , errno[%d]" , errno );
+		return -1;
+	}
+	else
+	{
+		InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_create TimeThread[%lu]" , pthread_self() , penv->time_thread_tid );
+	}
 	
 	/* 创建转发子线程 */
 	for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
@@ -35,23 +47,30 @@ int WorkerProcess( struct ServerEnv *penv )
 		}
 		else
 		{
-			InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_create [%lu]" , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
+			InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_create ForwardThread[%lu]" , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
 		}
 	}
 	
 	/* 主线程为连接接受线程 */
 	_AcceptThread( (void*)penv );
 	
-	/* 发送退出命令字符，回收数据收发线程 */
+	/* 等待回收时间管理线程 */
+	InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_join TimeThread[%lu] ..." , pthread_self() , penv->time_thread_tid );
+	pthread_join( penv->time_thread_tid , NULL );
+	InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_join TimeThread[%lu] ok" , pthread_self() , penv->time_thread_tid );
+	
+	/* 发送退出命令字符，等待回收数据收发线程 */
 	for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
 	{
+		INIT_TIME
+		
 		InfoLog( __FILE__ , __LINE__ , "write forward_request_pipe Q ..." );
 		nret = write( penv->forward_request_pipe[forward_thread_index].fds[1] , "Q" , 1 ) ;
 		InfoLog( __FILE__ , __LINE__ , "write forward_request_pipe Q done[%d]" , nret );
 		
-		InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_join [%lu] ..." , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
+		InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_join ForwardThread[%lu] ..." , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
 		pthread_join( penv->forward_thread_tid_array[forward_thread_index] , NULL );
-		InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_join [%lu] ok" , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
+		InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_join ForwardThread[%lu] ok" , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
 	}
 	
 	return 0;

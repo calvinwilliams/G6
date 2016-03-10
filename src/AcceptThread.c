@@ -27,12 +27,12 @@ static int MatchClientAddr( struct NetAddress *p_netaddr , struct ForwardRule *p
 }
 
 #define IF_SERVER_ENABLE(_server_addr_) \
-	if( (_server_addr_).server_unable == 1 && (_server_addr_).timestamp_to > 0 && GETTIMEVAL.tv_sec > (_server_addr_).timestamp_to ) \
+	if( (_server_addr_).server_unable == 1 && (_server_addr_).timestamp_to > 0 && g_time_tv.tv_sec > (_server_addr_).timestamp_to ) \
 	{ \
 		(_server_addr_).server_unable = 0 ; \
 		(_server_addr_).timestamp_to = (_server_addr_).heartbeat ; \
 	} \
-	else if( (_server_addr_).server_unable == 0 && (_server_addr_).timestamp_to > 0 && GETTIMEVAL.tv_sec > (_server_addr_).timestamp_to ) \
+	else if( (_server_addr_).server_unable == 0 && (_server_addr_).timestamp_to > 0 && g_time_tv.tv_sec > (_server_addr_).timestamp_to ) \
 	{ \
 		(_server_addr_).server_unable = 1 ; \
 		(_server_addr_).timestamp_to = 0 ; \
@@ -222,7 +222,7 @@ static int ResolveConnectingError( struct ServerEnv *penv , struct ForwardSessio
 	/* 设置服务端不可用 */
 	p_servers_addr = p_reverse_forward_session->p_forward_rule->server_addr_array + p_reverse_forward_session->server_index ;
 	p_servers_addr->server_unable = 1 ;
-	p_servers_addr->timestamp_to = GETTIMEVAL.tv_sec + penv->timeout ;
+	p_servers_addr->timestamp_to = g_time_tv.tv_sec + penv->timeout ;
 	
 	/* 非堵塞连接服务端 */
 	nret = TryToConnectServer( penv , p_reverse_forward_session ) ;
@@ -731,7 +731,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 				if( STRCMP( p_servers_addr->netaddr.ip , == , ip ) && p_servers_addr->netaddr.port.port_int == port_int )
 				{
 					p_servers_addr->server_unable = 1 ;
-					p_servers_addr->timestamp_to = GETTIMEVAL.tv_sec + atoi(disable_timeout) ;
+					p_servers_addr->timestamp_to = g_time_tv.tv_sec + atoi(disable_timeout) ;
 					
 					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d unable\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 					send( sock , io_buffer , io_buffer_len , 0 );
@@ -833,7 +833,7 @@ static int OnReceiveCommand( struct ServerEnv *penv , struct ForwardSession *p_f
 	{
 		/* 对端断开连接 */
 		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock );
-		return -1;
+		return 1;
 	}
 	else if( len == -1 )
 	{
@@ -882,11 +882,14 @@ void *AcceptThread( struct ServerEnv *penv )
 	/* 设置日志输出文件 */
 	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
 	SetLogLevel( penv->cmd_para.log_level );
+	INIT_TIME
+	SETPID
+	SETTID
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.AcceptThread ---" );
 	
 	/* 主工作循环 */
 	g_exit_flag = 0 ;
-	while( ! ( g_exit_flag == 1 && penv->forward_session_count == 0 ) )
+	while( g_exit_flag == 0 || penv->forward_session_count > 0 )
 	{
 		if( g_exit_flag == 1 )
 			timeout = 1000 ;
@@ -896,6 +899,7 @@ void *AcceptThread( struct ServerEnv *penv )
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]... timeout[%d]" , penv->accept_request_pipe.fds[0] , timeout );
 		CloseLogFile();
 		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
+		UPDATE_TIME
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
@@ -907,9 +911,9 @@ void *AcceptThread( struct ServerEnv *penv )
 				
 				DebugLog( __FILE__ , __LINE__ , "pipe session event" );
 				
-				InfoLog( __FILE__ , __LINE__ , "read accept_request_pipe ..." );
+				DebugLog( __FILE__ , __LINE__ , "read accept_request_pipe ..." );
 				nret = read( penv->accept_request_pipe.fds[0] , & command , 1 ) ;
-				InfoLog( __FILE__ , __LINE__ , "read accept_request_pipe done[%d][%c]" , nret , command );
+				DebugLog( __FILE__ , __LINE__ , "read accept_request_pipe done[%d][%c]" , nret , command );
 				if( nret == -1 )
 				{
 					ErrorLog( __FILE__ , __LINE__ , "read request pipe failed , errno[%d]" , errno );
@@ -930,9 +934,9 @@ void *AcceptThread( struct ServerEnv *penv )
 						
 						for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
 						{
-							InfoLog( __FILE__ , __LINE__ , "write forward_request_pipe L ..." );
+							DebugLog( __FILE__ , __LINE__ , "write forward_request_pipe L ..." );
 							nret = write( penv->forward_request_pipe[forward_thread_index].fds[1] , "L" , 1 ) ;
-							InfoLog( __FILE__ , __LINE__ , "write forward_request_pipe L done[%d]" , nret );
+							DebugLog( __FILE__ , __LINE__ , "write forward_request_pipe L done[%d]" , nret );
 						}
 					}
 					else if( command == 'Q' )
@@ -954,9 +958,9 @@ void *AcceptThread( struct ServerEnv *penv )
 						g_exit_flag = 1 ;
 						DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
 						
-						InfoLog( __FILE__ , __LINE__ , "write accept_response_pipe Q ..." );
+						DebugLog( __FILE__ , __LINE__ , "write accept_response_pipe Q ..." );
 						nret = write( penv->accept_response_pipe.fds[1] , "Q" , 1 ) ;
-						InfoLog( __FILE__ , __LINE__ , "write accept_response_pipe Q done[%d]" , nret );
+						DebugLog( __FILE__ , __LINE__ , "write accept_response_pipe Q done[%d]" , nret );
 					}
 				}
 			}
@@ -1021,7 +1025,15 @@ void *AcceptThread( struct ServerEnv *penv )
 			else if( p_forward_session->status == FORWARD_SESSION_STATUS_COMMAND )
 			{
 				nret = OnReceiveCommand( penv , p_forward_session ) ;
-				if( nret )
+				if( nret > 0 )
+				{
+					RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_forward_session->p_forward_rule->client_addr_array[p_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr );
+					epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+					DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+					_CLOSESOCKET( p_forward_session->sock );
+					SetForwardSessionUnused( penv , p_forward_session );
+				}
+				else if( nret < 0 )
 				{
 					ErrorLog( __FILE__ , __LINE__ , "OnReceiveCommand failed[%d]" , nret );
 					RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_forward_session->p_forward_rule->client_addr_array[p_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr );

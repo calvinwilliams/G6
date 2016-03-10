@@ -34,6 +34,7 @@ int main( int argc , char *argv[] )
 	
 	/* 初始化服务器环境 */
 	memset( penv , 0x00 , sizeof(struct ServerEnv) );
+	g_penv = penv ;
 	
 	/* 初始化命令行参数 */
 	memset( & (penv->cmd_para) , 0x00 , sizeof(struct CommandParameter) );
@@ -52,6 +53,7 @@ int main( int argc , char *argv[] )
 	/* 设置日志输出文件 */
 	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
 	SetLogLevel( penv->cmd_para.log_level );
+	INIT_TIME
 	SETPID
 	SETTID
 	

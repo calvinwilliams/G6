@@ -285,8 +285,20 @@ struct IpConnectionStat
 	unsigned int			ip_connection_stat_size ; /* 最大IP-CONNECTION数量 */
 } ;
 
+#define INIT_TIME \
+	UpdateTimeNow( & g_time_tv , g_date_and_time ); \
+
+#define UPDATE_TIME \
+	pthread_mutex_lock( & (penv->time_cache_mutex) ); \
+	g_time_tv.tv_sec = penv->time_tv.tv_sec ; \
+	memcpy( g_date_and_time , penv->date_and_time , sizeof(penv->date_and_time) ); \
+	pthread_mutex_unlock( & (penv->time_cache_mutex) );
+
 struct ServerEnv
 {
+	struct timeval			time_tv ;
+	char				date_and_time[ sizeof(g_date_and_time) ] ;
+	
 	struct CommandParameter		cmd_para ; /* 命令行参数结构 */
 	char				**argv ;
 	
@@ -306,20 +318,22 @@ struct ServerEnv
 	unsigned int			forward_session_count ; /* 通讯会话数组大小 */
 	unsigned int			forward_session_use_offsetpos ; /* 转发会话最近使用单元偏移量 */
 	
-	pid_t				pid ; /* 子进程PID */
-	struct PipeFds			accept_request_pipe ; /* 父子进程请求命令管道 */
-	struct PipeFds			accept_response_pipe ; /* 父子进程响应命令管道 */
+	pid_t				pid ; /* 工作进程PID */
+	struct PipeFds			accept_request_pipe ; /* 工作进程请求命令管道 */
+	struct PipeFds			accept_response_pipe ; /* 工作进程响应命令管道 */
 	int				accept_epoll_fd ; /* 侦听端口epoll池 */
 	
-	pthread_t			*forward_thread_tid_array ; /* 子线程TID */
-	struct PipeFds			*forward_request_pipe ; /* 父子线程请求命令管道 */
-	struct PipeFds			*forward_response_pipe ; /* 父子线程响应命令管道 */
+	pthread_t			time_thread_tid ; /* 时间管理线程 */
+	pthread_t			*forward_thread_tid_array ; /* 分发线程TID */
+	struct PipeFds			*forward_request_pipe ; /* 分发线程请求命令管道 */
+	struct PipeFds			*forward_response_pipe ; /* 分发线程响应命令管道 */
 	int				*forward_epoll_fd_array ; /* 数据收发epoll池 */
 	
 	pthread_mutex_t			ip_connection_stat_mutex ; /* IP-CONNECTION统计 临界区互斥 */
 	pthread_mutex_t			forward_session_count_mutex ; /* 通讯会话数量 临界区互斥 */
 	pthread_mutex_t			server_connection_count_mutex ; /* 服务端连接数量 临界区互斥 */
 	pthread_mutex_t			timeout_rbtree_mutex ; /* 超时红黑树 临界区互斥 */
+	pthread_mutex_t			time_cache_mutex ; /* 超时红黑树 临界区互斥 */
 } ;
 
 /********* util *********/
@@ -389,6 +403,12 @@ void *_AcceptThread( void *pv );
 
 void *ForwardThread( unsigned long forward_thread_index );
 void *_ForwardThread( void *pv );
+
+/********* TimeThread *********/
+
+void UpdateTimeNow( struct timeval *p_time_tv , char *p_date_and_time );
+void *TimeThread();
+void *_TimeThread( void *pv );
 
 #endif
 

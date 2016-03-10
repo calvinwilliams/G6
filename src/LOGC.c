@@ -23,6 +23,7 @@ TLS char		g_log_pathfilename[ MAXLEN_FILENAME + 1 ] = "" ;
 TLS int			g_log_level = LOGLEVEL_INFO ;
 TLS int			g_file_fd = -1 ;
 TLS struct timeval	g_time_tv = { 0 , 0 } ;
+TLS char		g_date_and_time[ 10 + 1 + 8 + 1 ] = "" ;
 TLS unsigned long	g_pid = 0 ;
 TLS unsigned long	g_tid = 0 ;
 
@@ -82,8 +83,6 @@ static int WriteLogBase( int log_level , char *c_filename , long c_fileline , ch
 	char		c_filename_copy[ MAXLEN_FILENAME + 1 ] ;
 	char		*p_c_filename = NULL ;
 	
-	struct tm	stime ;
-	
 	char		log_buffer[ 1024 + 1 ] ;
 	char		*log_bufptr = NULL ;
 	size_t		log_buflen ;
@@ -102,33 +101,17 @@ static int WriteLogBase( int log_level , char *c_filename , long c_fileline , ch
 		p_c_filename = c_filename_copy ;
 
 	/* 填充行日志 */
-#if ( defined __linux__ ) || ( defined __unix ) || ( defined _AIX )
-	gettimeofday( & g_time_tv , NULL );
-	localtime_r( &(g_time_tv.tv_sec) , & stime );
-#elif ( defined _WIN32 )
-	{
-	SYSTEMTIME	stNow ;
-	GetLocalTime( & stNow );
-	time( & (g_time_tv.tv_sec) );
-	g_time_tv.tv_usec = stNow.wMilliseconds * 1000 ;
-	stime.tm_year = stNow.wYear - 1900 ;
-	stime.tm_mon = stNow.wMonth - 1 ;
-	stime.tm_mday = stNow.wDay ;
-	stime.tm_hour = stNow.wHour ;
-	stime.tm_min = stNow.wMinute ;
-	stime.tm_sec = stNow.wSecond ;
-	}
-#endif
-
 	memset( log_buffer , 0x00 , sizeof(log_buffer) );
 	log_bufptr = log_buffer ;
 	log_buflen = 0 ;
 	log_buf_remain_len = sizeof(log_buffer) - 1 ;
 	
-	len = strftime( log_bufptr , log_buf_remain_len , "%Y-%m-%d %H:%M:%S" , & stime ) ;
+	len = SNPRINTF( log_bufptr , log_buf_remain_len , "%s" , g_date_and_time ) ;
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
+	/*
 	len = SNPRINTF( log_bufptr , log_buf_remain_len , ".%06ld" , (long)(g_time_tv.tv_usec) ) ;
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
+	*/
 	len = SNPRINTF( log_bufptr , log_buf_remain_len , " | %-5s" , log_level_itoa[log_level] ) ;
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
 	len = SNPRINTF( log_bufptr , log_buf_remain_len , " | %lu:%lu:%s:%ld | " , g_pid , g_tid , p_c_filename , c_fileline ) ;
@@ -260,7 +243,10 @@ static int WriteHexLogBase( int log_level , char *c_filename , long c_fileline ,
 		return -1;
 	
 	/* 输出行日志 */
-	WriteLogBase( log_level , c_filename , c_fileline , format , valist );
+	if( format )
+	{
+		WriteLogBase( log_level , c_filename , c_fileline , format , valist );
+	}
 	
 	/* 填充十六进制块日志 */
 	memset( hexlog_buffer , 0x00 , sizeof(hexlog_buffer) );

@@ -125,6 +125,7 @@ int MonitorProcess( struct ServerEnv *penv )
 	int			nret = 0 ;
 	
 	/* 设置日志输出文件 */
+	INIT_TIME
 	SETPID
 	SETTID
 	InfoLog( __FILE__ , __LINE__ , "--- G6.MonitorProcess ---" );
@@ -137,7 +138,6 @@ int MonitorProcess( struct ServerEnv *penv )
 	signal( SIGCLD , SIG_DFL );
 	signal( SIGCHLD , SIG_DFL );
 	signal( SIGPIPE , SIG_IGN );
-	g_penv = penv ;
 	sigaction( SIGTERM , & act , NULL );
 	sigaction( SIGUSR1 , & act , NULL );
 	sigaction( SIGUSR2 , & act , NULL );
@@ -161,6 +161,7 @@ int MonitorProcess( struct ServerEnv *penv )
 		}
 		else if( penv->pid == 0 )
 		{
+			INIT_TIME
 			SETPID
 			SETTID
 			
@@ -188,6 +189,7 @@ int MonitorProcess( struct ServerEnv *penv )
 		/* 监控子进程结束 */
 		_WAITPID :
 		pid = waitpid( -1 , & status , 0 );
+		INIT_TIME
 		if( pid == -1 )
 		{
 			if( errno == EINTR )
