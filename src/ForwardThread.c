@@ -1,6 +1,7 @@
 #include "G6.h"
 
 #define DISCONNECT \
+	IgnoreReverseSessionEvents( p_forward_session , events , event_index , event_count ); \
 	RemoveTimeoutTreeNode( penv , p_forward_session ); \
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL ); \
 	DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock ); \
@@ -8,6 +9,7 @@
 	SetForwardSessionUnused( penv , p_forward_session );
 
 #define DISCONNECT_PAIR	\
+	IgnoreReverseSessionEvents( p_forward_session , events , event_index , event_count ); \
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL ); \
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL ); \
 	RemoveTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
@@ -23,11 +25,14 @@
 	} \
 	DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
 	_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
-	SetForwardSessionUnused2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
+	SetForwardSessionUnused2( penv , p_forward_session , p_forward_session->p_reverse_forward_session );
 
 static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
 {
 	struct epoll_event	*p_event = NULL ;
+	
+	if( event_count == 0 )
+		return;
 	
 	for( ++event_index , p_event = p_events + event_index ; event_index < event_count ; event_index++ , p_event++ )
 	{
@@ -53,14 +58,12 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	{
 		/* 对端断开连接 */
 		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock );
-		IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
 		return 1;
 	}
 	else if( p_forward_session->io_buffer_len == -1 )
 	{
 		/* 通讯接收出错 */
 		ErrorLog( __FILE__ , __LINE__ , "recv #%d# failed , errno[%d]" , p_forward_session->sock , errno );
-		IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
 		return -1;
 	}
 	
@@ -93,7 +96,6 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 		{
 			/* 通讯发送出错 */
 			ErrorLog( __FILE__ , __LINE__ , "send #%d# failed , errno[%d]" , p_forward_session->sock , errno );
-			IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
 			return -1;
 		}
 	}
@@ -152,7 +154,6 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 		{
 			/* 通讯发送出错 */
 			ErrorLog( __FILE__ , __LINE__ , "send #%d# failed , errno[%d]" , p_forward_session->sock , errno );
-			IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
 			return -1;
 		}
 	}
@@ -201,7 +202,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 	int			timeout ;
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
 	int			event_count ;
-	int			event_index ;
+	int			event_index = 0 ;
 	struct epoll_event	*p_event = NULL ;
 	
 	struct ForwardSession	*p_forward_session = NULL ;
@@ -319,7 +320,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 						UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , time(NULL) + penv->timeout );
 					}
 				}
-				else if( p_event->events & EPOLLERR ) /* 错误事件 */
+				else if( p_event->events ) /* 错误事件 */
 				{
 					ErrorLog( __FILE__ , __LINE__ , "forward session EPOLLERR" );
 					DISCONNECT_PAIR
