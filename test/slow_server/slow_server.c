@@ -99,7 +99,7 @@ int slow_server( int port )
 		}
 		else
 		{
-			printf( "read [%d/%d]bytes from socket , total[%d]\n" , read_len , sizeof(buffer)-1 , total_size+read_len );
+			printf( "read [%d/%d]bytes from socket , total[%d]\n" , read_len , (int)sizeof(buffer)-1 , total_size+read_len );
 		}
 		
 		write_len = fwrite( buffer , 1 , read_len , fp ) ;
