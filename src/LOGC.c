@@ -65,8 +65,11 @@ void SetLogFile( char *format , ... )
 /* 关闭日志文件 */
 void CloseLogFile()
 {
-	CLOSE( g_file_fd );
-	g_file_fd = -1 ;
+	if( g_file_fd != -1 )
+	{
+		CLOSE( g_file_fd );
+		g_file_fd = -1 ;
+	}
 }
 
 /* 设置日志等级 */
@@ -122,19 +125,16 @@ static int WriteLogBase( int log_level , char *c_filename , long c_fileline , ch
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
 	
 	/* 输出行日志 */
-	if( STRCMP( g_log_pathfilename , == , "#stdout" ) )
+	if( g_file_fd == -1 )
 	{
-		printf( "%.*s" , (int)log_buflen , log_buffer );
-	}
-	else if( g_log_pathfilename[0] )
-	{
-		if( g_file_fd == -1 )
-		{
-			nret = OpenLogFile() ;
-			if( nret )
-				return nret;
-		}
+		nret = OpenLogFile() ;
+		if( nret )
+			return nret;
 		
+		WRITE( g_file_fd , log_buffer , log_buflen );
+	}
+	else
+	{
 		WRITE( g_file_fd , log_buffer , log_buflen );
 	}
 	
@@ -309,19 +309,16 @@ static int WriteHexLogBase( int log_level , char *c_filename , long c_fileline ,
 	}
 	
 	/* 输出十六进制块日志 */
-	if( STRCMP( g_log_pathfilename , == , "#stdout" ) )
+	if( g_file_fd == -1 )
 	{
-		printf( "%.*s" , (int)hexlog_buflen , hexlog_buffer );
-	}
-	else if( g_log_pathfilename[0] )
-	{
-		if( g_file_fd == -1 )
-		{
-			nret = OpenLogFile() ;
-			if( nret )
-				return nret;
-		}
+		nret = OpenLogFile() ;
+		if( nret )
+			return nret;
 		
+		WRITE( g_file_fd , hexlog_buffer , hexlog_buflen );
+	}
+	else
+	{
 		WRITE( g_file_fd , hexlog_buffer , hexlog_buflen );
 	}
 	

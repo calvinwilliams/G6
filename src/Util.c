@@ -48,6 +48,17 @@ void SetNonBlocking( int sock )
 	return;
 }
 
+/* 关闭算法 */
+void SetNagleClosed( int sock )
+{
+	int	on = 1 ;
+	
+	setsockopt( sock , IPPROTO_TCP , TCP_NODELAY , (void*) & on , sizeof(int) );
+	
+	return;
+}
+
+/* 设置exec自动关闭选项 */
 void SetCloseExec( int sock )
 {
 	int	val ;

@@ -260,6 +260,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	}
 	
 	SetNonBlocking( p_reverse_forward_session->sock );
+	SetNagleClosed( p_reverse_forward_session->sock );
 	SetCloseExec( p_reverse_forward_session->sock );
 	
 	/* 连接服务端 */
@@ -377,6 +378,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 		
 		/* 设置socket选项 */		
 		SetNonBlocking( sock );
+		SetNagleClosed( sock );
 		SetCloseExec( sock );
 		
 		/* 检查客户端白名单 */

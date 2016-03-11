@@ -17,6 +17,7 @@
 #include <sys/socket.h>
 #include <sys/epoll.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -342,6 +343,7 @@ int Rand( int min, int max );
 unsigned long CalcHash( char *str );
 void SetReuseAddr( int sock );
 void SetNonBlocking( int sock );
+void SetNagleClosed( int sock );
 void SetCloseExec( int sock );
 void SetCloseExec2( int sock , int sock2 );
 void SetCloseExec3( int sock , int sock2 , int sock3 );
