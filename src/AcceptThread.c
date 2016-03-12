@@ -319,7 +319,6 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		
 		forward_thread_index = (p_reverse_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
 		
-DebugLog( __FILE__ , __LINE__ , "XXX - AddTimeoutTreeNode2 - time(NULL)[%ld] g_time_tv.tv_sec[%ld] p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout[%ld] p_forward_session->forward_index[%u]" , time(NULL) , g_time_tv.tv_sec , p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout , p_forward_session->forward_index );
 		AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_forward_session , g_time_tv.tv_sec + p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout );
 		
 		memset( & event , 0x00 , sizeof(struct epoll_event) );
@@ -539,7 +538,6 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	
 	forward_thread_index = (p_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
 	
-DebugLog( __FILE__ , __LINE__ , "YYY - AddTimeoutTreeNode2 - time(NULL)[%ld] g_time_tv.tv_sec[%ld] p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout[%ld] - p_forward_session->forward_index[%u]" , time(NULL) , g_time_tv.tv_sec , p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout , p_forward_session->forward_index );
 	AddTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
 	
 	memset( & event , 0x00 , sizeof(struct epoll_event) );

@@ -769,22 +769,22 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		
 		if( p_forward_rule->forward_addr_array == NULL || p_forward_rule->forward_addr_count+1 > p_forward_rule->forward_addr_size )
 		{
-			unsigned long			new_forwards_addr_maxcount ;
+			unsigned long			new_forwards_addr_size ;
 			struct ForwardNetAddress	*new_forwards_addr = NULL ;
 			
 			if( p_forward_rule->forward_addr_array == NULL )
-				new_forwards_addr_maxcount = DEFAULT_CLIENTS_INITCOUNT_IN_ONE_RULE ;
+				new_forwards_addr_size = DEFAULT_CLIENTS_INITCOUNT_IN_ONE_RULE ;
 			else
-				new_forwards_addr_maxcount = p_forward_rule->forward_addr_size + DEFAULT_CLIENTS_INCREASE_IN_ONE_RULE ;
+				new_forwards_addr_size = p_forward_rule->forward_addr_size + DEFAULT_CLIENTS_INCREASE_IN_ONE_RULE ;
 			
-			new_forwards_addr = realloc( p_forward_rule->forward_addr_array , sizeof(struct ForwardRule) * new_forwards_addr_maxcount ) ;
+			new_forwards_addr = realloc( p_forward_rule->forward_addr_array , sizeof(struct ForwardRule) * new_forwards_addr_size ) ;
 			if( new_forwards_addr == NULL )
 			{
 				ErrorLog( __FILE__ , __LINE__ , "realloc failed , errno[%d]" , errno );
 				return -11;
 			}
 			p_forward_rule->forward_addr_array = new_forwards_addr ;
-			p_forward_rule->forward_addr_size = new_forwards_addr_maxcount ;
+			p_forward_rule->forward_addr_size = new_forwards_addr_size ;
 			memset( p_forward_rule->forward_addr_array+p_forward_rule->forward_addr_count , 0x00 , sizeof(struct ForwardRule) * (p_forward_rule->forward_addr_size-p_forward_rule->forward_addr_count) );
 		}
 		

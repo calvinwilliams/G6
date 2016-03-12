@@ -68,6 +68,7 @@ void *_TimeThread( void *pv )
 {
 	TimeThread();
 	
+	INIT_TIME
 	InfoLog( __FILE__ , __LINE__ , "pthread_exit" );
 	pthread_exit(NULL);
 }

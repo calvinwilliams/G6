@@ -360,7 +360,8 @@ int AddListeners( struct ServerEnv *penv )
 				{
 					if( STRCMP( p_old_forward_addr->netaddr.ip , == , p_forward_rule->forward_addr_array[forward_addr_index].netaddr.ip ) && p_old_forward_addr->netaddr.port.port_int == p_forward_rule->forward_addr_array[forward_addr_index].netaddr.port.port_int )
 					{
-						memcpy( p_forward_addr , p_old_forward_addr , sizeof(struct ForwardNetAddress) );
+						memcpy( & (p_forward_addr->netaddr.sockaddr) , & (p_old_forward_addr->netaddr.sockaddr) , sizeof(struct sockaddr_in) );
+						p_forward_addr->sock = p_old_forward_addr->sock ;
 ErrorLog( __FILE__ , __LINE__ , "p_forward_addr->timeout[%ld]" , p_forward_addr->timeout );
 						memset( p_old_forward_addr , 0x00 , sizeof(struct ForwardNetAddress) );
 						break;
