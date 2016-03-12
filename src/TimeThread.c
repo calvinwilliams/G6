@@ -41,7 +41,7 @@ void *TimeThread()
 	char			date_and_time[ sizeof(g_date_and_time) ] = "" ;
 	
 	/* 设置日志输出文件 */
-	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
+	SetLogFile( penv->cmd_para.log_pathfilename );
 	SetLogLevel( penv->cmd_para.log_level );
 	INIT_TIME
 	SETPID

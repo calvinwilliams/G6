@@ -48,16 +48,14 @@ void SetLogFile( char *format , ... )
 {
 	va_list		valist ;
 	
-	va_start( valist , format );
-	VSNPRINTF( g_log_pathfilename , sizeof(g_log_pathfilename)-1 , format , valist );
-	va_end( valist );
-	
 	if( g_file_fd != -1 )
 	{
 		CLOSE( g_file_fd );
 	}
 	
-	OpenLogFile();
+	va_start( valist , format );
+	VSNPRINTF( g_log_pathfilename , sizeof(g_log_pathfilename)-1 , format , valist );
+	va_end( valist );
 	
 	return;
 }

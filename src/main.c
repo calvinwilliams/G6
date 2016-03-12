@@ -15,7 +15,7 @@ static void version()
 
 static void usage()
 {
-	printf( "USAGE : G6 -f config_pathfilename [ -t forward_thread_size ] [ -s forward_session_size ] [ --log-level (DEBUG|INFO|WARN|ERROR|FATAL) ] [ --no-daemon ]\n" );
+	printf( "USAGE : G6 -f (config_pathfilename) [ -t (forward_thread_size) ] [ -s (forward_session_size) ] [ --log-level (DEBUG|INFO|WARN|ERROR|FATAL) ] [ --log-filename (logfilename) ] [ --no-daemon ]\n" );
 	return;
 }
 
@@ -42,14 +42,12 @@ int main( int argc , char *argv[] )
 	penv->cmd_para.forward_thread_size = sysconf(_SC_NPROCESSORS_ONLN) * 2 ;
 	penv->cmd_para.forward_session_size = DEFAULT_FORWARD_SESSIONS_MAXCOUNT ;
 	penv->cmd_para.log_level = LOGLEVEL_INFO ;
+	snprintf( penv->cmd_para.log_pathfilename , sizeof(penv->cmd_para.log_pathfilename)-1 , "%s/log/G6.log" , getenv("HOME") );
 	penv->cmd_para.no_daemon_flag = 0 ;
 	
 	/* 设置日志输出文件 */
-	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
+	SetLogFile( penv->cmd_para.log_pathfilename );
 	SetLogLevel( penv->cmd_para.log_level );
-	INIT_TIME
-	SETPID
-	SETTID
 	
 	/* 分析命令行参数 */
 	if( argc == 1 )
@@ -103,6 +101,12 @@ int main( int argc , char *argv[] )
 			
 			SetLogLevel( penv->cmd_para.log_level );
 		}
+		else if( strcmp( argv[n] , "--log-filename" ) == 0 && n + 1 < argc )
+		{
+			n++;
+			snprintf( penv->cmd_para.log_pathfilename , sizeof(penv->cmd_para.log_pathfilename)-1 , argv[n] );
+			SetLogFile( penv->cmd_para.log_pathfilename );
+		}
 		else if( strcmp( argv[n] , "--no-daemon" ) == 0 )
 		{
 			penv->cmd_para.no_daemon_flag = 1 ;
@@ -126,6 +130,10 @@ int main( int argc , char *argv[] )
 		exit(7);
 	}
 	
+	INIT_TIME
+	SETPID
+	SETTID
+	
 	InfoLog( __FILE__ , __LINE__ , "--- G6 BEGIN --- v%s build %s %s" , __G6_VERSION , __DATE__ , __TIME__ );
 	
 	/* 初始化环境 */
@@ -139,7 +147,7 @@ int main( int argc , char *argv[] )
 	/* 设置公共参数 */
 	penv->moratorium = DEFAULT_MORATORIUM_SECONDS ;
 	penv->timeout = DEFAULT_TIMEOUT_SECONDS ;
-	penv->ip_connection_stat.max_connections = UINT_MAX - 1 ;
+	penv->ip_connection_stat.max_connections = UINT_MAX - 100 ;
 	
 	/* 装载配置 */
 	nret = LoadConfig( penv ) ;

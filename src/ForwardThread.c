@@ -224,7 +224,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 	forward_epoll_fd = penv->forward_epoll_fd_array[forward_thread_index] ;
 	
 	/* 设置日志输出文件 */
-	SetLogFile( "%s/log/G6.log" , getenv("HOME") );
+	SetLogFile( penv->cmd_para.log_pathfilename );
 	SetLogLevel( penv->cmd_para.log_level );
 	INIT_TIME
 	SETPID

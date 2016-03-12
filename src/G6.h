@@ -280,6 +280,7 @@ struct CommandParameter
 	unsigned int			forward_thread_size ; /* -t ... */
 	unsigned int			forward_session_size ; /* -s ... */
 	int				log_level ; /* --log-level (DEBUG|INFO|WARN|ERROR|FATAL)*/
+	char				log_pathfilename[ MAXLEN_FILENAME + 1 ] ; /* --log-filename (logfilename) */
 	int				no_daemon_flag ; /* --no-daemon */
 	int				close_log_flag ; /* --close-log */
 } ;
