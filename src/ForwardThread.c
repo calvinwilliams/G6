@@ -356,6 +356,7 @@ void *_ForwardThread( void *pv )
 	free( p_forward_thread_index );
 	ForwardThread( forward_thread_index );
 	
+	INIT_TIME
 	InfoLog( __FILE__ , __LINE__ , "pthread_exit" );
 	pthread_exit(NULL);
 }

@@ -102,22 +102,14 @@ static int WriteLogBase( int log_level , char *c_filename , long c_fileline , ch
 		p_c_filename++;
 	else
 		p_c_filename = c_filename_copy ;
-
+	
 	/* ÃÓ≥‰––»’÷æ */
-	memset( log_buffer , 0x00 , sizeof(log_buffer) );
+	/* memset( log_buffer , 0x00 , sizeof(log_buffer) ); */
 	log_bufptr = log_buffer ;
 	log_buflen = 0 ;
 	log_buf_remain_len = sizeof(log_buffer) - 1 ;
 	
-	len = SNPRINTF( log_bufptr , log_buf_remain_len , "%s" , g_date_and_time ) ;
-	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
-	/*
-	len = SNPRINTF( log_bufptr , log_buf_remain_len , ".%06ld" , (long)(g_time_tv.tv_usec) ) ;
-	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
-	*/
-	len = SNPRINTF( log_bufptr , log_buf_remain_len , " | %-5s" , log_level_itoa[log_level] ) ;
-	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
-	len = SNPRINTF( log_bufptr , log_buf_remain_len , " | %lu:%lu:%s:%ld | " , g_pid , g_tid , p_c_filename , c_fileline ) ;
+	len = SNPRINTF( log_bufptr , log_buf_remain_len , "%s | %-5s | %lu:%lu:%s:%ld | " , g_date_and_time , log_level_itoa[log_level] , g_pid , g_tid , p_c_filename , c_fileline ) ;
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
 	len = VSNPRINTF( log_bufptr , log_buf_remain_len , format , valist );
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
