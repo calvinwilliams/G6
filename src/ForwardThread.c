@@ -1,34 +1,35 @@
 #include "G6.h"
 
-#define DISCONNECT \
-	IgnoreReverseSessionEvents( p_forward_session , events , event_index , event_count ); \
-	RemoveTimeoutTreeNode( penv , p_forward_session ); \
-	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL ); \
-	DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock ); \
-	_CLOSESOCKET( p_forward_session->sock ); \
-	SetForwardSessionUnused( penv , p_forward_session );
-
 #define DISCONNECT_PAIR	\
-	IgnoreReverseSessionEvents( p_forward_session , events , event_index , event_count ); \
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL ); \
-	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL ); \
-	RemoveTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session ); \
+	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL ); \
+	RemoveTimeoutTreeNode2( penv , p_forward_session , p_reverse_forward_session ); \
 	if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER ) \
 	{ \
-		RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr ); \
-		SERVER_CONNECTION_COUNT_DECREASE(penv,p_forward_session->p_reverse_forward_session->p_forward_rule->server_addr_array[p_forward_session->p_reverse_forward_session->server_index],1) \
+		nret = RemoveIpConnectionStat( penv , & (p_forward_session->p_forward_rule->client_addr_array[p_forward_session->client_index].ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr ) ; \
+		if( nret ) \
+			ErrorLog( __FILE__ , __LINE__ , "RemoveIpConnectionStat failed[%d] , SERVER.1" , nret ); \
+		nret = RemoveIpConnectionStat( penv , & (p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].ip_connection_stat) , p_reverse_forward_session->netaddr.sockaddr.sin_addr.s_addr ) ; \
+		if( nret ) \
+			ErrorLog( __FILE__ , __LINE__ , "RemoveIpConnectionStat failed[%d] , SERVER.2" , nret ); \
 	} \
 	else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT ) \
 	{ \
-		RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_forward_session->p_reverse_forward_session->netaddr.sockaddr.sin_addr.s_addr ); \
-		SERVER_CONNECTION_COUNT_DECREASE(penv,p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index],1) \
+		nret = RemoveIpConnectionStat( penv , & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr ) ; \
+		if( nret ) \
+			ErrorLog( __FILE__ , __LINE__ , "RemoveIpConnectionStat failed[%d] , CLIENT.1" , nret ); \
+		nret = RemoveIpConnectionStat( penv , & (p_reverse_forward_session->p_forward_rule->client_addr_array[p_reverse_forward_session->client_index].ip_connection_stat) , p_reverse_forward_session->netaddr.sockaddr.sin_addr.s_addr ) ; \
+		if( nret ) \
+			ErrorLog( __FILE__ , __LINE__ , "RemoveIpConnectionStat failed[%d] , CLIENT.2" , nret ); \
 	} \
-	DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
-	_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock ); \
-	SetForwardSessionUnused2( penv , p_forward_session , p_forward_session->p_reverse_forward_session );
+	DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_reverse_forward_session->sock ); \
+	_CLOSESOCKET2( p_forward_session->sock , p_reverse_forward_session->sock ); \
+	IgnoreReverseSessionEvents( p_forward_session , events , event_index , event_count ); \
+	SetForwardSessionUnused2( penv , p_forward_session , p_reverse_forward_session );
 
 static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
 {
+	struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
 	struct epoll_event	*p_event = NULL ;
 	
 	if( event_count == 0 )
@@ -39,7 +40,7 @@ static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session
 		if( p_event->data.ptr == p_forward_session )
 			continue;
 		
-		if( p_event->data.ptr == p_forward_session->p_reverse_forward_session )
+		if( p_event->data.ptr == p_reverse_forward_session )
 			p_event->events = 0 ;
 	}
 	
@@ -216,6 +217,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 	struct epoll_event	*p_event = NULL ;
 	
 	struct ForwardSession	*p_forward_session = NULL ;
+	struct ForwardSession	*p_reverse_forward_session = NULL ;
 	
 	int			nret = 0 ;
 	
@@ -242,6 +244,8 @@ void *ForwardThread( unsigned long forward_thread_index )
 		}
 		
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]... timeout[%d]" , penv->forward_request_pipe[forward_thread_index].fds[0] , timeout );
+		if( penv->cmd_para.close_log_flag == 1 )
+			CloseLogFile();
 		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
 		UPDATE_TIME
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
@@ -253,6 +257,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 				p_forward_session = GetExpireTimeoutNode( penv ) ;
 				if( p_forward_session == NULL )
 					break;
+				p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
 				
 				ErrorLog( __FILE__ , __LINE__ , "forward session TIMEOUT" );
 				DISCONNECT_PAIR
@@ -263,9 +268,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 		
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
-			p_forward_session = p_event->data.ptr ;
-			
-			if( p_forward_session == NULL )
+			if( p_event->data.ptr == NULL )
 			{
 				char		command ;
 				
@@ -298,6 +301,9 @@ void *ForwardThread( unsigned long forward_thread_index )
 			else
 			{
 				DebugLog( __FILE__ , __LINE__ , "forward session event" );
+				
+				p_forward_session = p_event->data.ptr ;
+				p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
 				
 				if( p_event->events & EPOLLIN ) /*  ‰»Î ¬º˛ */
 				{

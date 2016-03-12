@@ -107,6 +107,10 @@ int main( int argc , char *argv[] )
 		{
 			penv->cmd_para.no_daemon_flag = 1 ;
 		}
+		else if( strcmp( argv[n] , "--close-log" ) == 0 )
+		{
+			penv->cmd_para.close_log_flag = 1 ;
+		}
 		else
 		{
 			fprintf( stderr , "invalid opt[%s]\r\n" , argv[n] );
@@ -132,19 +136,16 @@ int main( int argc , char *argv[] )
 		return -nret;
 	}
 	
+	/* 设置公共参数 */
+	penv->moratorium = DEFAULT_MORATORIUM_SECONDS ;
+	penv->timeout = DEFAULT_TIMEOUT_SECONDS ;
+	penv->ip_connection_stat.max_connections = UINT_MAX - 1 ;
+	
 	/* 装载配置 */
 	nret = LoadConfig( penv ) ;
 	if( nret )
 	{
 		printf( "LoadConfig failed[%d]\n" , nret );
-		return -nret;
-	}
-	
-	/* 初始化环境2 */
-	nret = InitEnvirment2( penv ) ;
-	if( nret )
-	{
-		printf( "InitEnvirment2 failed[%d]\n" , nret );
 		return -nret;
 	}
 	

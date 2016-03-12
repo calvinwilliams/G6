@@ -184,7 +184,8 @@ int MonitorProcess( struct ServerEnv *penv )
 			close( penv->accept_response_pipe.fds[1] );
 		}
 		
-		CloseLogFile();
+		if( penv->cmd_para.close_log_flag == 1 )
+			CloseLogFile();
 		
 		/* 监控子进程结束 */
 		_WAITPID :

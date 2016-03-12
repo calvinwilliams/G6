@@ -97,7 +97,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 		{
 			IF_SERVER_ENABLE( p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index] )
 			{
-				if( p_forward_session->server_index == -1 || p_forward_rule->server_addr_array[p_forward_session->server_index].server_connection_count < p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].server_connection_count )
+				if( p_forward_session->server_index == -1 || p_forward_rule->server_addr_array[p_forward_session->server_index].ip_connection_stat.connection_count < p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index].ip_connection_stat.connection_count )
 					p_forward_session->server_index = p_forward_rule->selected_addr_index ;
 			}
 			
@@ -204,8 +204,6 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 		return -1;
 	}
 	
-	SERVER_CONNECTION_COUNT_INCREASE(penv,p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index],1)
-	
 	memcpy( & (p_forward_session->netaddr) , & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].netaddr) , sizeof(struct NetAddress) );
 	
 	return 0;
@@ -222,7 +220,7 @@ static int ResolveConnectingError( struct ServerEnv *penv , struct ForwardSessio
 	/* 设置服务端不可用 */
 	p_servers_addr = p_reverse_forward_session->p_forward_rule->server_addr_array + p_reverse_forward_session->server_index ;
 	p_servers_addr->server_unable = 1 ;
-	p_servers_addr->timestamp_to = g_time_tv.tv_sec + penv->timeout ;
+	p_servers_addr->timestamp_to = g_time_tv.tv_sec + penv->moratorium ;
 	
 	/* 非堵塞连接服务端 */
 	nret = TryToConnectServer( penv , p_reverse_forward_session ) ;
@@ -237,6 +235,7 @@ static int ResolveConnectingError( struct ServerEnv *penv , struct ForwardSessio
 
 static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p_reverse_forward_session )
 {
+	struct ForwardSession	*p_forward_session = p_reverse_forward_session->p_reverse_forward_session ;
 	_SOCKLEN_T		addr_len ;
 	struct epoll_event	event ;
 	unsigned int		forward_thread_index ;
@@ -248,7 +247,15 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	if( nret )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "SelectServerAddress failed[%d]" , nret );
-		return 1;
+		return -1;
+	}
+	
+	/* 登记服务端统计信息 */
+	nret = AddIpConnectionStat( penv , & (p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].ip_connection_stat) , p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].netaddr.sockaddr.sin_addr.s_addr ) ;
+	if( nret )
+	{
+		ErrorLog( __FILE__ , __LINE__ , "AddIpConnectionStat server failed[%d]" , nret );
+		return ResolveConnectingError( penv , p_reverse_forward_session );
 	}
 	
 	/* 创建连接服务端的客户端 */
@@ -259,6 +266,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		return -1;
 	}
 	
+	/* 设置套接字选项 */
 	SetNonBlocking( p_reverse_forward_session->sock );
 	SetNagleClosed( p_reverse_forward_session->sock );
 	SetCloseExec( p_reverse_forward_session->sock );
@@ -280,41 +288,39 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_reverse_forward_session->sock , & event );
 			
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
-			event.data.ptr = p_reverse_forward_session->p_reverse_forward_session ;
+			event.data.ptr = p_forward_session ;
 			event.events = EPOLLERR ;
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_reverse_forward_session->p_reverse_forward_session->sock , & event );
 		}
 		else /* 连接失败 */
 		{
-			ErrorLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] failed , errno[%d]" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , errno );
-			SERVER_CONNECTION_COUNT_DECREASE(penv,p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index],1)
+			ErrorLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] failed , errno[%d]" , p_forward_session->sock , p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , errno );
+			RemoveIpConnectionStat( penv , & (p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].ip_connection_stat) , p_reverse_forward_session->netaddr.sockaddr.sin_addr.s_addr );
 			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_reverse_forward_session->sock );
 			_CLOSESOCKET( p_reverse_forward_session->sock );
 			nret = ResolveConnectingError( penv , p_reverse_forward_session ) ;
 			if( nret )
 			{
-				struct ForwardSession	*p = p_reverse_forward_session->p_reverse_forward_session ;
-				RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p->p_forward_rule->client_addr_array[p->client_index].netaddr.sockaddr.sin_addr.s_addr );
-				DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_reverse_forward_session->p_reverse_forward_session->sock );
-				_CLOSESOCKET( p_reverse_forward_session->p_reverse_forward_session->sock );
+				return nret;
 			}
 		}
 	}
 	else /* 连接成功 */
 	{
 		p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
-		p_reverse_forward_session->p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
+		p_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
 		
 		InfoLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] ok" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int );
 		
 		p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].server_unable = 0 ;
 		
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL );
-		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->p_reverse_forward_session->sock , NULL );
+		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 		
 		forward_thread_index = (p_reverse_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
 		
-		AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_reverse_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout );
+DebugLog( __FILE__ , __LINE__ , "XXX - AddTimeoutTreeNode2 - time(NULL)[%ld] g_time_tv.tv_sec[%ld] p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout[%ld] p_forward_session->forward_index[%u]" , time(NULL) , g_time_tv.tv_sec , p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout , p_forward_session->forward_index );
+		AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_forward_session , g_time_tv.tv_sec + p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout );
 		
 		memset( & event , 0x00 , sizeof(struct epoll_event) );
 		event.data.ptr = p_reverse_forward_session ;
@@ -322,9 +328,9 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_MOD , p_reverse_forward_session->sock , & event );
 		
 		memset( & event , 0x00 , sizeof(struct epoll_event) );
-		event.data.ptr = p_reverse_forward_session->p_reverse_forward_session ;
+		event.data.ptr = p_forward_session ;
 		event.events = EPOLLIN | EPOLLERR ;
-		epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_MOD , p_reverse_forward_session->p_reverse_forward_session->sock , & event );
+		epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_MOD , p_forward_session->sock , & event );
 		
 		nret = write( penv->forward_request_pipe[forward_thread_index].fds[1] , "L" , 1 ) ;
 	}
@@ -363,16 +369,6 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 			InfoLog( __FILE__ , __LINE__ , "accept [%s:%d]#%d# ok" , netaddr.ip , netaddr.port.port_int , sock );
 		}
 		
-		/* 登记统计信息 */
-		nret = AddIpConnectionStat( penv , &(penv->ip_connection_stat) , netaddr.sockaddr.sin_addr.s_addr ) ;
-		if( nret )
-		{
-			ErrorLog( __FILE__ , __LINE__ , "AddIpConnectionStat failed[%d]" , nret );
-			DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
-			_CLOSESOCKET( sock );
-			continue;
-		}
-		
 		/* 设置socket选项 */		
 		SetNonBlocking( sock );
 		SetNagleClosed( sock );
@@ -383,6 +379,16 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 		if( nret == NOT_MATCH )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "MatchClientAddr failed[%d] , rule_id[%s]" , nret , p_listen_session->p_forward_rule->rule_id );
+			DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
+			_CLOSESOCKET( sock );
+			continue;
+		}
+		
+		/* 登记客户端统计信息 */
+		nret = AddIpConnectionStat( penv , & (p_listen_session->p_forward_rule->client_addr_array[client_index].ip_connection_stat) , netaddr.sockaddr.sin_addr.s_addr ) ;
+		if( nret )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "AddIpConnectionStat client failed[%d]" , nret );
 			DebugLog( __FILE__ , __LINE__ , "close #%d#" , sock );
 			_CLOSESOCKET( sock );
 			continue;
@@ -462,6 +468,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 			if( nret )
 			{
 				DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+				RemoveIpConnectionStat( penv , & (p_listen_session->p_forward_rule->client_addr_array[client_index].ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr );
 				_CLOSESOCKET( p_forward_session->sock );
 				SetForwardSessionUnused2( penv , p_forward_session , p_reverse_forward_session );
 				continue;
@@ -474,6 +481,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 
 static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p_forward_session )
 {
+	struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
 #if ( defined __linux ) || ( defined __unix )
 	int			error , code ;
 #endif
@@ -501,19 +509,17 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 #endif
         {
 		ErrorLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] failed , errno[%d]" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int , errno );
+		RemoveIpConnectionStat( penv , & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr );
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 		DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
 		_CLOSESOCKET( p_forward_session->sock );
 		nret = ResolveConnectingError( penv , p_forward_session->p_reverse_forward_session ) ;
 		if( nret )
 		{
-			struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
-			RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_reverse_forward_session->p_forward_rule->client_addr_array[p_reverse_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr );
-			SERVER_CONNECTION_COUNT_DECREASE(penv,p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index],1)
-			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
-			DebugLog( __FILE__ , __LINE__ , "close #%d#-#%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-			_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
+			RemoveIpConnectionStat( penv , & (p_reverse_forward_session->p_forward_rule->client_addr_array[p_reverse_forward_session->client_index].ip_connection_stat) , p_reverse_forward_session->netaddr.sockaddr.sin_addr.s_addr );
+			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL );
+			DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_reverse_forward_session->sock );
+			_CLOSESOCKET( p_reverse_forward_session->sock );
 		}
 		
 		return 0;
@@ -533,6 +539,7 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	
 	forward_thread_index = (p_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
 	
+DebugLog( __FILE__ , __LINE__ , "YYY - AddTimeoutTreeNode2 - time(NULL)[%ld] g_time_tv.tv_sec[%ld] p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout[%ld] - p_forward_session->forward_index[%u]" , time(NULL) , g_time_tv.tv_sec , p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout , p_forward_session->forward_index );
 	AddTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
 	
 	memset( & event , 0x00 , sizeof(struct epoll_event) );
@@ -872,6 +879,7 @@ void *AcceptThread( struct ServerEnv *penv )
 	struct epoll_event	*p_event = NULL ;
 	
 	struct ForwardSession	*p_forward_session = NULL ;
+	struct ForwardSession	*p_reverse_forward_session = NULL ;
 	
 	int			nret = 0 ;
 	
@@ -893,14 +901,14 @@ void *AcceptThread( struct ServerEnv *penv )
 			timeout = -1 ;
 		
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]... timeout[%d]" , penv->accept_request_pipe.fds[0] , timeout );
+		if( penv->cmd_para.close_log_flag == 1 )
+			CloseLogFile();
 		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
 		UPDATE_TIME
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
-			p_forward_session = p_event->data.ptr ;
-			
-			if( p_forward_session == NULL )
+			if( p_event->data.ptr == NULL )
 			{
 				char		command ;
 				
@@ -959,89 +967,93 @@ void *AcceptThread( struct ServerEnv *penv )
 					}
 				}
 			}
-			else if( p_forward_session->status == FORWARD_SESSION_STATUS_LISTEN )
-			{
-				DebugLog( __FILE__ , __LINE__ , "listen session event" );
-				
-				if( p_event->events & EPOLLIN ) /* 侦听端口事件 */
-				{
-					nret = OnListenAccept( penv , p_forward_session ) ;
-					if( nret )
-					{
-						ErrorLog( __FILE__ , __LINE__ , "OnListenAccept failed[%d]" , nret );
-					}
-				}
-				else
-				{
-					ErrorLog( __FILE__ , __LINE__ , "accept pipe EPOLLERR" );
-				}
-			}
-			else if( p_forward_session->status == FORWARD_SESSION_STATUS_CONNECTING )
-			{
-				DebugLog( __FILE__ , __LINE__ , "connecting session event" );
-				
-				if( p_event->events & EPOLLOUT ) /* 非堵塞连接事件 */
-				{
-					nret = OnConnectingServer( penv , p_forward_session ) ;
-					if( nret )
-					{
-						ErrorLog( __FILE__ , __LINE__ , "OnConnectingServer failed[%d]" , nret );
-					}
-				}
-				else
-				{
-					ErrorLog( __FILE__ , __LINE__ , "connecting session #%d#EPOLLERR" , p_forward_session->sock );
-					epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-					DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
-					_CLOSESOCKET( p_forward_session->sock );
-					nret = ResolveConnectingError( penv , p_forward_session ) ;
-					if( nret )
-					{
-						struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
-						RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_reverse_forward_session->p_forward_rule->client_addr_array[p_reverse_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr );
-						SERVER_CONNECTION_COUNT_DECREASE(penv,p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index],1)
-						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
-						DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->p_reverse_forward_session->sock );
-						_CLOSESOCKET( p_forward_session->p_reverse_forward_session->sock );
-					}
-				}
-			}
-			else if( p_forward_session->status == FORWARD_SESSION_STATUS_READY )
-			{
-				DebugLog( __FILE__ , __LINE__ , "accepted session event" );
-				RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_forward_session->p_forward_rule->client_addr_array[p_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr );
-				SERVER_CONNECTION_COUNT_DECREASE(penv,p_forward_session->p_reverse_forward_session->p_forward_rule->server_addr_array[p_forward_session->p_reverse_forward_session->server_index],1)
-				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
-				DebugLog( __FILE__ , __LINE__ , "close #%d#-#%d#" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-				_CLOSESOCKET2( p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock );
-			}
-			else if( p_forward_session->status == FORWARD_SESSION_STATUS_COMMAND )
-			{
-				nret = OnReceiveCommand( penv , p_forward_session ) ;
-				if( nret > 0 )
-				{
-					RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_forward_session->p_forward_rule->client_addr_array[p_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr );
-					epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-					DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
-					_CLOSESOCKET( p_forward_session->sock );
-					SetForwardSessionUnused( penv , p_forward_session );
-				}
-				else if( nret < 0 )
-				{
-					ErrorLog( __FILE__ , __LINE__ , "OnReceiveCommand failed[%d]" , nret );
-					RemoveIpConnectionStat( penv , &(penv->ip_connection_stat) , p_forward_session->p_forward_rule->client_addr_array[p_forward_session->client_index].netaddr.sockaddr.sin_addr.s_addr );
-					epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
-					DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
-					_CLOSESOCKET( p_forward_session->sock );
-					SetForwardSessionUnused( penv , p_forward_session );
-				}
-			}
 			else
 			{
-				ErrorLog( __FILE__ , __LINE__ , "unknow event" );
-				exit(0);
+				p_forward_session = p_event->data.ptr ;
+				p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
+				
+				if( p_forward_session->status == FORWARD_SESSION_STATUS_LISTEN )
+				{
+					DebugLog( __FILE__ , __LINE__ , "listen session event" );
+					
+					if( p_event->events & EPOLLIN ) /* 侦听端口事件 */
+					{
+						nret = OnListenAccept( penv , p_forward_session ) ;
+						if( nret )
+						{
+							ErrorLog( __FILE__ , __LINE__ , "OnListenAccept failed[%d]" , nret );
+						}
+					}
+					else
+					{
+						ErrorLog( __FILE__ , __LINE__ , "accept pipe EPOLLERR" );
+					}
+				}
+				else if( p_forward_session->status == FORWARD_SESSION_STATUS_CONNECTING )
+				{
+					DebugLog( __FILE__ , __LINE__ , "connecting session event" );
+					
+					if( p_event->events & EPOLLOUT ) /* 非堵塞连接事件 */
+					{
+						nret = OnConnectingServer( penv , p_forward_session ) ;
+						if( nret )
+						{
+							ErrorLog( __FILE__ , __LINE__ , "OnConnectingServer failed[%d]" , nret );
+						}
+					}
+					else
+					{
+						ErrorLog( __FILE__ , __LINE__ , "connecting session #%d#EPOLLERR" , p_forward_session->sock );
+						RemoveIpConnectionStat( penv , & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr );
+						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+						DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+						_CLOSESOCKET( p_forward_session->sock );
+						nret = ResolveConnectingError( penv , p_forward_session->p_reverse_forward_session ) ;
+						if( nret )
+						{
+							RemoveIpConnectionStat( penv , & (p_reverse_forward_session->p_forward_rule->client_addr_array[p_reverse_forward_session->client_index].ip_connection_stat) , p_reverse_forward_session->netaddr.sockaddr.sin_addr.s_addr );
+							epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL );
+							DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_reverse_forward_session->sock );
+							_CLOSESOCKET( p_reverse_forward_session->sock );
+						}
+					}
+				}
+				else if( p_forward_session->status == FORWARD_SESSION_STATUS_READY )
+				{
+					DebugLog( __FILE__ , __LINE__ , "ready session event" );
+					RemoveIpConnectionStat( penv , & (p_forward_session->p_forward_rule->client_addr_array[p_forward_session->client_index].ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr );
+					RemoveIpConnectionStat( penv , & (p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].ip_connection_stat) , p_reverse_forward_session->netaddr.sockaddr.sin_addr.s_addr );
+					epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+					epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL );
+					DebugLog( __FILE__ , __LINE__ , "close #%d#-#%d#" , p_forward_session->sock , p_reverse_forward_session->sock );
+					_CLOSESOCKET2( p_forward_session->sock , p_reverse_forward_session->sock );
+				}
+				else if( p_forward_session->status == FORWARD_SESSION_STATUS_COMMAND )
+				{
+					nret = OnReceiveCommand( penv , p_forward_session ) ;
+					if( nret > 0 )
+					{
+						RemoveIpConnectionStat( penv , & (p_forward_session->p_forward_rule->client_addr_array[p_forward_session->client_index].ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr );
+						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+						DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+						_CLOSESOCKET( p_forward_session->sock );
+						SetForwardSessionUnused( penv , p_forward_session );
+					}
+					else if( nret < 0 )
+					{
+						ErrorLog( __FILE__ , __LINE__ , "OnReceiveCommand failed[%d]" , nret );
+						RemoveIpConnectionStat( penv , & (p_forward_session->p_forward_rule->client_addr_array[p_forward_session->client_index].ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr );
+						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
+						DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+						_CLOSESOCKET( p_forward_session->sock );
+						SetForwardSessionUnused( penv , p_forward_session );
+					}
+				}
+				else
+				{
+					ErrorLog( __FILE__ , __LINE__ , "unknow event" );
+					exit(0);
+				}
 			}
 		}
 	}

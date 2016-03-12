@@ -137,6 +137,158 @@ static int LoadProperty( FILE *fp , funcLoadCustomProperty *pfuncLoadCustomPrope
 	return 0;
 }
 
+funcLoadCustomProperty LoadCustomProperty_ForwardRule_GlobalClient ;
+int LoadCustomProperty_ForwardRule_GlobalClient( void *p1 , void *p2 , void *p3 , char *property_name , char *property_value )
+{
+	char			*postfix = NULL ;
+	
+	struct ForwardRule	*p_forward_rule = (struct ForwardRule *)p1 ;
+	
+	if( STRCMP( property_name , == , "max_ip" ) )
+	{
+		p_forward_rule->client_ip_connection_stat.max_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				p_forward_rule->client_ip_connection_stat.max_ip *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_forward_rule->client_ip_connection_stat.max_ip *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[max_ip] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else if( STRCMP( property_name , == , "max_connections" ) )
+	{
+		p_forward_rule->client_ip_connection_stat.max_connections = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				p_forward_rule->client_ip_connection_stat.max_connections *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_forward_rule->client_ip_connection_stat.max_connections *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[max_connections] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else if( STRCMP( property_name , == , "max_connections_per_ip" ) )
+	{
+		p_forward_rule->client_ip_connection_stat.max_connections_per_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				p_forward_rule->client_ip_connection_stat.max_connections_per_ip *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_forward_rule->client_ip_connection_stat.max_connections_per_ip *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[max_connections_per_ip] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else
+	{
+		ErrorLog( __FILE__ , __LINE__ , "invalid property[%s]" , property_name );
+		return -1;
+	}
+	
+	return 0;
+}
+
+funcLoadCustomProperty LoadCustomProperty_ForwardRule_Client ;
+int LoadCustomProperty_ForwardRule_Client( void *p1 , void *p2 , void *p3 , char *property_name , char *property_value )
+{
+	char				*postfix = NULL ;
+	
+	struct ClientNetAddress		*p_client_addr = (struct ClientNetAddress *)p2 ;
+	
+	if( STRCMP( property_name , == , "max_ip" ) )
+	{
+		p_client_addr->ip_connection_stat.max_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				p_client_addr->ip_connection_stat.max_ip *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_client_addr->ip_connection_stat.max_ip *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[max_ip] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else if( STRCMP( property_name , == , "max_connections" ) )
+	{
+		p_client_addr->ip_connection_stat.max_connections = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				p_client_addr->ip_connection_stat.max_connections *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_client_addr->ip_connection_stat.max_connections *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[max_connections] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else if( STRCMP( property_name , == , "max_connections_per_ip" ) )
+	{
+		p_client_addr->ip_connection_stat.max_connections_per_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				p_client_addr->ip_connection_stat.max_connections_per_ip *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_client_addr->ip_connection_stat.max_connections_per_ip *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[max_connections_per_ip] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else
+	{
+		ErrorLog( __FILE__ , __LINE__ , "invalid property[%s]" , property_name );
+		return -1;
+	}
+	
+	return 0;
+}
+
 funcLoadCustomProperty LoadCustomProperty_ForwardRule_GlobalForward ;
 int LoadCustomProperty_ForwardRule_GlobalForward( void *p1 , void *p2 , void *p3 , char *property_name , char *property_value )
 {
@@ -245,6 +397,66 @@ int LoadCustomProperty_ForwardRule_GlobalServer( void *p1 , void *p2 , void *p3 
 			}
 		}
 	}
+	else if( STRCMP( property_name , == , "max_ip" ) )
+	{
+		p_forward_rule->server_ip_connection_stat.max_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				p_forward_rule->server_ip_connection_stat.max_ip *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_forward_rule->server_ip_connection_stat.max_ip *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[max_ip] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else if( STRCMP( property_name , == , "max_connections" ) )
+	{
+		p_forward_rule->server_ip_connection_stat.max_connections = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				p_forward_rule->server_ip_connection_stat.max_connections *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_forward_rule->server_ip_connection_stat.max_connections *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[max_connections] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else if( STRCMP( property_name , == , "max_connections_per_ip" ) )
+	{
+		p_forward_rule->server_ip_connection_stat.max_connections_per_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				p_forward_rule->server_ip_connection_stat.max_connections_per_ip *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_forward_rule->server_ip_connection_stat.max_connections_per_ip *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[max_connections_per_ip] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
 	else
 	{
 		ErrorLog( __FILE__ , __LINE__ , "invalid property[%s]" , property_name );
@@ -280,6 +492,66 @@ int LoadCustomProperty_ForwardRule_Server( void *p1 , void *p2 , void *p3 , char
 			else
 			{
 				ErrorLog( __FILE__ , __LINE__ , "property[heartbeat] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else if( STRCMP( property_name , == , "max_ip" ) )
+	{
+		p_server_addr->ip_connection_stat.max_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				p_server_addr->ip_connection_stat.max_ip *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_server_addr->ip_connection_stat.max_ip *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[max_ip] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else if( STRCMP( property_name , == , "max_connections" ) )
+	{
+		p_server_addr->ip_connection_stat.max_connections = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				p_server_addr->ip_connection_stat.max_connections *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_server_addr->ip_connection_stat.max_connections *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[max_connections] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else if( STRCMP( property_name , == , "max_connections_per_ip" ) )
+	{
+		p_server_addr->ip_connection_stat.max_connections_per_ip = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "k" ) || STRCMP( postfix , == , "K" ) )
+			{
+				p_server_addr->ip_connection_stat.max_connections_per_ip *= 1000 ;
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				p_server_addr->ip_connection_stat.max_connections_per_ip *= 1000*1000 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[max_connections_per_ip] value[%s] invalid" , property_value );
 				return -1;
 			}
 		}
@@ -377,6 +649,24 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 			return -11;
 		}
 		
+		if( STRCMP( ip_and_port , == , "(" ) )
+		{
+			if( p_forward_rule->client_addr_count == 0 )
+			{
+				nret = LoadProperty( fp , & LoadCustomProperty_ForwardRule_GlobalClient , p_forward_rule , NULL , NULL ) ;
+				if( nret )
+					return nret;
+			}
+			else
+			{
+				nret = LoadProperty( fp , & LoadCustomProperty_ForwardRule_Client , p_forward_rule , p_forward_rule->client_addr_array + p_forward_rule->client_addr_count - 1 , NULL ) ;
+				if( nret )
+					return nret;
+			}
+			
+			continue;
+		}
+		
 		if( STRCMP( ip_and_port , == , ";" ) )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "unexpect end of config in client_addr_array in rule[%s]" , p_forward_rule->rule_id );
@@ -427,6 +717,13 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 			p_client_addr->ip_connection_stat.max_connections_per_ip = p_forward_rule->client_ip_connection_stat.max_connections_per_ip ;
 		}
 		
+		nret = InitIpConnectionStat( & (p_client_addr->ip_connection_stat) );
+		if( nret )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "InitIpConnectionStat failed in rule[%s]" , p_forward_rule->rule_id );
+			return nret;
+		}
+		
 		p_forward_rule->client_addr_count++;
 	}
 	
@@ -443,7 +740,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		
 		if( STRCMP( ip_and_port , == , "(" ) )
 		{
-			if( p_forward_rule->server_addr_count == 0 )
+			if( p_forward_rule->forward_addr_count == 0 )
 			{
 				nret = LoadProperty( fp , & LoadCustomProperty_ForwardRule_GlobalForward , p_forward_rule , NULL , NULL ) ;
 				if( nret )
@@ -451,7 +748,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 			}
 			else
 			{
-				nret = LoadProperty( fp , & LoadCustomProperty_ForwardRule_Forward , p_forward_rule , NULL , NULL ) ;
+				nret = LoadProperty( fp , & LoadCustomProperty_ForwardRule_Forward , p_forward_rule , p_forward_rule->forward_addr_array + p_forward_rule->forward_addr_count - 1 , NULL ) ;
 				if( nret )
 					return nret;
 			}
@@ -505,6 +802,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		{
 			p_forward_addr->timeout = p_forward_rule->forward_timeout ;
 		}
+		
 		p_forward_rule->forward_addr_count++;
 	}
 	
@@ -588,16 +886,15 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 			p_server_addr->ip_connection_stat.max_connections_per_ip = p_forward_rule->server_ip_connection_stat.max_connections_per_ip ;
 		}
 		
+		nret = InitIpConnectionStat( & (p_server_addr->ip_connection_stat) );
+		if( nret )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "InitIpConnectionStat failed in rule[%s]" , p_forward_rule->rule_id );
+			return nret;
+		}
+		
 		p_forward_rule->server_addr_count++;
 	}
-	
-	nret = InitIpConnectionStat( penv , & (p_forward_rule->client_ip_connection_stat) ) ;
-	if( nret )
-		return nret;
-	
-	nret = InitIpConnectionStat( penv , & (p_forward_rule->server_ip_connection_stat) ) ;
-	if( nret )
-		return nret;
 	
 	return 0;
 }
@@ -614,7 +911,7 @@ static void LogOneRule( struct ServerEnv *penv , struct ForwardRule *p_forward_r
 	/* 客户端配置信息 */
 	for( client_addr_index = 0 , p_client_addr = p_forward_rule->client_addr_array ; client_addr_index < p_forward_rule->client_addr_count ; client_addr_index++ , p_client_addr++ )
 	{
-		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%s]" , p_client_addr->netaddr.ip , p_client_addr->netaddr.port.port_str );
+		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%s] (max_connections=[%u])" , p_client_addr->netaddr.ip , p_client_addr->netaddr.port.port_str , p_client_addr->ip_connection_stat.max_connections );
 	}
 	
 	InfoLog( __FILE__ , __LINE__ , "    -" );
@@ -622,7 +919,7 @@ static void LogOneRule( struct ServerEnv *penv , struct ForwardRule *p_forward_r
 	/* 转发端配置信息 */
 	for( forward_addr_index = 0 , p_forward_addr = p_forward_rule->forward_addr_array ; forward_addr_index < p_forward_rule->forward_addr_count ; forward_addr_index++ , p_forward_addr++ )
 	{
-		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%d] (timeout=[%u])" , p_forward_addr->netaddr.ip , p_forward_addr->netaddr.port.port_int , p_forward_rule->forward_timeout );
+		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%d] (timeout=[%u])" , p_forward_addr->netaddr.ip , p_forward_addr->netaddr.port.port_int , p_forward_addr->timeout );
 	}
 	
 	InfoLog( __FILE__ , __LINE__ , "    >" );
@@ -630,7 +927,7 @@ static void LogOneRule( struct ServerEnv *penv , struct ForwardRule *p_forward_r
 	/* 服务端配置信息 */
 	for( server_addr_index = 0 , p_server_addr = p_forward_rule->server_addr_array ; server_addr_index < p_forward_rule->server_addr_count ; server_addr_index++ , p_server_addr++ )
 	{
-		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%d] (heartbeat=[%u])" , p_server_addr->netaddr.ip , p_server_addr->netaddr.port.port_int , p_server_addr->heartbeat );
+		InfoLog( __FILE__ , __LINE__ , "    [%s]:[%d] (max_connections=[%u],heartbeat=[%u])" , p_server_addr->netaddr.ip , p_server_addr->netaddr.port.port_int , p_server_addr->ip_connection_stat.max_connections , p_server_addr->heartbeat );
 	}
 	
 	InfoLog( __FILE__ , __LINE__ , "    ;" );
@@ -645,7 +942,30 @@ int LoadCustomProperty_GlobalProperties( void *p1 , void *p2 , void *p3 , char *
 	
 	struct ServerEnv	*penv = (struct ServerEnv *)p1 ;
 	
-	if( STRCMP( property_name , == , "timeout" ) )
+	if( STRCMP( property_name , == , "moratorium" ) )
+	{
+		penv->moratorium = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
+		if( postfix && postfix[0] )
+		{
+			if( STRCMP( postfix , == , "s" ) || STRCMP( postfix , == , "S" ) )
+			{
+			}
+			else if( STRCMP( postfix , == , "m" ) || STRCMP( postfix , == , "M" ) )
+			{
+				penv->moratorium *= 60 ;
+			}
+			else if( STRCMP( postfix , == , "h" ) || STRCMP( postfix , == , "H" ) )
+			{
+				penv->moratorium *= 3600 ;
+			}
+			else
+			{
+				ErrorLog( __FILE__ , __LINE__ , "property[moratorium] value[%s] invalid" , property_value );
+				return -1;
+			}
+		}
+	}
+	else if( STRCMP( property_name , == , "timeout" ) )
 	{
 		penv->timeout = (unsigned int)strtoul( property_value , & postfix , 10 ) ;
 		if( postfix && postfix[0] )
@@ -683,7 +1003,7 @@ int LoadCustomProperty_GlobalProperties( void *p1 , void *p2 , void *p3 , char *
 			}
 			else
 			{
-				ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
+				ErrorLog( __FILE__ , __LINE__ , "property[max_ip] value[%s] invalid" , property_value );
 				return -1;
 			}
 		}
@@ -703,7 +1023,7 @@ int LoadCustomProperty_GlobalProperties( void *p1 , void *p2 , void *p3 , char *
 			}
 			else
 			{
-				ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
+				ErrorLog( __FILE__ , __LINE__ , "property[max_connections] value[%s] invalid" , property_value );
 				return -1;
 			}
 		}
@@ -723,7 +1043,7 @@ int LoadCustomProperty_GlobalProperties( void *p1 , void *p2 , void *p3 , char *
 			}
 			else
 			{
-				ErrorLog( __FILE__ , __LINE__ , "property[timeout] value[%s] invalid" , property_value );
+				ErrorLog( __FILE__ , __LINE__ , "property[max_connections_per_ip] value[%s] invalid" , property_value );
 				return -1;
 			}
 		}
@@ -732,6 +1052,20 @@ int LoadCustomProperty_GlobalProperties( void *p1 , void *p2 , void *p3 , char *
 	{
 		ErrorLog( __FILE__ , __LINE__ , "invalid property[%s]" , property_name );
 		return -1;
+	}
+	
+	return 0;
+}
+
+static int CheckRuleIdDuplicated( struct ServerEnv *penv , char *rule_id )
+{
+	unsigned int		forward_rule_index ;
+	struct ForwardRule	*p_forward_rule = NULL ;
+	
+	for( forward_rule_index = 0 , p_forward_rule = penv->forward_rule_array ; forward_rule_index < penv->forward_rule_count ; forward_rule_index++ , p_forward_rule++ )
+	{
+		if( STRCMP( p_forward_rule->rule_id , == , rule_id ) )
+			return -1;
 	}
 	
 	return 0;
@@ -759,7 +1093,10 @@ int LoadConfig( struct ServerEnv *penv )
 		/* 读转发规则ID */
 		nret = GetToken( rule_id , fp , "%64s" , rule_id ) ;
 		if( nret == EOF )
+		{
+			nret = 0 ;
 			break;
+		}
 		
 		if( STRCMP( rule_id , == , "(" ) )
 		{
@@ -767,21 +1104,31 @@ int LoadConfig( struct ServerEnv *penv )
 			
 			nret = LoadProperty( fp , & LoadCustomProperty_GlobalProperties , penv , NULL , NULL ) ;
 			if( nret )
-				return nret;
+			{
+				break;
+			}
 			
 			nret = GetToken( sepchar , fp , "%1s" , sepchar ) ;
 			if( nret == EOF )
 			{
 				ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
-				return -11;
+				break;
 			}
 			if( STRCMP( sepchar , != , ";" ) )
 			{
 				ErrorLog( __FILE__ , __LINE__ , "expect ';' after properties" );
-				return -11;
+				nret = -1 ;
+				break;
 			}
 			
 			continue;
+		}
+		
+		nret = CheckRuleIdDuplicated( penv , rule_id ) ;
+		if( nret )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "rule_id[%s] duplicated" , rule_id );
+			break;
 		}
 		
 		/* 调整转发规则数组 */
@@ -799,7 +1146,7 @@ int LoadConfig( struct ServerEnv *penv )
 			if( new_forward_rules == NULL )
 			{
 				ErrorLog( __FILE__ , __LINE__ , "realloc failed , errno[%d]" , errno );
-				nret = -11 ;
+				nret = -1 ;
 				break;
 			}
 			penv->forward_rule_array = new_forward_rules ;
@@ -812,7 +1159,7 @@ int LoadConfig( struct ServerEnv *penv )
 		if( nret )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "LoadOneRule failed[%d]" , nret );
-			return nret;
+			break;
 		}
 		
 		penv->forward_rule_count++;
@@ -821,11 +1168,12 @@ int LoadConfig( struct ServerEnv *penv )
 	/* 关闭配置文件 */
 	fclose( fp );
 	
-	if( nret != EOF )
+	if( nret )
 		return nret;
 	
 	/* 输出已装载转发规则到日志 */
-	InfoLog( __FILE__ , __LINE__ , "Global properties >>>" );
+	InfoLog( __FILE__ , __LINE__ , "Global Properties >>>" );
+	InfoLog( __FILE__ , __LINE__ , "  moratorium[%u]" , penv->moratorium );
 	InfoLog( __FILE__ , __LINE__ , "  timeout[%u]" , penv->timeout );
 	InfoLog( __FILE__ , __LINE__ , "  max_ip[%u]" , penv->ip_connection_stat.max_ip );
 	InfoLog( __FILE__ , __LINE__ , "  max_connections[%u]" , penv->ip_connection_stat.max_connections );
@@ -850,14 +1198,24 @@ void UnloadConfig( struct ServerEnv *penv )
 {
 	unsigned int		forward_rule_index ;
 	struct ForwardRule	*p_forward_rule = NULL ;
+	unsigned int		client_addr_index ;
+	struct ClientNetAddress	*p_client_addr = NULL ;
+	unsigned int		server_addr_index ;
+	struct ServerNetAddress	*p_server_addr = NULL ;
 	
 	if( penv->forward_rule_array )
 	{
-		CleanIpConnectionStat( penv , & (p_forward_rule->client_ip_connection_stat) );
-		CleanIpConnectionStat( penv , & (p_forward_rule->server_ip_connection_stat) );
-		
 		for( forward_rule_index = 0 , p_forward_rule = penv->forward_rule_array ; forward_rule_index < penv->forward_rule_count ; forward_rule_index++ , p_forward_rule++ )
 		{
+			for( client_addr_index = 0 , p_client_addr = p_forward_rule->client_addr_array ; client_addr_index < p_forward_rule->client_addr_count ; client_addr_index++ , p_client_addr++ )
+			{
+				CleanIpConnectionStat( & (p_client_addr->ip_connection_stat) );
+			}
+			for( server_addr_index = 0 , p_server_addr = p_forward_rule->server_addr_array ; server_addr_index < p_forward_rule->server_addr_count ; server_addr_index++ , p_server_addr++ )
+			{
+				CleanIpConnectionStat( & (p_server_addr->ip_connection_stat) );
+			}
+			
 			if( p_forward_rule->client_addr_array )
 				free( p_forward_rule->client_addr_array );
 			if( p_forward_rule->forward_addr_array )

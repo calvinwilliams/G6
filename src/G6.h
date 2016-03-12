@@ -133,9 +133,6 @@
 #define FORWARD_SESSION_TYPE_CLIENT		2 /* 作为客户端连接远端服务端会话 */
 #define FORWARD_SESSION_TYPE_SERVER		3 /* 作为服务端接受远端连接会话 */
 #define FORWARD_SESSION_TYPE_MANAGER		4 /* 作为管理服务端接受远端连接会话 */
-#if 0
-#define FORWARD_SESSION_TYPE_HEARTBEAT		5 /* 作为服务端接受远端服务端心跳连接会话 */
-#endif
 
 #define FORWARD_SESSION_STATUS_UNUSED		0 /* 未使用 */
 #define FORWARD_SESSION_STATUS_READY		1 /* 准备使用 */
@@ -146,8 +143,8 @@
 
 #define IO_BUFFER_SIZE				4096 /* 输入输出缓冲区大小 */
 
-#define DEFAULT_ALIVE_TIMEOUT			10 /* 缺省存活时间，单位：秒 */
-#define DEFAULT_DISABLE_TIMEOUT			60 /* 缺省暂禁时间，单位：秒 */
+#define DEFAULT_MORATORIUM_SECONDS		60 /* 缺省暂禁时间，单位：秒 */
+#define DEFAULT_TIMEOUT_SECONDS			60 /* 缺省超时时间，单位：秒 */
 
 #define G6_LISTEN_SOCKFDS			"G6_LISTEN_SOCKFDS"
 
@@ -202,14 +199,14 @@ struct ForwardNetAddress
 } ;
 
 /* 服务端信息结构 */
-#define SERVER_CONNECTION_COUNT_INCREASE(_penv_,_client_addr_,_d_) \
+#define SERVER_CONNECTION_COUNT_INCREASE(_penv_,_server_addr_,_d_) \
 	pthread_mutex_lock( & ((_penv_)->server_connection_count_mutex) ); \
-	(_client_addr_).server_connection_count+=(_d_); \
+	(_server_addr_).ip_connection_stat.connection_count+=(_d_); \
 	pthread_mutex_unlock( & ((_penv_)->server_connection_count_mutex) );
 
-#define SERVER_CONNECTION_COUNT_DECREASE(_penv_,_client_addr_,_d_) \
+#define SERVER_CONNECTION_COUNT_DECREASE(_penv_,_server_addr_,_d_) \
 	pthread_mutex_lock( & ((_penv_)->server_connection_count_mutex) ); \
-	(_client_addr_).server_connection_count-=(_d_); \
+	(_server_addr_).ip_connection_stat.connection_count-=(_d_); \
 	pthread_mutex_unlock( & ((_penv_)->server_connection_count_mutex) );
 
 struct ServerNetAddress
@@ -217,11 +214,8 @@ struct ServerNetAddress
 	struct NetAddress	netaddr ; /* 网络地址结构 */
 	
 	unsigned int		heartbeat ; /* 心跳周期 */
-	
 	unsigned char		server_unable ; /* 服务端可用标志 */
 	time_t			timestamp_to ; /* 恢复正常秒戳 */
-	
-	unsigned int		server_connection_count ; /* 服务端连接数量 */
 	
 	time_t			rtt ; /* 最近读时间戳 */
 	time_t			wtt ; /* 最近写时间戳 */
@@ -286,7 +280,8 @@ struct CommandParameter
 	unsigned int			forward_thread_size ; /* -t ... */
 	unsigned int			forward_session_size ; /* -s ... */
 	int				log_level ; /* --log-level (DEBUG|INFO|WARN|ERROR|FATAL)*/
-	int				no_daemon_flag ; /* --no-daemon (1|0) */
+	int				no_daemon_flag ; /* --no-daemon */
+	int				close_log_flag ; /* --close-log */
 } ;
 
 /* 服务器环境结构 */
@@ -318,6 +313,7 @@ struct ServerEnv
 	struct ForwardNetAddress	*old_forward_addr_array ; /* 用于平滑升级的老进程侦听端口信息 */
 	unsigned int			old_forward_addr_count ;
 	
+	unsigned int			moratorium ; /* 暂禁时间 */
 	unsigned int			timeout ; /* 超时周期 */
 	struct rb_root			timeout_rbtree ; /* 超时 红黑树 */
 	unsigned int			heartbeat ; /* 心跳周期 */
@@ -391,8 +387,8 @@ int UpdateTimeoutNode2( struct ServerEnv *penv , struct ForwardSession *p_forwar
 int GetLastestTimeout( struct ServerEnv *penv );
 struct ForwardSession *GetExpireTimeoutNode( struct ServerEnv *penv );
 
-int InitIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat );
-void CleanIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat );
+int InitIpConnectionStat( struct IpConnectionStat *p_ip_connection_stat );
+void CleanIpConnectionStat( struct IpConnectionStat *p_ip_connection_stat );
 int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int );
 int RemoveIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_connection_stat , uint32_t ip_int );
 
