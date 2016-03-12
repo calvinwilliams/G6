@@ -280,7 +280,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		{
 			p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTING ;
 			
-			InfoLog( __FILE__ , __LINE__ , "#%d# connecting [%s:%d]#%d# ..." , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , p_reverse_forward_session->sock );
+			DebugLog( __FILE__ , __LINE__ , "#%d# connecting [%s:%d]#%d# ..." , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , p_reverse_forward_session->sock );
 			
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_reverse_forward_session ;
@@ -310,7 +310,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
 		p_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
 		
-		InfoLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] ok" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int );
+		DebugLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] ok" , p_reverse_forward_session->p_reverse_forward_session->sock , p_reverse_forward_session->sock , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int );
 		
 		p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].server_unable = 0 ;
 		
@@ -365,7 +365,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 		else
 		{
 			GetNetAddress( & netaddr );
-			InfoLog( __FILE__ , __LINE__ , "accept [%s:%d]#%d# ok" , netaddr.ip , netaddr.port.port_int , sock );
+			DebugLog( __FILE__ , __LINE__ , "accept [%s:%d]#%d# ok" , netaddr.ip , netaddr.port.port_int , sock );
 		}
 		
 		/* ÉèÖÃsocketÑ¡Ïî */		
@@ -529,7 +529,7 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	p_forward_session->p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
 	
 	p_servers_addr = p_forward_session->p_forward_rule->server_addr_array + p_forward_session->server_index ;
-	InfoLog( __FILE__ , __LINE__ , "#%d#-#%d# connect2 [%s:%d] ok" , p_forward_session->p_reverse_forward_session->sock , p_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
+	DebugLog( __FILE__ , __LINE__ , "#%d#-#%d# connect2 [%s:%d] ok" , p_forward_session->p_reverse_forward_session->sock , p_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 	
 	p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_unable = 0 ;
 	
@@ -555,7 +555,7 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	return 0;
 }
 
-char	g_ForwardSessionTypeDesc[][7+1] = { "LISTEN" , "CLIENT" , "SERVER" , "MANAGER" } ;
+char	g_ForwardSessionTypeDesc[][7+1] = { "UNUSED" , "LISTEN" , "CLIENT" , "SERVER" , "MANAGER" } ;
 char	g_ForwardSessionStatusDesc[][10+1] = { "UNUSED" , "READY" , "LISTEN" , "CONNECTING" , "CONNECTED" , "COMMAND" } ;
 
 #define COMMAND_SEPCHAR		" \t"
@@ -570,7 +570,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 	int			io_buffer_len ;
 	
 	cmd = strtok( p_forward_session->io_buffer , COMMAND_SEPCHAR ) ;
-	if( cmd == NULL )
+	if( cmd == NULL || STRCMP( cmd , == , "" ) )
 	{
 		;
 	}
