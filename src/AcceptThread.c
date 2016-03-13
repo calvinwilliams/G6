@@ -915,7 +915,7 @@ void *AcceptThread( struct ServerEnv *penv )
 			timeout = -1 ;
 		*/
 		
-		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]... timeout[%d]" , penv->accept_request_pipe.fds[0] , 1000 );
+		ErrorLog( __FILE__ , __LINE__ , "epoll_wait sock[%d][...] forward_session_count[%u] ..." , penv->accept_request_pipe.fds[0] , penv->forward_session_count );
 		if( penv->cmd_para.close_log_flag == 1 )
 			CloseLogFile();
 		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , 1000 ) ;
@@ -1036,7 +1036,7 @@ void *AcceptThread( struct ServerEnv *penv )
 						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 						DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
 						_CLOSESOCKET( p_forward_session->sock );
-						SetForwardSessionUnused( penv , p_forward_session );
+						//SetForwardSessionUnused( penv , p_forward_session );
 						nret = ResolveConnectingError( penv , p_forward_session->p_reverse_forward_session ) ;
 						if( nret )
 						{
@@ -1044,7 +1044,7 @@ void *AcceptThread( struct ServerEnv *penv )
 							epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL );
 							DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_reverse_forward_session->sock );
 							_CLOSESOCKET( p_reverse_forward_session->sock );
-							SetForwardSessionUnused( penv , p_reverse_forward_session );
+							SetForwardSessionUnused2( penv , p_reverse_forward_session , p_forward_session );
 						}
 					}
 				}
