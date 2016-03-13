@@ -213,6 +213,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	_SOCKLEN_T		addr_len ;
 	struct epoll_event	event ;
 	unsigned int		forward_thread_index ;
+	int			forward_epoll_fd ;
 	
 	int			nret = 0 ;
 	
@@ -293,18 +294,20 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 		
 		forward_thread_index = (p_reverse_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
+		forward_epoll_fd = penv->forward_epoll_fd_array[forward_thread_index] ;
 		
 		AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_forward_session , g_time_tv.tv_sec + p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout );
 		
-		memset( & event , 0x00 , sizeof(struct epoll_event) );
-		event.data.ptr = p_reverse_forward_session ;
-		event.events = EPOLLIN | EPOLLERR ;
-		epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_MOD , p_reverse_forward_session->sock , & event );
-		
-		memset( & event , 0x00 , sizeof(struct epoll_event) );
-		event.data.ptr = p_forward_session ;
-		event.events = EPOLLIN | EPOLLERR ;
-		epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_MOD , p_forward_session->sock , & event );
+		nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , NULL , 0 , 0 , 1 ) ;
+		if( nret > 0 )
+		{
+			DISCONNECT_PAIR
+		}
+		else if( nret < 0 )
+		{
+			ErrorLog( __FILE__ , __LINE__ , "OnForwardInput failed[%d]" , nret );
+			DISCONNECT_PAIR
+		}
 	}
 	
 	return 0;
@@ -491,10 +494,11 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	int			error , code ;
 #endif
 	_SOCKLEN_T		addr_len ;
-	struct epoll_event	event ;
+	//struct epoll_event	event ;
 	
 	struct ServerNetAddress	*p_servers_addr = NULL ;
 	unsigned int		forward_thread_index ;
+	int			forward_epoll_fd ;
 	
 	int			nret = 0 ;
 	
@@ -545,18 +549,20 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->p_reverse_forward_session->sock , NULL );
 	
 	forward_thread_index = (p_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
+	forward_epoll_fd = penv->forward_epoll_fd_array[forward_thread_index] ;
 	
-	AddTimeoutTreeNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
+	AddTimeoutTreeNode2( penv , p_forward_session , p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
 	
-	memset( & event , 0x00 , sizeof(struct epoll_event) );
-	event.data.ptr = p_forward_session ;
-	event.events = EPOLLIN | EPOLLERR ;
-	epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_ADD , p_forward_session->sock , & event );
-	
-	memset( & event , 0x00 , sizeof(struct epoll_event) );
-	event.data.ptr = p_forward_session->p_reverse_forward_session ;
-	event.events = EPOLLIN | EPOLLERR ;
-	epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_ADD , p_forward_session->p_reverse_forward_session->sock , & event );
+	nret = OnForwardInput( penv , p_reverse_forward_session , forward_epoll_fd , NULL , 0 , 0 , 1 ) ;
+	if( nret > 0 )
+	{
+		DISCONNECT_PAIR
+	}
+	else if( nret < 0 )
+	{
+		ErrorLog( __FILE__ , __LINE__ , "OnForwardInput failed[%d]" , nret );
+		DISCONNECT_PAIR
+	}
 	
 	return 0;
 }

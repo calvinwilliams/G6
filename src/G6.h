@@ -478,6 +478,34 @@ void *_AcceptThread( void *pv );
 
 /********* ForwardThread *********/
 
+#define DISCONNECT_PAIR	\
+	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL ); \
+	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL ); \
+	RemoveTimeoutTreeNode2( penv , p_forward_session , p_reverse_forward_session ); \
+	if( p_forward_session->type == FORWARD_SESSION_TYPE_SERVER ) \
+	{ \
+		nret = RemoveIpConnectionStat( penv , & (p_forward_session->p_forward_rule->client_addr_array[p_forward_session->client_index].ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr ) ; \
+		if( nret ) \
+			ErrorLog( __FILE__ , __LINE__ , "RemoveIpConnectionStat failed[%d] , SERVER.1" , nret ); \
+		nret = RemoveIpConnectionStat( penv , & (p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].ip_connection_stat) , p_reverse_forward_session->netaddr.sockaddr.sin_addr.s_addr ) ; \
+		if( nret ) \
+			ErrorLog( __FILE__ , __LINE__ , "RemoveIpConnectionStat failed[%d] , SERVER.2" , nret ); \
+	} \
+	else if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT ) \
+	{ \
+		nret = RemoveIpConnectionStat( penv , & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr ) ; \
+		if( nret ) \
+			ErrorLog( __FILE__ , __LINE__ , "RemoveIpConnectionStat failed[%d] , CLIENT.1" , nret ); \
+		nret = RemoveIpConnectionStat( penv , & (p_reverse_forward_session->p_forward_rule->client_addr_array[p_reverse_forward_session->client_index].ip_connection_stat) , p_reverse_forward_session->netaddr.sockaddr.sin_addr.s_addr ) ; \
+		if( nret ) \
+			ErrorLog( __FILE__ , __LINE__ , "RemoveIpConnectionStat failed[%d] , CLIENT.2" , nret ); \
+	} \
+	DebugLog( __FILE__ , __LINE__ , "close #%d# #%d#" , p_forward_session->sock , p_reverse_forward_session->sock ); \
+	_CLOSESOCKET2( p_forward_session->sock , p_reverse_forward_session->sock ); \
+	/* IgnoreReverseSessionEvents( p_forward_session , events , event_index , event_count ); */ \
+	SetForwardSessionUnused2( penv , p_forward_session , p_reverse_forward_session );
+
+int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_session , int forward_epoll_fd , struct epoll_event *p_events , int event_index , int event_count , unsigned char after_accept_flag );
 void *ForwardThread( unsigned long forward_thread_index );
 void *_ForwardThread( void *pv );
 
