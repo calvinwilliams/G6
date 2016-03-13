@@ -157,13 +157,15 @@ int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchChar
 /* °ó¶¨CPUÇ×ÔµÐÔ */
 int BindCpuAffinity( int processor_no )
 {
+	/*
 	cpu_set_t	cpu_mask ;
-	
+	*/
 	int		nret = 0 ;
-	
+	/*
 	CPU_ZERO( & cpu_mask );
 	CPU_SET( processor_no , & cpu_mask );
 	nret = sched_setaffinity( 0 , sizeof(cpu_mask) , & cpu_mask ) ;
+	*/
 	return nret;
 }
 

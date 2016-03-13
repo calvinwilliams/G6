@@ -14,22 +14,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <sys/epoll.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <time.h>
 #include <stdarg.h>
 #include <limits.h>
-#include <signal.h>
 #include <sys/wait.h>
-#define __USE_GNU
+#include <signal.h>
 #include <sched.h>
 #include <pthread.h>
 #define _VSNPRINTF			vsnprintf
@@ -87,12 +86,6 @@
 		GetLocalTime( & stNow ); \
 		_SYSTEMTIME2TM( stNow , (_stime_) ); \
 	}
-#endif
-
-#if ( defined __STDC_VERSION__ ) && ( __STDC_VERSION__ >= 199901 )
-int setenv(const char *name, const char *value, int overwrite);
-char *strdup(const char *s);
-struct tm *localtime_r(const time_t *timep, struct tm *result);
 #endif
 
 #include "LOGC.h"

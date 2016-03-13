@@ -126,6 +126,8 @@ static void sig_proc( struct ServerEnv *penv )
 
 int MonitorProcess( struct ServerEnv *penv )
 {
+	struct sigaction	act ;
+	
 	pid_t			pid ;
 	int			status ;
 	
@@ -138,12 +140,16 @@ int MonitorProcess( struct ServerEnv *penv )
 	InfoLog( __FILE__ , __LINE__ , "--- G6.MonitorProcess ---" );
 	
 	/* 设置信号句柄 */
+	act.sa_handler = & sig_set_flag ;
+	sigemptyset( & (act.sa_mask) );
+	act.sa_flags = 0 ;
+	
 	signal( SIGCLD , SIG_DFL );
 	signal( SIGCHLD , SIG_DFL );
 	signal( SIGPIPE , SIG_IGN );
-	signal( SIGTERM , & sig_set_flag );
-	signal( SIGUSR1 , & sig_set_flag );
-	signal( SIGUSR2 , & sig_set_flag );
+	sigaction( SIGTERM , & act , NULL );
+	sigaction( SIGUSR1 , & act , NULL );
+	sigaction( SIGUSR2 , & act , NULL );
 	
 	/* 主工作循环 */
 	while( g_exit_flag == 0 )
