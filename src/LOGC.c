@@ -109,6 +109,8 @@ static int WriteLogBase( int log_level , char *c_filename , long c_fileline , ch
 	log_buflen = 0 ;
 	log_buf_remain_len = sizeof(log_buffer) - 1 ;
 	
+//gettimeofday( & g_time_tv , NULL );
+//len = SNPRINTF( log_bufptr , log_buf_remain_len , "%s.%06ld | %-5s | %lu:%lu:%s:%ld | " , g_date_and_time , g_time_tv.tv_usec , log_level_itoa[log_level] , g_pid , g_tid , p_c_filename , c_fileline ) ;
 	len = SNPRINTF( log_bufptr , log_buf_remain_len , "%s | %-5s | %lu:%lu:%s:%ld | " , g_date_and_time , log_level_itoa[log_level] , g_pid , g_tid , p_c_filename , c_fileline ) ;
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
 	len = VSNPRINTF( log_bufptr , log_buf_remain_len , format , valist );

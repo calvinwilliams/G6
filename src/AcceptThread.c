@@ -1,31 +1,5 @@
 #include "G6.h"
 
-static int MatchClientAddr( struct NetAddress *p_netaddr , struct ForwardRule *p_forward_rule , unsigned int *p_client_index )
-{
-	char			port_str[ PORT_MAXLEN + 1 ] ;
-	unsigned int		match_client_index ;
-	struct ClientNetAddress	*p_match_addr = NULL ;
-	
-	memset( port_str , 0x00 , sizeof(port_str) );
-	snprintf( port_str , sizeof(port_str)-1 , "%d" , p_netaddr->port.port_int );
-	
-	for( match_client_index = 0 , p_match_addr = & (p_forward_rule->client_addr_array[0])
-		; match_client_index < p_forward_rule->client_addr_count
-		; match_client_index++ , p_match_addr++ )
-	{
-		if(	IsMatchString( p_match_addr->netaddr.ip , p_netaddr->ip , '*' , '?' ) == 0
-			&&
-			IsMatchString( p_match_addr->netaddr.port.port_str , port_str , '*' , '?' ) == 0
-		)
-		{
-			(*p_client_index) = match_client_index ;
-			return MATCH;
-		}
-	}
-	
-	return NOT_MATCH;
-}
-
 #define IF_SERVER_ENABLE(_server_addr_) \
 	if( (_server_addr_).server_unable == 1 && (_server_addr_).timestamp_to > 0 && g_time_tv.tv_sec > (_server_addr_).timestamp_to ) \
 	{ \
@@ -336,6 +310,32 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	}
 	
 	return 0;
+}
+
+static int MatchClientAddr( struct NetAddress *p_netaddr , struct ForwardRule *p_forward_rule , unsigned int *p_client_index )
+{
+	char			port_str[ PORT_MAXLEN + 1 ] ;
+	unsigned int		match_client_index ;
+	struct ClientNetAddress	*p_match_addr = NULL ;
+	
+	memset( port_str , 0x00 , sizeof(port_str) );
+	snprintf( port_str , sizeof(port_str)-1 , "%d" , p_netaddr->port.port_int );
+	
+	for( match_client_index = 0 , p_match_addr = & (p_forward_rule->client_addr_array[0])
+		; match_client_index < p_forward_rule->client_addr_count
+		; match_client_index++ , p_match_addr++ )
+	{
+		if(	IsMatchString( p_match_addr->netaddr.ip , p_netaddr->ip , '*' , '?' ) == 0
+			&&
+			IsMatchString( p_match_addr->netaddr.port.port_str , port_str , '*' , '?' ) == 0
+		)
+		{
+			(*p_client_index) = match_client_index ;
+			return MATCH;
+		}
+	}
+	
+	return NOT_MATCH;
 }
 
 static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_listen_session )
@@ -892,6 +892,8 @@ void *AcceptThread( struct ServerEnv *penv )
 	SETTID
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.AcceptThread ---" );
 	
+	BindCpuAffinity( 0 );
+	
 	/* 主工作循环 */
 	g_exit_flag = 0 ;
 	while( g_exit_flag == 0 || penv->forward_session_count > 0 )
@@ -1074,8 +1076,10 @@ void *AcceptThread( struct ServerEnv *penv )
 
 void *_AcceptThread( void *pv )
 {
-	InfoLog( __FILE__ , __LINE__ , "return" );
+	AcceptThread( (struct ServerEnv *)pv );
 	
-	return AcceptThread( (struct ServerEnv *)pv );
+	INIT_TIME
+	InfoLog( __FILE__ , __LINE__ , "return" );
+	return NULL;
 }
 

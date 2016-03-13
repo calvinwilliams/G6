@@ -11,6 +11,8 @@
 
 #if ( defined __linux ) || ( defined __unix )
 #include <stdio.h>
+#define __USE_GNU
+#include <sched.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -199,16 +201,6 @@ struct ForwardNetAddress
 } ;
 
 /* 服务端信息结构 */
-#define SERVER_CONNECTION_COUNT_INCREASE(_penv_,_server_addr_,_d_) \
-	pthread_mutex_lock( & ((_penv_)->server_connection_count_mutex) ); \
-	(_server_addr_).ip_connection_stat.connection_count+=(_d_); \
-	pthread_mutex_unlock( & ((_penv_)->server_connection_count_mutex) );
-
-#define SERVER_CONNECTION_COUNT_DECREASE(_penv_,_server_addr_,_d_) \
-	pthread_mutex_lock( & ((_penv_)->server_connection_count_mutex) ); \
-	(_server_addr_).ip_connection_stat.connection_count-=(_d_); \
-	pthread_mutex_unlock( & ((_penv_)->server_connection_count_mutex) );
-
 struct ServerNetAddress
 {
 	struct NetAddress	netaddr ; /* 网络地址结构 */
@@ -358,6 +350,7 @@ void SetNetAddress( struct NetAddress *p_netaddr );
 void GetNetAddress( struct NetAddress *p_netaddr );
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) );
 int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchCharacters, char cMatchOneCharacters);
+int BindCpuAffinity( int processor_no );
 
 #define SetReuseAddr(_sock_) \
 	{ \

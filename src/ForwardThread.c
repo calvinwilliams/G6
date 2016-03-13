@@ -232,6 +232,8 @@ void *ForwardThread( unsigned long forward_thread_index )
 	SETTID
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.ForwardThread.%d ---" , forward_thread_index+1 );
 	
+	BindCpuAffinity( forward_thread_index+1 );
+	
 	/* 主工作循环 */
 	while( g_exit_flag == 0 || penv->forward_session_count > 0 )
 	{
