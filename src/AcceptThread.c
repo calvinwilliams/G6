@@ -325,9 +325,17 @@ static int MatchClientAddr( struct NetAddress *p_netaddr , struct ForwardRule *p
 		; match_client_index < p_forward_rule->client_addr_count
 		; match_client_index++ , p_match_addr++ )
 	{
-		if(	IsMatchString( p_match_addr->netaddr.ip , p_netaddr->ip , '*' , '?' ) == 0
+		if(	(
+				STRCMP( p_match_addr->netaddr.ip , == , "*" )
+				||
+				IsMatchString( p_match_addr->netaddr.ip , p_netaddr->ip , '*' , '?' ) == 0
+			)
 			&&
-			IsMatchString( p_match_addr->netaddr.port.port_str , port_str , '*' , '?' ) == 0
+			(
+				STRCMP( p_match_addr->netaddr.port.port_str , == , "*" )
+				||
+				IsMatchString( p_match_addr->netaddr.port.port_str , port_str , '*' , '?' ) == 0
+			)
 		)
 		{
 			(*p_client_index) = match_client_index ;
@@ -873,7 +881,9 @@ static int OnReceiveCommand( struct ServerEnv *penv , struct ForwardSession *p_f
 
 void *AcceptThread( struct ServerEnv *penv )
 {
+	/*
 	int			timeout ;
+	*/
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
 	int			event_count ;
 	int			event_index ;
@@ -898,23 +908,29 @@ void *AcceptThread( struct ServerEnv *penv )
 	g_exit_flag = 0 ;
 	while( g_exit_flag == 0 || penv->forward_session_count > 0 )
 	{
+		/*
 		if( g_exit_flag == 1 )
 			timeout = 1000 ;
 		else
 			timeout = -1 ;
+		*/
 		
-		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]... timeout[%d]" , penv->accept_request_pipe.fds[0] , timeout );
+		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]... timeout[%d]" , penv->accept_request_pipe.fds[0] , 1000 );
 		if( penv->cmd_para.close_log_flag == 1 )
 			CloseLogFile();
-		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
+		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , 1000 ) ;
+		/*
 		if( g_exit_flag == 0 )
 		{
 			UPDATE_TIME
 		}
 		else
 		{
+		*/
 			INIT_TIME
+		/*
 		}
+		*/
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
@@ -971,9 +987,11 @@ void *AcceptThread( struct ServerEnv *penv )
 						g_exit_flag = 1 ;
 						DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
 						
+						/*
 						DebugLog( __FILE__ , __LINE__ , "write accept_response_pipe Q ..." );
 						nret = write( penv->accept_response_pipe.fds[1] , "Q" , 1 ) ;
 						DebugLog( __FILE__ , __LINE__ , "write accept_response_pipe Q done[%d]" , nret );
+						*/
 					}
 				}
 			}

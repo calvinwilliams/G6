@@ -724,6 +724,10 @@ int InitIpConnectionStat( struct IpConnectionStat *p_ip_connection_stat )
 		p_ip_connection_stat->ip_count = 0 ;
 		p_ip_connection_stat->connection_count = 0 ;
 	}
+	else
+	{
+		memset( p_ip_connection_stat , 0x00 , sizeof(struct IpConnectionStat) );
+	}
 	
 	return 0;
 }

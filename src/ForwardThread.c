@@ -211,7 +211,9 @@ void *ForwardThread( unsigned long forward_thread_index )
 	struct ServerEnv	*penv = g_penv ;
 	int			forward_epoll_fd ;
 	
+	/*
 	int			timeout ;
+	*/
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
 	int			event_count ;
 	int			event_index = 0 ;
@@ -237,6 +239,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 	/* 主工作循环 */
 	while( g_exit_flag == 0 || penv->forward_session_count > 0 )
 	{
+		/*
 		if( g_exit_flag == 1 )
 		{
 			timeout = 1000 ;
@@ -245,35 +248,35 @@ void *ForwardThread( unsigned long forward_thread_index )
 		{
 			timeout = GetLastestTimeout( penv ) ;
 		}
+		*/
 		
-		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]... timeout[%d]" , penv->forward_request_pipe[forward_thread_index].fds[0] , timeout );
+		DebugLog( __FILE__ , __LINE__ , "epoll_wait [%d][...]... timeout[%d]" , penv->forward_request_pipe[forward_thread_index].fds[0] , 1000 );
 		if( penv->cmd_para.close_log_flag == 1 )
 			CloseLogFile();
-		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
+		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , 1000 ) ;
+		/*
 		if( g_exit_flag == 0 )
 		{
 			UPDATE_TIME
 		}
 		else
 		{
+		*/
 			INIT_TIME
+		/*
 		}
+		*/
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		
-		if( event_count == 0 )
+		while(1)
 		{
-			while(1)
-			{
-				p_forward_session = GetExpireTimeoutNode( penv ) ;
-				if( p_forward_session == NULL )
-					break;
-				p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
-				
-				ErrorLog( __FILE__ , __LINE__ , "forward session TIMEOUT" );
-				DISCONNECT_PAIR
-			}
+			p_forward_session = GetExpireTimeoutNode( penv ) ;
+			if( p_forward_session == NULL )
+				break;
+			p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
 			
-			continue;
+			ErrorLog( __FILE__ , __LINE__ , "forward session TIMEOUT" );
+			DISCONNECT_PAIR
 		}
 		
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )

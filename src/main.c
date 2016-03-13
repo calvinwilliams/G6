@@ -147,9 +147,13 @@ int main( int argc , char *argv[] )
 	}
 	
 	/* 设置公共参数 */
+	/*
 	penv->moratorium = DEFAULT_MORATORIUM_SECONDS ;
+	*/
 	penv->timeout = DEFAULT_TIMEOUT_SECONDS ;
+	/*
 	penv->ip_connection_stat.max_connections = UINT_MAX - 100 ;
+	*/
 	
 	/* 装载配置 */
 	nret = LoadConfig( penv ) ;
