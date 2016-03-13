@@ -1,6 +1,5 @@
 #include "G6.h"
 
-/*
 static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
 {
 	struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
@@ -20,7 +19,6 @@ static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session
 	
 	return;
 }
-*/
 
 int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_session , int forward_epoll_fd , struct epoll_event *p_events , int event_index , int event_count , unsigned char after_accept_flag )
 {
@@ -78,7 +76,7 @@ int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_se
 		if( _ERRNO == _EWOULDBLOCK )
 		{
 			/* 通讯发送缓冲区满 */
-			//IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
+			IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
 			
 			if( after_accept_flag == 1 )
 			{
@@ -138,7 +136,7 @@ int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_se
 		InfoLog( __FILE__ , __LINE__ , "transfer #%d# [%d/%d]bytes to #%d#" , p_forward_session->netaddr.ip , p_forward_session->netaddr.port.port_int , p_forward_session->sock , len , p_forward_session->io_buffer_len , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , p_reverse_forward_session->sock );
 		DebugHexLog( __FILE__ , __LINE__ , p_forward_session->io_buffer , len , NULL );
 		
-		//IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
+		IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
 		
 		p_forward_session->io_buffer_len -= len ;
 		p_forward_session->io_buffer_offsetpos = len ;
