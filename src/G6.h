@@ -416,6 +416,16 @@ void UpdateTimeNow( struct timeval *p_time_tv , char *p_date_and_time );
 		SetCloseExec( _sock4_ ); \
 	}
 
+#define SetNetAddress(_p_netaddr_) \
+	memset( & ((_p_netaddr_)->sockaddr) , 0x00 , sizeof(struct sockaddr_in) ); \
+	(_p_netaddr_)->sockaddr.sin_family = AF_INET ; \
+	(_p_netaddr_)->sockaddr.sin_addr.s_addr = inet_addr((_p_netaddr_)->ip) ; \
+	(_p_netaddr_)->sockaddr.sin_port = htons( (unsigned short)((_p_netaddr_)->port.port_int) );
+
+#define GetNetAddress(_p_netaddr_) \
+	strcpy( (_p_netaddr_)->ip , inet_ntoa((_p_netaddr_)->sockaddr.sin_addr) ); \
+	(_p_netaddr_)->port.port_int = (int)ntohs( (_p_netaddr_)->sockaddr.sin_port ) ;
+
 /********* Envirment *********/
 
 int InitEnvirment( struct ServerEnv *penv );

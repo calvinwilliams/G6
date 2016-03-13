@@ -316,7 +316,6 @@ static int MatchClientAddr( struct NetAddress *p_netaddr , struct ForwardRule *p
 	unsigned int		match_client_index ;
 	struct ClientNetAddress	*p_match_addr = NULL ;
 	
-	memset( port_str , 0x00 , sizeof(port_str) );
 	snprintf( port_str , sizeof(port_str)-1 , "%d" , p_netaddr->port.port_int );
 	
 	for( match_client_index = 0 , p_match_addr = & (p_forward_rule->client_addr_array[0])

@@ -21,6 +21,8 @@ unsigned long CalcHash( char *str )
 	return hashval;
 }
 
+#if 0
+
 /* 用IP和PORT设置sockaddr结构 */
 void SetNetAddress( struct NetAddress *p_netaddr )
 {
@@ -38,6 +40,8 @@ void GetNetAddress( struct NetAddress *p_netaddr )
 	p_netaddr->port.port_int = (int)ntohs( p_netaddr->sockaddr.sin_port ) ;
 	return;
 }
+
+#endif
 
 /* 转换为守护进程 */
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) )
