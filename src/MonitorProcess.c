@@ -7,7 +7,7 @@ signed char		g_SIGTERM_flag = 0 ;
 
 static void sig_set_flag( int sig_no )
 {
-	INIT_TIME
+	UPDATE_TIME
 	InfoLog( __FILE__ , __LINE__ , "recv signal[%d]" , sig_no );
 	
 	if( sig_no == SIGUSR1 )
@@ -126,30 +126,24 @@ static void sig_proc( struct ServerEnv *penv )
 
 int MonitorProcess( struct ServerEnv *penv )
 {
-	struct sigaction	act ;
-	
 	pid_t			pid ;
 	int			status ;
 	
 	int			nret = 0 ;
 	
 	/* 设置日志输出文件 */
-	INIT_TIME
+	UPDATE_TIME
 	SETPID
 	SETTID
 	InfoLog( __FILE__ , __LINE__ , "--- G6.MonitorProcess ---" );
 	
 	/* 设置信号句柄 */
-	act.sa_handler = & sig_set_flag ;
-	sigemptyset( & (act.sa_mask) );
-	act.sa_flags = 0 ;
-	
 	signal( SIGCLD , SIG_DFL );
 	signal( SIGCHLD , SIG_DFL );
 	signal( SIGPIPE , SIG_IGN );
-	sigaction( SIGTERM , & act , NULL );
-	sigaction( SIGUSR1 , & act , NULL );
-	sigaction( SIGUSR2 , & act , NULL );
+	signal( SIGTERM , & sig_set_flag );
+	signal( SIGUSR1 , & sig_set_flag );
+	signal( SIGUSR2 , & sig_set_flag );
 	
 	/* 主工作循环 */
 	while( g_exit_flag == 0 )
@@ -170,8 +164,8 @@ int MonitorProcess( struct ServerEnv *penv )
 		}
 		else if( penv->pid == 0 )
 		{
-			INIT_TIME
-			SETPID
+			UPDATE_TIME
+			SETPID 
 			SETTID
 			
 			InfoLog( __FILE__ , __LINE__ , "child : [%ld]fork[%ld]" , getppid() , getpid() );
@@ -199,7 +193,7 @@ int MonitorProcess( struct ServerEnv *penv )
 		/* 监控子进程结束 */
 		_WAITPID :
 		pid = waitpid( -1 , & status , 0 );
-		INIT_TIME
+		UPDATE_TIME
 		if( pid == -1 )
 		{
 			if( errno == EINTR )
@@ -216,17 +210,17 @@ int MonitorProcess( struct ServerEnv *penv )
 		if( pid != penv->pid )
 			goto _WAITPID;
 		
-		if( WCOREDUMP(status) )
+		if( WTERMSIG(status) )
 		{
 			ErrorLog( __FILE__ , __LINE__
-				, "waitpid[%ld] WEXITSTATUS[%d] WIFSIGNALED[%d] WTERMSIG[%d] WCOREDUMP[%d]"
-				, penv->pid , WEXITSTATUS(status) , WIFSIGNALED(status) , WTERMSIG(status) , WCOREDUMP(status) );
+				, "waitpid[%ld] WEXITSTATUS[%d] WIFSIGNALED[%d] WTERMSIG[%d]"
+				, penv->pid , WEXITSTATUS(status) , WIFSIGNALED(status) , WTERMSIG(status) );
 		}
 		else
 		{
 			InfoLog( __FILE__ , __LINE__
-				, "waitpid[%ld] WEXITSTATUS[%d] WIFSIGNALED[%d] WTERMSIG[%d] WCOREDUMP[%d]"
-				, penv->pid , WEXITSTATUS(status) , WIFSIGNALED(status) , WTERMSIG(status) , WCOREDUMP(status) );
+				, "waitpid[%ld] WEXITSTATUS[%d] WIFSIGNALED[%d] WTERMSIG[%d]"
+				, penv->pid , WEXITSTATUS(status) , WIFSIGNALED(status) , WTERMSIG(status) );
 		}
 		
 		if( g_exit_flag == 0 )

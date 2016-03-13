@@ -160,16 +160,39 @@ int BindCpuAffinity( int processor_no )
 	CPU_ZERO( & cpu_mask );
 	CPU_SET( processor_no , & cpu_mask );
 	nret = sched_setaffinity( 0 , sizeof(cpu_mask) , & cpu_mask ) ;
-	if( nret == -1 )
-	{
-		WarnLog( __FILE__ , __LINE__ , "sched_setaffinity[%d] failed[%d] , errno[%d]" , processor_no , nret , errno );
-		return -1;
-	}
-	else
-	{
-		InfoLog( __FILE__ , __LINE__ , "sched_setaffinity[%d] ok" , processor_no );
-	}
+	return nret;
+}
+
+void UpdateTimeNow( struct timeval *p_time_tv , char *p_date_and_time )
+{
+	struct tm		stime ;
 	
-	return 0;
+	p_time_tv->tv_sec = time( NULL ) ;
+	
+#if ( defined __linux__ ) || ( defined __unix ) || ( defined _AIX )
+	/*
+	gettimeofday( & g_time_tv , NULL );
+	*/
+	localtime_r( &(p_time_tv->tv_sec) , & stime );
+#elif ( defined _WIN32 )
+	{
+	SYSTEMTIME	stNow ;
+	GetLocalTime( & stNow );
+	time( & (p_time_tv->tv_sec) );
+	/*
+	g_time_tv.tv_usec = stNow.wMilliseconds * 1000 ;
+	*/
+	stime.tm_year = stNow.wYear - 1900 ;
+	stime.tm_mon = stNow.wMonth - 1 ;
+	stime.tm_mday = stNow.wDay ;
+	stime.tm_hour = stNow.wHour ;
+	stime.tm_min = stNow.wMinute ;
+	stime.tm_sec = stNow.wSecond ;
+	}
+#endif
+	
+	strftime( p_date_and_time , sizeof(g_date_and_time) , "%Y-%m-%d %H:%M:%S" , & stime );
+	
+	return;
 }
 

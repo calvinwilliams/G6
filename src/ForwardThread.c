@@ -229,43 +229,29 @@ void *ForwardThread( unsigned long forward_thread_index )
 	/* 设置日志输出文件 */
 	SetLogFile( penv->cmd_para.log_pathfilename );
 	SetLogLevel( penv->cmd_para.log_level );
-	INIT_TIME
+	UPDATE_TIME
 	SETPID
 	SETTID
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.ForwardThread.%d ---" , forward_thread_index+1 );
 	
 	BindCpuAffinity( forward_thread_index+1 );
+	InfoLog( __FILE__ , __LINE__ , "sched_setaffinity" );
 	
 	/* 主工作循环 */
 	while( g_exit_flag == 0 || penv->forward_session_count > 0 )
 	{
-		/*
-		if( g_exit_flag == 1 )
-		{
-			timeout = 1000 ;
-		}
-		else
-		{
-			timeout = GetLastestTimeout( penv ) ;
-		}
-		*/
-		
-		ErrorLog( __FILE__ , __LINE__ , "epoll_wait sock[%d][...] forward_session_count[%u] ..." , penv->forward_request_pipe[forward_thread_index].fds[0] , penv->forward_session_count );
+		DebugLog( __FILE__ , __LINE__ , "epoll_wait sock[%d][...] forward_session_count[%u] ..." , penv->forward_request_pipe[forward_thread_index].fds[0] , penv->forward_session_count );
 		if( penv->cmd_para.close_log_flag == 1 )
 			CloseLogFile();
 		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , 1000 ) ;
-		/*
 		if( g_exit_flag == 0 )
 		{
-			UPDATE_TIME
+			UPDATE_TIME_FROM_CACHE
 		}
 		else
 		{
-		*/
-			INIT_TIME
-		/*
+			UPDATE_TIME
 		}
-		*/
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		
 		while(1)
@@ -369,7 +355,7 @@ void *_ForwardThread( void *pv )
 	free( p_forward_thread_index );
 	ForwardThread( forward_thread_index );
 	
-	INIT_TIME
+	UPDATE_TIME
 	InfoLog( __FILE__ , __LINE__ , "pthread_exit" );
 	pthread_exit(NULL);
 }

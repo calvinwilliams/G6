@@ -305,8 +305,6 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		event.data.ptr = p_forward_session ;
 		event.events = EPOLLIN | EPOLLERR ;
 		epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_MOD , p_forward_session->sock , & event );
-		
-		nret = write( penv->forward_request_pipe[forward_thread_index].fds[1] , "L" , 1 ) ;
 	}
 	
 	return 0;
@@ -561,8 +559,6 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	event.events = EPOLLIN | EPOLLERR ;
 	epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_ADD , p_forward_session->p_reverse_forward_session->sock , & event );
 	
-	write( penv->forward_request_pipe[forward_thread_index].fds[1] , " " , 1 );
-	
 	return 0;
 }
 
@@ -779,6 +775,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 				if( STRCMP( p_servers_addr->netaddr.ip , == , ip ) && p_servers_addr->netaddr.port.port_int == port_int )
 				{
 					p_servers_addr->server_unable = 0 ;
+					p_servers_addr->timestamp_to = 0 ;
 					
 					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d enabled\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 					send( sock , io_buffer , io_buffer_len , 0 );
@@ -897,41 +894,33 @@ void *AcceptThread( struct ServerEnv *penv )
 	/* 设置日志输出文件 */
 	SetLogFile( penv->cmd_para.log_pathfilename );
 	SetLogLevel( penv->cmd_para.log_level );
-	INIT_TIME
+	UPDATE_TIME
 	SETPID
 	SETTID
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.AcceptThread ---" );
 	
 	BindCpuAffinity( 0 );
+	InfoLog( __FILE__ , __LINE__ , "sched_setaffinity" );
 	
 	/* 主工作循环 */
 	g_exit_flag = 0 ;
 	while( g_exit_flag == 0 || penv->forward_session_count > 0 )
 	{
-		/*
-		if( g_exit_flag == 1 )
-			timeout = 1000 ;
-		else
-			timeout = -1 ;
-		*/
-		
-		ErrorLog( __FILE__ , __LINE__ , "epoll_wait sock[%d][...] forward_session_count[%u] ..." , penv->accept_request_pipe.fds[0] , penv->forward_session_count );
+		DebugLog( __FILE__ , __LINE__ , "epoll_wait sock[%d][...] forward_session_count[%u] ..." , penv->accept_request_pipe.fds[0] , penv->forward_session_count );
 		if( penv->cmd_para.close_log_flag == 1 )
 			CloseLogFile();
 		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , 1000 ) ;
-		/*
+		
 		if( g_exit_flag == 0 )
 		{
-			UPDATE_TIME
+			UPDATE_TIME_FROM_CACHE
 		}
 		else
 		{
-		*/
-			INIT_TIME
-		/*
+			UPDATE_TIME
 		}
-		*/
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
+		
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
 			if( p_event->data.ptr == NULL )
@@ -986,12 +975,6 @@ void *AcceptThread( struct ServerEnv *penv )
 						
 						g_exit_flag = 1 ;
 						DebugLog( __FILE__ , __LINE__ , "set g_exit_flag[%d]" , g_exit_flag );
-						
-						/*
-						DebugLog( __FILE__ , __LINE__ , "write accept_response_pipe Q ..." );
-						nret = write( penv->accept_response_pipe.fds[1] , "Q" , 1 ) ;
-						DebugLog( __FILE__ , __LINE__ , "write accept_response_pipe Q done[%d]" , nret );
-						*/
 					}
 				}
 			}
@@ -1036,7 +1019,6 @@ void *AcceptThread( struct ServerEnv *penv )
 						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 						DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
 						_CLOSESOCKET( p_forward_session->sock );
-						//SetForwardSessionUnused( penv , p_forward_session );
 						nret = ResolveConnectingError( penv , p_forward_session->p_reverse_forward_session ) ;
 						if( nret )
 						{
@@ -1096,7 +1078,7 @@ void *_AcceptThread( void *pv )
 {
 	AcceptThread( (struct ServerEnv *)pv );
 	
-	INIT_TIME
+	UPDATE_TIME
 	InfoLog( __FILE__ , __LINE__ , "return" );
 	return NULL;
 }

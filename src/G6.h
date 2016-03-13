@@ -11,8 +11,6 @@
 
 #if ( defined __linux ) || ( defined __unix )
 #include <stdio.h>
-#define __USE_GNU
-#include <sched.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -31,6 +29,8 @@
 #include <limits.h>
 #include <signal.h>
 #include <sys/wait.h>
+#define __USE_GNU
+#include <sched.h>
 #include <pthread.h>
 #define _VSNPRINTF			vsnprintf
 #define _SNPRINTF			snprintf
@@ -87,6 +87,12 @@
 		GetLocalTime( & stNow ); \
 		_SYSTEMTIME2TM( stNow , (_stime_) ); \
 	}
+#endif
+
+#if ( defined __STDC_VERSION__ ) && ( __STDC_VERSION__ >= 199901 )
+int setenv(const char *name, const char *value, int overwrite);
+char *strdup(const char *s);
+struct tm *localtime_r(const time_t *timep, struct tm *result);
 #endif
 
 #include "LOGC.h"
@@ -286,12 +292,12 @@ struct PipeFds
 	int				fds[ 2 ] ;
 } ;
 
-#define INIT_TIME \
+#define UPDATE_TIME \
 	{ \
 		UpdateTimeNow( & g_time_tv , g_date_and_time ); \
 	}
 
-#define UPDATE_TIME \
+#define UPDATE_TIME_FROM_CACHE \
 	{ \
 		pthread_mutex_lock( & (penv->time_cache_mutex) ); \
 		g_time_tv.tv_sec = penv->time_tv.tv_sec ; \
@@ -351,6 +357,7 @@ void GetNetAddress( struct NetAddress *p_netaddr );
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) );
 int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchCharacters, char cMatchOneCharacters);
 int BindCpuAffinity( int processor_no );
+void UpdateTimeNow( struct timeval *p_time_tv , char *p_date_and_time );
 
 #define SetReuseAddr(_sock_) \
 	{ \
@@ -466,7 +473,6 @@ void *_ForwardThread( void *pv );
 
 /********* TimeThread *********/
 
-void UpdateTimeNow( struct timeval *p_time_tv , char *p_date_and_time );
 void *TimeThread();
 void *_TimeThread( void *pv );
 

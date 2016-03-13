@@ -557,7 +557,7 @@ static int _AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *
 	pp_new_node = & (penv->timeout_rbtree.rb_node) ;
         while( *pp_new_node )
         {
-                p = container_of( *pp_new_node , struct ForwardSession , timeout_rbnode );
+                p = container_of( *pp_new_node , struct ForwardSession , timeout_rbnode ) ;
 		
                 p_parent = (*pp_new_node) ;
                 if( p_forward_session->timeout_timestamp < p->timeout_timestamp )

@@ -89,6 +89,7 @@ void SetLogFile( char *format , ... );
 void CloseLogFile();
 void SetLogLevel( int log_level );
 
+extern TLS int			g_log_level ;
 extern TLS struct timeval	g_time_tv ;
 extern TLS char			g_date_and_time[ 10 + 1 + 8 + 1 ] ;
 extern TLS unsigned long	g_pid ;
@@ -96,6 +97,64 @@ extern TLS unsigned long	g_tid ;
 
 #define SETPID			g_pid = PROCESSID ;
 #define SETTID			g_tid = THREADID ;
+
+#if ( defined __STDC_VERSION__ ) && ( __STDC_VERSION__ >= 199901 )
+
+int WriteLogBaseV( int log_level , char *c_filename , long c_fileline , char *format , va_list valist );
+int WriteLogBase( int log_level , char *c_filename , long c_fileline , char *format , ... );
+
+#define WriteLog(_log_level_,_c_filename_,_c_fileline_,...) \
+	if( log_level >= g_log_level ) \
+		WriteLogBase( _log_level_ , _c_filename_ , _c_fileline_ , __VA_ARGS__ );
+
+#define FatalLog(_c_filename_,_c_fileline_,...) \
+	if( LOGLEVEL_FATAL >= g_log_level ) \
+		WriteLogBase( LOGLEVEL_FATAL , _c_filename_ , _c_fileline_ , __VA_ARGS__ );
+
+#define ErrorLog(_c_filename_,_c_fileline_,...) \
+	if( LOGLEVEL_ERROR >= g_log_level ) \
+		WriteLogBase( LOGLEVEL_ERROR , _c_filename_ , _c_fileline_ , __VA_ARGS__ );
+
+#define WarnLog(_c_filename_,_c_fileline_,...) \
+	if( LOGLEVEL_WARN >= g_log_level ) \
+		WriteLogBase( LOGLEVEL_WARN , _c_filename_ , _c_fileline_ , __VA_ARGS__ );
+
+#define InfoLog(_c_filename_,_c_fileline_,...) \
+	if( LOGLEVEL_INFO >= g_log_level ) \
+		WriteLogBase( LOGLEVEL_INFO , _c_filename_ , _c_fileline_ , __VA_ARGS__ );
+
+#define DebugLog(_c_filename_,_c_fileline_,...) \
+	if( LOGLEVEL_DEBUG >= g_log_level ) \
+		WriteLogBase( LOGLEVEL_DEBUG , _c_filename_ , _c_fileline_ , __VA_ARGS__ );
+
+int WriteHexLogBaseV( int log_level , char *c_filename , long c_fileline , char *buf , long buflen , char *format , va_list valist );
+int WriteHexLogBase( int log_level , char *c_filename , long c_fileline , char *buf , long buflen , char *format , ... );
+
+#define WriteHexLog(_log_level_,_c_filename_,_c_fileline_,_buf_,_buflen_,...) \
+	if( log_level >= g_log_level ) \
+		WriteHexLogBase( _log_level_ , _c_filename_ , _c_fileline_ , _buf_ , _buflen_ , __VA_ARGS__ );
+
+#define FatalHexLog(_c_filename_,_c_fileline_,_buf_,_buflen_,...) \
+	if( LOGLEVEL_FATAL >= g_log_level ) \
+		WriteHexLogBase( LOGLEVEL_FATAL , _c_filename_ , _c_fileline_ , _buf_ , _buflen_ , __VA_ARGS__ );
+
+#define ErrorHexLog(_c_filename_,_c_fileline_,_buf_,_buflen_,...) \
+	if( LOGLEVEL_ERROR >= g_log_level ) \
+		WriteHexLogBase( LOGLEVEL_ERROR , _c_filename_ , _c_fileline_ , _buf_ , _buflen_ , __VA_ARGS__ );
+
+#define WarnHexLog(_c_filename_,_c_fileline_,_buf_,_buflen_,...) \
+	if( LOGLEVEL_WARN >= g_log_level ) \
+		WriteHexLogBase( LOGLEVEL_WARN , _c_filename_ , _c_fileline_ , _buf_ , _buflen_ , __VA_ARGS__ );
+
+#define InfoHexLog(_c_filename_,_c_fileline_,_buf_,_buflen_,...) \
+	if( LOGLEVEL_INFO >= g_log_level ) \
+		WriteHexLogBase( LOGLEVEL_INFO , _c_filename_ , _c_fileline_ , _buf_ , _buflen_ , __VA_ARGS__ );
+
+#define DebugHexLog(_c_filename_,_c_fileline_,_buf_,_buflen_,...) \
+	if( LOGLEVEL_DEBUG >= g_log_level ) \
+		WriteHexLogBase( LOGLEVEL_DEBUG , _c_filename_ , _c_fileline_ , _buf_ , _buflen_ , __VA_ARGS__ );
+
+#else
 
 int WriteLog( int log_level , char *c_filename , long c_fileline , char *format , ... );
 int FatalLog( char *c_filename , long c_fileline , char *format , ... );
@@ -110,6 +169,8 @@ int ErrorHexLog( char *c_filename , long c_fileline , char *buf , long buflen , 
 int WarnHexLog( char *c_filename , long c_fileline , char *buf , long buflen , char *format , ... );
 int InfoHexLog( char *c_filename , long c_fileline , char *buf , long buflen , char *format , ... );
 int DebugHexLog( char *c_filename , long c_fileline , char *buf , long buflen , char *format , ... );
+
+#endif
 
 #if ( defined __STDC_VERSION__ ) && ( __STDC_VERSION__ >= 199901 )
 
