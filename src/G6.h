@@ -1,5 +1,5 @@
 /*
- * G6 - TCP Transfer && LB Dispenser
+ * G6 - TCP Bridge && LB Dispenser
  * Author      : calvin
  * Email       : calvinwillliams@163.com
  *

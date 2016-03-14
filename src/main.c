@@ -8,7 +8,7 @@ struct ServerEnv	*g_penv = NULL ;
 static void version()
 {
 	printf( "G6 v%s build %s %s\n" , __G6_VERSION , __DATE__ , __TIME__ );
-	printf( "TCP Transfer && Load-Balance Dispenser\n" );
+	printf( "TCP Bridge && Load-Balance Dispenser\n" );
 	printf( "Copyright by calvin 2016\n" );
 	return;
 }
