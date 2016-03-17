@@ -49,6 +49,7 @@ static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session
 
 static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_session , int forward_epoll_fd , struct epoll_event *p_events , int event_index , int event_count )
 {
+	struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
 	int			len ;
 	struct epoll_event	event ;
 	
@@ -58,7 +59,7 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	if( p_forward_session->io_buffer_len == 0 )
 	{
 		/* 对端断开连接 */
-		InfoLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock );
+		DebugLog( __FILE__ , __LINE__ , "recv #%d# closed" , p_forward_session->sock );
 		return 1;
 	}
 	else if( p_forward_session->io_buffer_len == -1 )
@@ -78,7 +79,7 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	}
 	
 	/* 发送通讯数据 */
-	len = send( p_forward_session->p_reverse_forward_session->sock , p_forward_session->io_buffer , p_forward_session->io_buffer_len , 0 ) ;
+	len = send( p_reverse_forward_session->sock , p_forward_session->io_buffer , p_forward_session->io_buffer_len , 0 ) ;
 	if( len == -1 )
 	{
 		if( _ERRNO == _EWOULDBLOCK )
@@ -92,9 +93,9 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 			epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_forward_session->sock , & event );
 			
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
-			event.data.ptr = p_forward_session->p_reverse_forward_session ;
+			event.data.ptr = p_reverse_forward_session ;
 			event.events = EPOLLOUT | EPOLLERR ;
-			epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_forward_session->p_reverse_forward_session->sock , & event );
+			epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_reverse_forward_session->sock , & event );
 		}
 		else
 		{
@@ -106,14 +107,14 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 	else if( len == p_forward_session->io_buffer_len )
 	{
 		/* 一次全发完 */
-		InfoLog( __FILE__ , __LINE__ , "transfer #%d# [%d]bytes to #%d#" , p_forward_session->sock , len , p_forward_session->p_reverse_forward_session->sock );
+		InfoLog( __FILE__ , __LINE__ , "transfer [%s:%u]#%d# [%d]bytes to [%s:%u]#%d#" , p_forward_session->netaddr.ip , p_forward_session->netaddr.port.port_int , p_forward_session->sock , len , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , p_reverse_forward_session->sock );
 		DebugHexLog( __FILE__ , __LINE__ , p_forward_session->io_buffer , p_forward_session->io_buffer_len , NULL );
 		p_forward_session->io_buffer_len = 0 ;
 	}
 	else
 	{
 		/* 只发送了部分 */
-		InfoLog( __FILE__ , __LINE__ , "transfer #%d# [%d/%d]bytes to #%d#" , p_forward_session->sock , len , p_forward_session->io_buffer_len , p_forward_session->p_reverse_forward_session->sock );
+		InfoLog( __FILE__ , __LINE__ , "transfer #%d# [%d/%d]bytes to #%d#" , p_forward_session->netaddr.ip , p_forward_session->netaddr.port.port_int , p_forward_session->sock , len , p_forward_session->io_buffer_len , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , p_reverse_forward_session->sock );
 		DebugHexLog( __FILE__ , __LINE__ , p_forward_session->io_buffer , len , NULL );
 		
 		IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
@@ -127,9 +128,9 @@ static int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_for
 		epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_forward_session->sock , & event );
 		
 		memset( & event , 0x00 , sizeof(struct epoll_event) );
-		event.data.ptr = p_forward_session->p_reverse_forward_session ;
+		event.data.ptr = p_reverse_forward_session ;
 		event.events = EPOLLOUT | EPOLLERR ;
-		epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_forward_session->p_reverse_forward_session->sock , & event );
+		epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_reverse_forward_session->sock , & event );
 	}
 	
 	/* 登记最近写时间戳 */
@@ -168,7 +169,7 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 	else if( len == p_reverse_forward_session->io_buffer_len )
 	{
 		/* 一次全发完 */
-		InfoLog( __FILE__ , __LINE__ , "transfer #%d# [%d]bytes to #%d#" , p_reverse_forward_session->sock , len , p_forward_session->sock );
+		InfoLog( __FILE__ , __LINE__ , "transfer [%s:%u]#%d# [%d]bytes to [%s:%u]#%d#" , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , p_reverse_forward_session->sock , len , p_forward_session->netaddr.ip , p_forward_session->netaddr.port.port_int , p_forward_session->sock );
 		DebugHexLog( __FILE__ , __LINE__ , p_reverse_forward_session->io_buffer + p_reverse_forward_session->io_buffer_offsetpos , p_reverse_forward_session->io_buffer_len , NULL );
 		
 		p_reverse_forward_session->io_buffer_len = 0 ;
@@ -186,7 +187,7 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 	else
 	{
 		/* 只发送了部分 */
-		InfoLog( __FILE__ , __LINE__ , "transfer #%d# [%d/%d]bytes to #%d#" , p_reverse_forward_session->sock , len , p_reverse_forward_session->io_buffer_len , p_forward_session->sock );
+		InfoLog( __FILE__ , __LINE__ , "transfer [%s:%u]#%d# [%d/%d]bytes to [%s:%u]#%d#" , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , p_reverse_forward_session->sock , len , p_reverse_forward_session->io_buffer_len , p_forward_session->netaddr.ip , p_forward_session->netaddr.port.port_int , p_forward_session->sock );
 		DebugHexLog( __FILE__ , __LINE__ , p_reverse_forward_session->io_buffer + p_reverse_forward_session->io_buffer_offsetpos , len , NULL );
 		
 		p_reverse_forward_session->io_buffer_len -= len ;
