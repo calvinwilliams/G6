@@ -248,7 +248,14 @@ void *ForwardThread( unsigned long forward_thread_index )
 		if( penv->cmd_para.close_log_flag == 1 )
 			CloseLogFile();
 		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , timeout ) ;
-		UPDATE_TIME
+		if( g_exit_flag == 0 )
+		{
+			UPDATE_TIME
+		}
+		else
+		{
+			INIT_TIME
+		}
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
 		
 		if( event_count == 0 )

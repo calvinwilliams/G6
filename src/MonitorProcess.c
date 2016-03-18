@@ -1,9 +1,9 @@
 #include "G6.h"
 
-int			g_exit_flag = 0 ;
-int			g_SIGUSR1_flag = 0 ;
-int			g_SIGUSR2_flag = 0 ;
-int			g_SIGTERM_flag = 0 ;
+signed char		g_exit_flag = 0 ;
+signed char		g_SIGUSR1_flag = 0 ;
+signed char		g_SIGUSR2_flag = 0 ;
+signed char		g_SIGTERM_flag = 0 ;
 
 static void sig_set_flag( int sig_no )
 {

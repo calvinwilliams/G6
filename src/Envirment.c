@@ -362,7 +362,6 @@ int AddListeners( struct ServerEnv *penv )
 					{
 						memcpy( & (p_forward_addr->netaddr.sockaddr) , & (p_old_forward_addr->netaddr.sockaddr) , sizeof(struct sockaddr_in) );
 						p_forward_addr->sock = p_old_forward_addr->sock ;
-ErrorLog( __FILE__ , __LINE__ , "p_forward_addr->timeout[%ld]" , p_forward_addr->timeout );
 						memset( p_old_forward_addr , 0x00 , sizeof(struct ForwardNetAddress) );
 						break;
 					}

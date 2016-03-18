@@ -287,7 +287,7 @@ struct CommandParameter
 
 /* 服务器环境结构 */
 extern struct ServerEnv			*g_penv ;
-extern int				g_exit_flag ;
+extern signed char			g_exit_flag ;
 
 struct PipeFds
 {
@@ -295,13 +295,17 @@ struct PipeFds
 } ;
 
 #define INIT_TIME \
-	UpdateTimeNow( & g_time_tv , g_date_and_time ); \
+	{ \
+		UpdateTimeNow( & g_time_tv , g_date_and_time ); \
+	}
 
 #define UPDATE_TIME \
-	pthread_mutex_lock( & (penv->time_cache_mutex) ); \
-	g_time_tv.tv_sec = penv->time_tv.tv_sec ; \
-	memcpy( g_date_and_time , penv->date_and_time , sizeof(penv->date_and_time) ); \
-	pthread_mutex_unlock( & (penv->time_cache_mutex) );
+	{ \
+		pthread_mutex_lock( & (penv->time_cache_mutex) ); \
+		g_time_tv.tv_sec = penv->time_tv.tv_sec ; \
+		memcpy( g_date_and_time , penv->date_and_time , sizeof(penv->date_and_time) ); \
+		pthread_mutex_unlock( & (penv->time_cache_mutex) ); \
+	}
 
 struct ServerEnv
 {
