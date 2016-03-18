@@ -1,5 +1,36 @@
 #include "G6.h"
 
+/*
+static int BindCpuProcessor()
+{
+	int		processor_count ;
+	int		processor_no ;
+	cpu_set_t	cpu_mask ;
+	
+	int		nret = 0 ;
+	
+	processor_count = sysconf( _SC_NPROCESSORS_CONF ) ;
+	
+	for( processor_no = processor_count - 1 ; processor_no >= 0 ; processor_no-- )
+	{
+		CPU_ZERO( & cpu_mask );
+		CPU_SET( processor_no , & cpu_mask );
+		nret = sched_setaffinity( 0 , sizeof(cpu_mask) , & cpu_mask ) ;
+		if( nret == 0 )
+		{
+			InfoLog( __FILE__ , __LINE__ , "sched_setaffinity[%d] ok" , processor_no );
+			return 0;
+		}
+		else
+		{
+			WarnLog( __FILE__ , __LINE__ , "sched_setaffinity[%d] failed[%d],errno[%d]" , processor_no , nret , errno );
+		}
+	}
+	
+	return -1;
+}
+*/
+
 int WorkerProcess( struct ServerEnv *penv )
 {
 	unsigned int		forward_thread_index ;
