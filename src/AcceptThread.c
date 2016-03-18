@@ -1074,6 +1074,8 @@ void *AcceptThread( struct ServerEnv *penv )
 
 void *_AcceptThread( void *pv )
 {
+	InfoLog( __FILE__ , __LINE__ , "return" );
+	
 	return AcceptThread( (struct ServerEnv *)pv );
 }
 

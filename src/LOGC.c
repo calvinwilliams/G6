@@ -32,6 +32,8 @@ const char log_level_itoa[][6] = { "DEBUG" , "INFO" , "WARN" , "ERROR" , "FATAL"
 /* 打开日志文件 */
 static int OpenLogFile()
 {
+	CloseLogFile();
+	
 #if ( defined __linux__ ) || ( defined __unix ) || ( defined _AIX )
 	g_file_fd = OPEN( g_log_pathfilename , O_CREAT | O_WRONLY | O_APPEND , S_IRWXU | S_IRWXG | S_IRWXO ) ;
 #elif ( defined _WIN32 )

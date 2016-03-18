@@ -7,6 +7,7 @@ signed char		g_SIGTERM_flag = 0 ;
 
 static void sig_set_flag( int sig_no )
 {
+	INIT_TIME
 	InfoLog( __FILE__ , __LINE__ , "recv signal[%d]" , sig_no );
 	
 	if( sig_no == SIGUSR1 )
@@ -223,6 +224,8 @@ int MonitorProcess( struct ServerEnv *penv )
 		if( g_exit_flag == 0 )
 			sleep(1);
 	}
+	
+	InfoLog( __FILE__ , __LINE__ , "return" );
 	
 	return 0;
 }

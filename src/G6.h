@@ -354,17 +354,67 @@ struct ServerEnv
 
 int Rand( int min, int max );
 unsigned long CalcHash( char *str );
-void SetReuseAddr( int sock );
-void SetNonBlocking( int sock );
-void SetNagleClosed( int sock );
-void SetCloseExec( int sock );
-void SetCloseExec2( int sock , int sock2 );
-void SetCloseExec3( int sock , int sock2 , int sock3 );
-void SetCloseExec4( int sock , int sock2 , int sock3 , int sock4 );
 void SetNetAddress( struct NetAddress *p_netaddr );
 void GetNetAddress( struct NetAddress *p_netaddr );
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) );
 int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchCharacters, char cMatchOneCharacters);
+
+#define SetReuseAddr(_sock_) \
+	{ \
+		int	on = 1 ; \
+		setsockopt( _sock_ , SOL_SOCKET , SO_REUSEADDR , (void *) & on, sizeof(on) ); \
+	}
+
+#if ( defined __linux ) || ( defined __unix )
+#define SetNonBlocking(_sock_) \
+	{ \
+		int	opts; \
+		opts = fcntl( _sock_ , F_GETFL ) ; \
+		opts = opts | O_NONBLOCK; \
+		fcntl( _sock_ , F_SETFL , opts ); \
+	}
+#elif ( defined _WIN32 )
+#define SetNonBlocking(_sock_) \
+	{ \
+		u_long	mode = 1 ; \
+		ioctlsocket( _sock_ , FIONBIO , & mode ); \
+	}
+#endif
+
+#define SetNagleClosed(_sock_) \
+	{ \
+		int	on = 1 ; \
+		setsockopt( _sock_ , IPPROTO_TCP , TCP_NODELAY , (void*) & on , sizeof(int) ); \
+	}
+
+#define SetCloseExec(_sock_) \
+	{ \
+		int	val ; \
+		val = fcntl( _sock_ , F_GETFD ) ; \
+		val |= FD_CLOEXEC ; \
+		fcntl( _sock_ , F_SETFD , val ); \
+	}
+
+#define SetCloseExec2(_sock_,_sock2_) \
+	{ \
+		SetCloseExec( _sock_ ); \
+		SetCloseExec( _sock2_ ); \
+	}
+
+#define SetCloseExec3(_sock_,_sock2_,_sock3_) \
+	{ \
+		SetCloseExec( _sock_ ); \
+		SetCloseExec( _sock2_ ); \
+		SetCloseExec( _sock3_ ); \
+	}
+
+#define SetCloseExec4(_sock_,_sock2_,_sock3_,_sock4_) \
+	{ \
+		SetCloseExec( _sock_ ); \
+		SetCloseExec( _sock2_ ); \
+		SetCloseExec( _sock3_ ); \
+		SetCloseExec( _sock4_ ); \
+	}
 
 /********* Envirment *********/
 

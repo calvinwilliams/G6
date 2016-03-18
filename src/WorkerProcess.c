@@ -72,6 +72,8 @@ int WorkerProcess( struct ServerEnv *penv )
 		InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_join ForwardThread[%lu] ok" , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
 	}
 	
+	InfoLog( __FILE__ , __LINE__ , "return" );
+	
 	return 0;
 }
 
