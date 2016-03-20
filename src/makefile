@@ -27,6 +27,7 @@ BININST		=	$(_BININST)
 
 ###### 编译选项
 CFLAGS		=	$(_CFLAGS) \
+			-std=gnu99 \
 
 ###### 链接选项
 LFLAGS		=	$(_LFLAGS) \

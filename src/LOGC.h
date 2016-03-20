@@ -91,7 +91,7 @@ void SetLogLevel( int log_level );
 
 extern TLS int			g_log_level ;
 extern TLS struct timeval	g_time_tv ;
-extern TLS char			g_date_and_time[ 10 + 1 + 8 + 1 ] ;
+extern TLS char			g_date_and_time[ 10 + 1 + 8 + 2 ] ;
 extern TLS unsigned long	g_pid ;
 extern TLS unsigned long	g_tid ;
 

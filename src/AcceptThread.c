@@ -283,6 +283,10 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	}
 	else /* 连接成功 */
 	{
+		struct epoll_event	events[ 1 ] ;
+		int			event_count = 0 ;
+		int			event_index = 0 ;
+		
 		p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
 		p_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
 		
@@ -296,7 +300,10 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		forward_thread_index = (p_reverse_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
 		forward_epoll_fd = penv->forward_epoll_fd_array[forward_thread_index] ;
 		
-		AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_forward_session , g_time_tv.tv_sec + p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout );
+		if( p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout > 0 )
+		{
+			AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_forward_session , g_time_tv.tv_sec + p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout );
+		}
 		
 		nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , NULL , 0 , 0 , 1 ) ;
 		if( nret > 0 )
@@ -494,11 +501,14 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	int			error , code ;
 #endif
 	_SOCKLEN_T		addr_len ;
-	//struct epoll_event	event ;
 	
 	struct ServerNetAddress	*p_servers_addr = NULL ;
 	unsigned int		forward_thread_index ;
 	int			forward_epoll_fd ;
+	
+	struct epoll_event	events[ 1 ] ;
+	int			event_count = 0 ;
+	int			event_index = 0 ;
 	
 	int			nret = 0 ;
 	
@@ -551,7 +561,10 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	forward_thread_index = (p_forward_session->sock) % (penv->cmd_para.forward_thread_size) ;
 	forward_epoll_fd = penv->forward_epoll_fd_array[forward_thread_index] ;
 	
-	AddTimeoutTreeNode2( penv , p_forward_session , p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
+	if( p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout > 0 )
+	{
+		AddTimeoutTreeNode2( penv , p_forward_session , p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
+	}
 	
 	nret = OnForwardInput( penv , p_reverse_forward_session , forward_epoll_fd , NULL , 0 , 0 , 1 ) ;
 	if( nret > 0 )

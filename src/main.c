@@ -147,7 +147,9 @@ int main( int argc , char *argv[] )
 	}
 	
 	/* 设置公共参数 */
+	/*
 	penv->timeout = DEFAULT_TIMEOUT_SECONDS ;
+	*/
 	
 	/* 装载配置 */
 	nret = LoadConfig( penv ) ;

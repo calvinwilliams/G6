@@ -23,7 +23,7 @@ TLS char		g_log_pathfilename[ MAXLEN_FILENAME + 1 ] = "" ;
 TLS int			g_log_level = LOGLEVEL_INFO ;
 TLS int			g_file_fd = -1 ;
 TLS struct timeval	g_time_tv = { 0 , 0 } ;
-TLS char		g_date_and_time[ 10 + 1 + 8 + 1 ] = "" ;
+TLS char		g_date_and_time[ 10 + 1 + 8 + 2 ] = "" ;
 TLS unsigned long	g_pid = 0 ;
 TLS unsigned long	g_tid = 0 ;
 

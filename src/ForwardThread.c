@@ -1,6 +1,6 @@
 #include "G6.h"
 
-static void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
+void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count )
 {
 	struct ForwardSession	*p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;
 	struct epoll_event	*p_event = NULL ;
@@ -246,7 +246,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 	int			forward_epoll_fd ;
 	
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
-	int			event_count ;
+	int			event_count = 0 ;
 	int			event_index = 0 ;
 	struct epoll_event	*p_event = NULL ;
 	
@@ -349,7 +349,10 @@ void *ForwardThread( unsigned long forward_thread_index )
 					}
 					else
 					{
-						UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
+						if( p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout > 0 )
+						{
+							UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
+						}
 					}
 				}
 				else if( p_event->events & EPOLLOUT ) /* 输出事件 */
@@ -362,7 +365,10 @@ void *ForwardThread( unsigned long forward_thread_index )
 					}
 					else
 					{
-						UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
+						if( p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout > 0 )
+						{
+							UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
+						}
 					}
 				}
 				else if( p_event->events ) /* 错误事件 */

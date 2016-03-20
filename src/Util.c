@@ -157,15 +157,13 @@ int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchChar
 /* °ó¶¨CPUÇ×ÔµÐÔ */
 int BindCpuAffinity( int processor_no )
 {
-	/*
 	cpu_set_t	cpu_mask ;
-	*/
 	int		nret = 0 ;
-	/*
+	
 	CPU_ZERO( & cpu_mask );
 	CPU_SET( processor_no , & cpu_mask );
 	nret = sched_setaffinity( 0 , sizeof(cpu_mask) , & cpu_mask ) ;
-	*/
+	
 	return nret;
 }
 
@@ -173,13 +171,15 @@ void UpdateTimeNow( struct timeval *p_time_tv , char *p_date_and_time )
 {
 	struct tm		stime ;
 	
-	p_time_tv->tv_sec = time( NULL ) ;
-	
 #if ( defined __linux__ ) || ( defined __unix ) || ( defined _AIX )
 	/*
 	gettimeofday( & g_time_tv , NULL );
 	*/
+	p_time_tv->tv_sec = time( NULL ) ;
 	localtime_r( &(p_time_tv->tv_sec) , & stime );
+	
+	/* strftime( p_date_and_time , sizeof(g_date_and_time) , "%Y-%m-%d %H:%M:%S" , & stime ); */
+	snprintf( p_date_and_time , sizeof(g_date_and_time)-1 , "%04d-%02d-%02d %02d:%02d:%02d" , stime.tm_year+1900 , stime.tm_mon+1 , stime.tm_mday , stime.tm_hour , stime.tm_min , stime.tm_sec );
 #elif ( defined _WIN32 )
 	{
 	SYSTEMTIME	stNow ;
@@ -188,16 +188,20 @@ void UpdateTimeNow( struct timeval *p_time_tv , char *p_date_and_time )
 	/*
 	g_time_tv.tv_usec = stNow.wMilliseconds * 1000 ;
 	*/
+	/*
 	stime.tm_year = stNow.wYear - 1900 ;
 	stime.tm_mon = stNow.wMonth - 1 ;
 	stime.tm_mday = stNow.wDay ;
 	stime.tm_hour = stNow.wHour ;
 	stime.tm_min = stNow.wMinute ;
 	stime.tm_sec = stNow.wSecond ;
+	*/
 	}
+	
+	/* strftime( p_date_and_time , sizeof(g_date_and_time) , "%Y-%m-%d %H:%M:%S" , & stime ); */
+	snprintf( p_date_and_time , sizeof(g_date_and_time)-1 , "%04d-%02d-%02d %02d:%02d:%02d" , stNow.wYear , stNow.wMonth , stNow.wDay , stNow.wHour , stNow.wMinute , stNow.wSecond );
 #endif
 	
-	strftime( p_date_and_time , sizeof(g_date_and_time) , "%Y-%m-%d %H:%M:%S" , & stime );
 	
 	return;
 }
