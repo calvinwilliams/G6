@@ -61,12 +61,10 @@ int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_se
 	}
 	
 	/* 登记最近读时间戳 */
-	if( STRCMP( p_forward_session->p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_RT ) )
+	if( p_forward_session->p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_RT )
 	{
-		pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 		if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
 			p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].rtt = g_time_tv.tv_sec ;
-		pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 	}
 	
 	/* 发送通讯数据 */
@@ -168,12 +166,10 @@ int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_se
 	}
 	
 	/* 登记最近写时间戳 */
-	if( STRCMP( p_forward_session->p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_RT ) )
+	if( p_forward_session->p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_RT )
 	{
-		pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 		if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
 			p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt = g_time_tv.tv_sec ;
-		pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 	}
 	
 	return 0;
@@ -229,12 +225,10 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 	}
 	
 	/* 登记最近写时间戳 */
-	if( STRCMP( p_forward_session->p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_RT ) )
+	if( p_forward_session->p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_RT )
 	{
-		pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 		if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
 			p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt = g_time_tv.tv_sec ;
-		pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 	}
 	
 	return 0;

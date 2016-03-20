@@ -102,13 +102,15 @@
 #define MATCH				1	/* 匹配 */
 #define NOT_MATCH			-1	/* 不匹配 */
 
-#define LOAD_BALANCE_ALGORITHM_G	"G"	/* 管理端口 */
-#define LOAD_BALANCE_ALGORITHM_MS	"MS"	/* 主备模式 */
-#define LOAD_BALANCE_ALGORITHM_RR	"RR"	/* 轮询模式 */
-#define LOAD_BALANCE_ALGORITHM_LC	"LC"	/* 最少连接模式 */
-#define LOAD_BALANCE_ALGORITHM_RT	"RT"	/* 最小响应时间模式 */
-#define LOAD_BALANCE_ALGORITHM_RD	"RD"	/* 随机模式 */
-#define LOAD_BALANCE_ALGORITHM_HS	"HS"	/* HASH模式 */
+#define LOAD_BALANCE_ALGORITHM_G	0	/* 管理端口 */
+#define LOAD_BALANCE_ALGORITHM_MS	1	/* 主备模式 */
+#define LOAD_BALANCE_ALGORITHM_RR	2	/* 轮询模式 */
+#define LOAD_BALANCE_ALGORITHM_LC	3	/* 最少连接模式 */
+#define LOAD_BALANCE_ALGORITHM_RT	4	/* 最小响应时间模式 */
+#define LOAD_BALANCE_ALGORITHM_RD	5	/* 随机模式 */
+#define LOAD_BALANCE_ALGORITHM_HS	6	/* HASH模式 */
+
+extern char	g_LoadBalanceAlgorithmString[7][2+1] ;
 
 #define DEFAULT_RULES_INITCOUNT			2
 #define DEFAULT_RULES_INCREASE			5
@@ -219,7 +221,7 @@ struct ServerNetAddress
 struct ForwardRule
 {
 	char				rule_id[ RULE_ID_MAXLEN + 1 ] ; /* 规则ID */
-	char				load_balance_algorithm[ LOAD_BALANCE_ALGORITHM_MAXLEN + 1 ] ; /* 负载均衡算法 */
+	unsigned char			load_balance_algorithm ; /* 负载均衡算法 */
 	
 	struct IpConnectionStat		client_ip_connection_stat ; /* IP-CONNECTION统计信息，也用于连接限制 */
 	
@@ -334,8 +336,6 @@ struct ServerEnv
 	struct PipeFds			*forward_command_pipe ; /* 分发线程请求命令管道 */
 	int				*forward_epoll_fd_array ; /* 数据收发epoll池 */
 	
-	pthread_mutex_t			ip_connection_stat_mutex ; /* IP-CONNECTION统计 临界区互斥 */
-	pthread_mutex_t			server_connection_count_mutex ; /* 服务端连接数量 临界区互斥 */
 	pthread_mutex_t			timeout_rbtree_mutex ; /* 超时红黑树 临界区互斥 */
 	pthread_mutex_t			time_cache_mutex ; /* 超时红黑树 临界区互斥 */
 } ;

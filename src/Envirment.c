@@ -98,8 +98,6 @@ int InitEnvirment( struct ServerEnv *penv )
 	penv->timeout_rbtree = RB_ROOT ;
 	
 	/* 创建线程互斥量 */
-	pthread_mutex_init( & (penv->ip_connection_stat_mutex) , NULL );
-	pthread_mutex_init( & (penv->server_connection_count_mutex) , NULL );
 	pthread_mutex_init( & (penv->timeout_rbtree_mutex) , NULL );
 	pthread_mutex_init( & (penv->time_cache_mutex) , NULL );
 	
@@ -145,8 +143,6 @@ void CleanEnvirment( struct ServerEnv *penv )
 	free( penv->forward_command_pipe );
 	free( penv->forward_epoll_fd_array );
 	
-	pthread_mutex_destroy( & (penv->ip_connection_stat_mutex) );
-	pthread_mutex_destroy( & (penv->server_connection_count_mutex) );
 	pthread_mutex_destroy( & (penv->timeout_rbtree_mutex) );
 	pthread_mutex_destroy( & (penv->time_cache_mutex) );
 	
@@ -727,10 +723,10 @@ static int _AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionSta
 			
 			p_ip_connection->used_flag = 1 ;
 			p_ip_connection->ip_int = ip_int ;
-			p_ip_connection->connection_count += connection_count ;
+			__sync_fetch_and_add( &(p_ip_connection->connection_count) , connection_count );
 			
-			p_ip_connection_stat->ip_count++;
-			p_ip_connection_stat->connection_count += connection_count ;
+			__sync_fetch_and_add( &(p_ip_connection_stat->ip_count) , 1 );
+			__sync_fetch_and_add( &(p_ip_connection_stat->connection_count) , connection_count );
 			
 			return 0;
 		}
@@ -742,9 +738,9 @@ static int _AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionSta
 				return -1;
 			}
 			
-			p_ip_connection->connection_count += connection_count ;
+			__sync_fetch_and_add( &(p_ip_connection->connection_count) , connection_count );
 			
-			p_ip_connection_stat->connection_count += connection_count ;
+			__sync_fetch_and_add( &(p_ip_connection_stat->connection_count) , connection_count );
 			
 			return 0;
 		}
@@ -766,18 +762,14 @@ int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_
 {
 	int			nret = 0 ;
 	
-	pthread_mutex_lock( & (penv->ip_connection_stat_mutex) );
-	
 	if( p_ip_connection_stat->ip_connection_stat_size == 0 )
 	{
-		pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
 		return 0;
 	}
 	
 	if( p_ip_connection_stat->max_connections > 0 && p_ip_connection_stat->connection_count+1 > p_ip_connection_stat->max_connections )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "too many connections" );
-		pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
 		return -1;
 	}
 	
@@ -798,7 +790,6 @@ int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_
 		if( new_ip_connection_stat.ip_connection_array == NULL )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
-			pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
 			return -1;
 		}
 		memset( new_ip_connection_stat.ip_connection_array , 0x00 , sizeof(struct IpConnection) * new_ip_connection_stat.ip_connection_stat_size );
@@ -811,7 +802,6 @@ int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_
 				if( nret )
 				{
 					ErrorLog( __FILE__ , __LINE__ , "AddIpConnectionStat failed[%d]" , nret );
-					pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
 					return -1;
 				}
 			}
@@ -823,8 +813,6 @@ int AddIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_ip_
 	
 	nret = _AddIpConnectionStat( penv , p_ip_connection_stat , ip_int , 1 ) ;
 	
-	pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
-	
 	return nret;
 }
 
@@ -834,11 +822,8 @@ int RemoveIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_
 	unsigned int		ip_connection_index ;
 	struct IpConnection	*p_ip_connection = NULL ;
 	
-	pthread_mutex_lock( & (penv->ip_connection_stat_mutex) );
-	
 	if( p_ip_connection_stat->ip_connection_stat_size == 0 )
 	{
-		pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
 		return 0;
 	}
 	
@@ -848,18 +833,17 @@ int RemoveIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_
 	{
 		if( p_ip_connection->used_flag == 1 && p_ip_connection->ip_int == ip_int )
 		{
-			p_ip_connection->connection_count--;
+			__sync_fetch_and_sub( &(p_ip_connection->connection_count) , 1 );
 			
-			p_ip_connection_stat->connection_count--;
+			__sync_fetch_and_sub( &(p_ip_connection_stat->connection_count) , 1 );
 			
 			if( p_ip_connection->connection_count == 0 )
 			{
 				p_ip_connection->used_flag = 0 ;
 				
-				p_ip_connection_stat->ip_count--;
+				__sync_fetch_and_sub( &(p_ip_connection_stat->ip_count) , 1 );
 			}
 			
-			pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
 			return 0;
 		}
 		
@@ -871,8 +855,6 @@ int RemoveIpConnectionStat( struct ServerEnv *penv , struct IpConnectionStat *p_
 			p_ip_connection = p_ip_connection_stat->ip_connection_array ;
 		}
 	}
-	
-	pthread_mutex_unlock( & (penv->ip_connection_stat_mutex) );
 	
 	ErrorLog( __FILE__ , __LINE__ , "invalid ip_int[%u]" , ip_int );
 	

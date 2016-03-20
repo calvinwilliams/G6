@@ -1,5 +1,7 @@
 #include "G6.h"
 
+char	g_LoadBalanceAlgorithmString[7][2+1] = { "G" , "MS" , "RR" , "LC" , "RT" , "RD" , "HS" };
+
 static int ToEndOfLine( FILE *fp )
 {
 	char	line[ 1024 + 1 ] ;
@@ -573,6 +575,7 @@ int LoadCustomProperty_ForwardRule_Server( void *p1 , void *p2 , void *p3 , char
 
 static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *p_forward_rule , char *rule_id )
 {
+	char				load_balance_algorithm[ LOAD_BALANCE_ALGORITHM_MAXLEN + 1 ] ; /* 负载均衡算法 */
 	char				ip_and_port[ 100 + 1 ] ;
 	struct ClientNetAddress		*p_client_addr = NULL ;
 	struct ForwardNetAddress	*p_forward_addr = NULL ;
@@ -584,22 +587,30 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 	strcpy( p_forward_rule->rule_id , rule_id );
 	
 	/* 读转发算法 */
-	nret = GetToken( p_forward_rule->load_balance_algorithm , fp , "%2s" , p_forward_rule->load_balance_algorithm ) ;
+	nret = GetToken( load_balance_algorithm , fp , "%2s" , load_balance_algorithm ) ;
 	if( nret == EOF )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "unexpect end of config" );
 		return -11;
 	}
 	
-	if( STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_G )
-		&& STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_MS )
-		&& STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_RR )
-		&& STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_LC )
-		&& STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_RT )
-		&& STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_RD )
-		&& STRCMP( p_forward_rule->load_balance_algorithm , != , LOAD_BALANCE_ALGORITHM_HS ) )
+	if( STRCMP( load_balance_algorithm , == , g_LoadBalanceAlgorithmString[LOAD_BALANCE_ALGORITHM_G] ) )
+		p_forward_rule->load_balance_algorithm = LOAD_BALANCE_ALGORITHM_G ;
+	else if( STRCMP( load_balance_algorithm , == , g_LoadBalanceAlgorithmString[LOAD_BALANCE_ALGORITHM_MS] ) )
+		p_forward_rule->load_balance_algorithm = LOAD_BALANCE_ALGORITHM_MS ;
+	else if( STRCMP( load_balance_algorithm , == , g_LoadBalanceAlgorithmString[LOAD_BALANCE_ALGORITHM_RR] ) )
+		p_forward_rule->load_balance_algorithm = LOAD_BALANCE_ALGORITHM_RR ;
+	else if( STRCMP( load_balance_algorithm , == , g_LoadBalanceAlgorithmString[LOAD_BALANCE_ALGORITHM_LC] ) )
+		p_forward_rule->load_balance_algorithm = LOAD_BALANCE_ALGORITHM_LC ;
+	else if( STRCMP( load_balance_algorithm , == , g_LoadBalanceAlgorithmString[LOAD_BALANCE_ALGORITHM_RT] ) )
+		p_forward_rule->load_balance_algorithm = LOAD_BALANCE_ALGORITHM_RT ;
+	else if( STRCMP( load_balance_algorithm , == , g_LoadBalanceAlgorithmString[LOAD_BALANCE_ALGORITHM_RD] ) )
+		p_forward_rule->load_balance_algorithm = LOAD_BALANCE_ALGORITHM_RD ;
+	else if( STRCMP( load_balance_algorithm , == , g_LoadBalanceAlgorithmString[LOAD_BALANCE_ALGORITHM_HS] ) )
+		p_forward_rule->load_balance_algorithm = LOAD_BALANCE_ALGORITHM_HS ;
+	else
 	{
-		ErrorLog( __FILE__ , __LINE__ , "rule rule_mode [%s] invalid\r\n" , p_forward_rule->load_balance_algorithm );
+		ErrorLog( __FILE__ , __LINE__ , "rule rule_mode [%s] invalid\r\n" , load_balance_algorithm );
 		return -11;
 	}
 	
@@ -745,7 +756,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		
 		if( STRCMP( ip_and_port , == , ";" ) )
 		{
-			if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_G ) )
+			if( p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_G )
 				return 0;
 			
 			ErrorLog( __FILE__ , __LINE__ , "unexpect end of config in forward_addr_array in rule[%s]" , p_forward_rule->rule_id );

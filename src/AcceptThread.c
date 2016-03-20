@@ -19,7 +19,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 	
 	unsigned int		server_addr_index ;
 		
-	if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_MS ) ) /* 主备算法 */
+	if( p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_MS ) /* 主备算法 */
 	{
 		for( server_addr_index = 0 ; server_addr_index < p_forward_rule->server_addr_count ; server_addr_index++ )
 		{
@@ -39,7 +39,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 			return -1;
 		}
 	}
-	else if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_RR ) ) /* 轮询算法 */
+	else if( p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_RR ) /* 轮询算法 */
 	{
 		for( server_addr_index = 0 ; server_addr_index < p_forward_rule->server_addr_count ; server_addr_index++ )
 		{
@@ -62,11 +62,10 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 			return -1;
 		}
 	}
-	else if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_LC ) ) /* 最少连接算法 */
+	else if( p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_LC ) /* 最少连接算法 */
 	{
 		p_forward_session->server_index = -1 ;
 		
-		pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 		for( server_addr_index = 0 ; server_addr_index < p_forward_rule->server_addr_count ; server_addr_index++ )
 		{
 			IF_SERVER_ENABLE( p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index] )
@@ -79,7 +78,6 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 			if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
 				p_forward_rule->selected_addr_index = 0 ;
 		}
-		pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 		if( p_forward_session->server_index == -1 )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "all servers unable" );
@@ -90,11 +88,10 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 		if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
 			p_forward_rule->selected_addr_index %= p_forward_rule->server_addr_count ;
 	}
-	else if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_RT ) ) /* 最小响应时间算法 */
+	else if( p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_RT ) /* 最小响应时间算法 */
 	{
 		p_forward_session->server_index = -1 ;
 		
-		pthread_mutex_lock( & (penv->server_connection_count_mutex) );
 		for( server_addr_index = 0 ; server_addr_index < p_forward_rule->server_addr_count ; server_addr_index++ )
 		{
 			IF_SERVER_ENABLE( p_forward_rule->server_addr_array[p_forward_rule->selected_addr_index] )
@@ -107,7 +104,6 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 			if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
 				p_forward_rule->selected_addr_index = 0 ;
 		}
-		pthread_mutex_unlock( & (penv->server_connection_count_mutex) );
 		if( p_forward_session->server_index == -1 )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "all servers unable" );
@@ -118,7 +114,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 		if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
 			p_forward_rule->selected_addr_index %= p_forward_rule->server_addr_count ;
 	}
-	else if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_RD ) ) /* 随机算法 */
+	else if( p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_RD ) /* 随机算法 */
 	{
 		p_forward_rule->selected_addr_index += Rand( 1 , p_forward_rule->server_addr_count ) ;
 		if( p_forward_rule->selected_addr_index >= p_forward_rule->server_addr_count )
@@ -160,7 +156,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 			return -1;
 		}
 	}
-	else if( STRCMP( p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_HS ) ) /* 哈希算法 */
+	else if( p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_HS ) /* 哈希算法 */
 	{
 		p_forward_session->server_index = CalcHash(p_forward_rule->client_addr_array[p_forward_session->client_index].netaddr.ip) % p_forward_rule->server_addr_count ;
 		IF_SERVER_ENABLE( p_forward_rule->server_addr_array[p_forward_session->server_index] )
@@ -174,7 +170,7 @@ static int SelectServerAddress( struct ServerEnv *penv , struct ForwardSession *
 	}
 	else
 	{
-		ErrorLog( __FILE__ , __LINE__ , "load_balance_algorithm[%s] invalid" , p_forward_session->p_forward_rule->load_balance_algorithm );
+		ErrorLog( __FILE__ , __LINE__ , "load_balance_algorithm[%d] invalid" , p_forward_session->p_forward_rule->load_balance_algorithm );
 		return -1;
 	}
 	
@@ -411,7 +407,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 			continue;
 		}
 		
-		if( STRCMP( p_listen_session->p_forward_rule->load_balance_algorithm , == , LOAD_BALANCE_ALGORITHM_G ) )
+		if( p_listen_session->p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_G )
 		{
 			/* 获取空闲会话结构 */
 			p_forward_session = GetForwardSessionUnused( penv ) ;
@@ -632,7 +628,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 			
 			for( forward_rule_index = 0 , p_forward_rule = penv->forward_rule_array ; forward_rule_index < penv->forward_rule_count ; forward_rule_index++ , p_forward_rule++ )
 			{
-				io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s | %s | " , p_forward_rule->rule_id , p_forward_rule->load_balance_algorithm );
+				io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s | %s | " , p_forward_rule->rule_id , g_LoadBalanceAlgorithmString[p_forward_rule->load_balance_algorithm] );
 				send( sock , io_buffer , io_buffer_len , 0 );
 				
 				for( client_addr_index = 0 , p_client_addr = p_forward_rule->client_addr_array ; client_addr_index < p_forward_rule->client_addr_count ; client_addr_index++ , p_client_addr++ )
