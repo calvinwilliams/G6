@@ -18,21 +18,13 @@ int InitEnvirment( struct ServerEnv *penv )
 	memset( penv->forward_thread_tid_array , 0x00 , sizeof(pthread_t) * penv->cmd_para.forward_thread_size );
 	
 	/* 创建父子进程命令管道 */
-	nret = pipe( penv->accept_request_pipe.fds ) ;
+	nret = pipe( penv->accept_command_pipe.fds ) ;
 	if( nret == -1 )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "pipe failed , errno[%d]" , errno );
 		return -1;
 	}
-	SetCloseExec2( penv->accept_request_pipe.fds[0] , penv->accept_request_pipe.fds[1] );
-	
-	nret = pipe( penv->accept_response_pipe.fds ) ;
-	if( nret == -1 )
-	{
-		ErrorLog( __FILE__ , __LINE__ , "pipe failed , errno[%d]" , errno );
-		return -1;
-	}
-	SetCloseExec2( penv->accept_response_pipe.fds[0] , penv->accept_response_pipe.fds[1] );
+	SetCloseExec2( penv->accept_command_pipe.fds[0] , penv->accept_command_pipe.fds[1] );
 	
 	/* 创建侦听端口epoll池 */
 	penv->accept_epoll_fd = epoll_create( 1024 );
@@ -47,24 +39,16 @@ int InitEnvirment( struct ServerEnv *penv )
 	memset( & event , 0x00 , sizeof(event) );
 	event.data.ptr = NULL ;
 	event.events = EPOLLIN | EPOLLERR ;
-	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , penv->accept_request_pipe.fds[0] , & event );
+	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , penv->accept_command_pipe.fds[0] , & event );
 	
 	/* 申请父子线程命令管道数组 */
-	penv->forward_request_pipe = (struct PipeFds *)malloc( sizeof(struct PipeFds) * penv->cmd_para.forward_thread_size ) ;
-	if( penv->forward_request_pipe == NULL )
+	penv->forward_command_pipe = (struct PipeFds *)malloc( sizeof(struct PipeFds) * penv->cmd_para.forward_thread_size ) ;
+	if( penv->forward_command_pipe == NULL )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
 		return -1;
 	}
-	memset( penv->forward_request_pipe , 0x00 , sizeof(struct PipeFds) * penv->cmd_para.forward_thread_size );
-	
-	penv->forward_response_pipe = (struct PipeFds *)malloc( sizeof(struct PipeFds) * penv->cmd_para.forward_thread_size ) ;
-	if( penv->forward_response_pipe == NULL )
-	{
-		ErrorLog( __FILE__ , __LINE__ , "malloc failed , errno[%d]" , errno );
-		return -1;
-	}
-	memset( penv->forward_response_pipe , 0x00 , sizeof(struct PipeFds) * penv->cmd_para.forward_thread_size );
+	memset( penv->forward_command_pipe , 0x00 , sizeof(struct PipeFds) * penv->cmd_para.forward_thread_size );
 	
 	penv->forward_epoll_fd_array = (int *)malloc( sizeof(int) * penv->cmd_para.forward_thread_size ) ;
 	if( penv->forward_epoll_fd_array == NULL )
@@ -77,21 +61,13 @@ int InitEnvirment( struct ServerEnv *penv )
 	for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
 	{
 		/* 创建父子线程命令管道 */
-		nret = pipe( penv->forward_request_pipe[forward_thread_index].fds ) ;
+		nret = pipe( penv->forward_command_pipe[forward_thread_index].fds ) ;
 		if( nret == -1 )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "pipe failed , errno[%d]" , errno );
 			return -1;
 		}
-		SetCloseExec2( penv->forward_request_pipe[forward_thread_index].fds[0] , penv->forward_request_pipe[forward_thread_index].fds[1] );
-		
-		nret = pipe( penv->forward_response_pipe[forward_thread_index].fds ) ;
-		if( nret == -1 )
-		{
-			ErrorLog( __FILE__ , __LINE__ , "pipe failed , errno[%d]" , errno );
-			return -1;
-		}
-		SetCloseExec2( penv->forward_response_pipe[forward_thread_index].fds[0] , penv->forward_response_pipe[forward_thread_index].fds[1] );
+		SetCloseExec2( penv->forward_command_pipe[forward_thread_index].fds[0] , penv->forward_command_pipe[forward_thread_index].fds[1] );
 		
 		/* 创建数据收发epoll池 */
 		penv->forward_epoll_fd_array[forward_thread_index] = epoll_create( 1024 );
@@ -106,7 +82,7 @@ int InitEnvirment( struct ServerEnv *penv )
 		memset( & event , 0x00 , sizeof(event) );
 		event.data.ptr = NULL ;
 		event.events = EPOLLIN | EPOLLERR ;
-		epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_ADD , penv->forward_request_pipe[forward_thread_index].fds[0] , & event );
+		epoll_ctl( penv->forward_epoll_fd_array[forward_thread_index] , EPOLL_CTL_ADD , penv->forward_command_pipe[forward_thread_index].fds[0] , & event );
 	}
 	
 	/* 申请通讯收发会话数组 */
@@ -144,10 +120,8 @@ void CleanEnvirment( struct ServerEnv *penv )
 		penv->old_forward_addr_array = NULL ;
 	}
 	
-	close( penv->accept_request_pipe.fds[0] );
-	close( penv->accept_request_pipe.fds[1] );
-	close( penv->accept_response_pipe.fds[0] );
-	close( penv->accept_response_pipe.fds[1] );
+	close( penv->accept_command_pipe.fds[0] );
+	close( penv->accept_command_pipe.fds[1] );
 	
 	close( penv->accept_epoll_fd );
 	free( penv->forward_thread_tid_array );
@@ -165,14 +139,11 @@ void CleanEnvirment( struct ServerEnv *penv )
 	
 	for( forward_thread_index = 0 ; forward_thread_index < penv->cmd_para.forward_thread_size ; forward_thread_index++ )
 	{
-		close( penv->forward_request_pipe[forward_thread_index].fds[0] );
-		close( penv->forward_request_pipe[forward_thread_index].fds[1] );
-		close( penv->forward_response_pipe[forward_thread_index].fds[0] );
-		close( penv->forward_response_pipe[forward_thread_index].fds[1] );
+		close( penv->forward_command_pipe[forward_thread_index].fds[0] );
+		close( penv->forward_command_pipe[forward_thread_index].fds[1] );
 		close( penv->forward_epoll_fd_array[forward_thread_index] );
 	}
-	free( penv->forward_request_pipe );
-	free( penv->forward_response_pipe );
+	free( penv->forward_command_pipe );
 	free( penv->forward_epoll_fd_array );
 	
 	pthread_mutex_destroy( & (penv->ip_connection_stat_mutex) );

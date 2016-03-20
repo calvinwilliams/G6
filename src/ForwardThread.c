@@ -274,7 +274,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 	/* 主工作循环 */
 	while( g_exit_flag == 0 || penv->forward_session_count > 0 )
 	{
-		DebugLog( __FILE__ , __LINE__ , "epoll_wait sock[%d][...] forward_session_count[%u] ..." , penv->forward_request_pipe[forward_thread_index].fds[0] , penv->forward_session_count );
+		DebugLog( __FILE__ , __LINE__ , "epoll_wait sock[%d][...] forward_session_count[%u] ..." , penv->forward_command_pipe[forward_thread_index].fds[0] , penv->forward_session_count );
 		if( penv->cmd_para.close_log_flag == 1 )
 			CloseLogFile();
 		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , 1000 ) ;
@@ -307,9 +307,9 @@ void *ForwardThread( unsigned long forward_thread_index )
 				
 				DebugLog( __FILE__ , __LINE__ , "pipe session event" );
 				
-				DebugLog( __FILE__ , __LINE__ , "read forward_request_pipe ..." );
-				nret = read( penv->forward_request_pipe[forward_thread_index].fds[0] , & command , 1 ) ;
-				DebugLog( __FILE__ , __LINE__ , "read forward_request_pipe done[%d][%c]" , nret , command );
+				DebugLog( __FILE__ , __LINE__ , "read forward_command_pipe ..." );
+				nret = read( penv->forward_command_pipe[forward_thread_index].fds[0] , & command , 1 ) ;
+				DebugLog( __FILE__ , __LINE__ , "read forward_command_pipe done[%d][%c]" , nret , command );
 				if( nret == -1 )
 				{
 					ErrorLog( __FILE__ , __LINE__ , "read request pipe failed , errno[%d]" , errno );

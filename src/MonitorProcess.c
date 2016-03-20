@@ -33,9 +33,9 @@ static void sig_proc( struct ServerEnv *penv )
 	if( g_SIGUSR1_flag == 1 )
 	{
 		/* 通知所有线程关闭日志文件描述字，后续写日志时会再次自动打开 */
-		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe L ..." );
-		nret = write( g_penv->accept_request_pipe.fds[1] , "L" , 1 ) ;
-		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe L done[%d]" , nret );
+		InfoLog( __FILE__ , __LINE__ , "write accept_command_pipe L ..." );
+		nret = write( g_penv->accept_command_pipe.fds[1] , "L" , 1 ) ;
+		InfoLog( __FILE__ , __LINE__ , "write accept_command_pipe L done[%d]" , nret );
 		
 		g_SIGUSR1_flag = 0 ;
 	}
@@ -68,9 +68,9 @@ static void sig_proc( struct ServerEnv *penv )
 		}
 		
 		/* 通知所有线程关闭侦听socket */
-		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q ..." );
-		nret = write( g_penv->accept_request_pipe.fds[1] , "Q" , 1 ) ;
-		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q done[%d]" , nret );
+		InfoLog( __FILE__ , __LINE__ , "write accept_command_pipe Q ..." );
+		nret = write( g_penv->accept_command_pipe.fds[1] , "Q" , 1 ) ;
+		InfoLog( __FILE__ , __LINE__ , "write accept_command_pipe Q done[%d]" , nret );
 		
 		/* 创建子进程，用新程序映像覆盖代码段 */
 		pid = fork() ;
@@ -95,9 +95,9 @@ static void sig_proc( struct ServerEnv *penv )
 		int		nret = 0 ;
 		
 		/* 通知所有线程关闭侦听socket */
-		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q ..." );
-		nret = write( g_penv->accept_request_pipe.fds[1] , "Q" , 1 ) ;
-		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q done[%d]" , nret );
+		InfoLog( __FILE__ , __LINE__ , "write accept_command_pipe Q ..." );
+		nret = write( g_penv->accept_command_pipe.fds[1] , "Q" , 1 ) ;
+		InfoLog( __FILE__ , __LINE__ , "write accept_command_pipe Q done[%d]" , nret );
 		
 		/* 设置退出标志 */
 		g_SIGTERM_flag = 0 ;
@@ -160,8 +160,7 @@ int MonitorProcess( struct ServerEnv *penv )
 			
 			InfoLog( __FILE__ , __LINE__ , "child : [%ld]fork[%ld]" , getppid() , getpid() );
 			
-			close( penv->accept_request_pipe.fds[1] );
-			close( penv->accept_response_pipe.fds[0] );
+			close( penv->accept_command_pipe.fds[1] );
 			
 			nret = WorkerProcess( penv ) ;
 			
@@ -173,8 +172,7 @@ int MonitorProcess( struct ServerEnv *penv )
 		{
 			InfoLog( __FILE__ , __LINE__ , "parent : [%ld]fork[%ld]" , getpid() , penv->pid );
 			
-			close( penv->accept_request_pipe.fds[0] );
-			close( penv->accept_response_pipe.fds[1] );
+			close( penv->accept_command_pipe.fds[0] );
 		}
 		
 		if( penv->cmd_para.close_log_flag == 1 )
@@ -193,8 +191,7 @@ int MonitorProcess( struct ServerEnv *penv )
 			}
 			
 			ErrorLog( __FILE__ , __LINE__ , "waitpid failed , errno[%d]" , errno );
-			close( penv->accept_request_pipe.fds[1] );
-			close( penv->accept_response_pipe.fds[0] );
+			close( penv->accept_command_pipe.fds[1] );
 			return -1;
 		}
 		if( pid != penv->pid )

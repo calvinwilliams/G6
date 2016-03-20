@@ -326,14 +326,12 @@ struct ServerEnv
 	unsigned int			forward_session_use_offsetpos ; /* 转发会话最近使用单元偏移量 */
 	
 	pid_t				pid ; /* 工作进程PID */
-	struct PipeFds			accept_request_pipe ; /* 工作进程请求命令管道 */
-	struct PipeFds			accept_response_pipe ; /* 工作进程响应命令管道 */
+	struct PipeFds			accept_command_pipe ; /* 工作进程命令管道 */
 	int				accept_epoll_fd ; /* 侦听端口epoll池 */
 	
 	pthread_t			time_thread_tid ; /* 时间管理线程 */
 	pthread_t			*forward_thread_tid_array ; /* 分发线程TID */
-	struct PipeFds			*forward_request_pipe ; /* 分发线程请求命令管道 */
-	struct PipeFds			*forward_response_pipe ; /* 分发线程响应命令管道 */
+	struct PipeFds			*forward_command_pipe ; /* 分发线程请求命令管道 */
 	int				*forward_epoll_fd_array ; /* 数据收发epoll池 */
 	
 	pthread_mutex_t			ip_connection_stat_mutex ; /* IP-CONNECTION统计 临界区互斥 */
