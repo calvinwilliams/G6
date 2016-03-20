@@ -479,6 +479,19 @@ void *_AcceptThread( void *pv );
 /********* ForwardThread *********/
 void IgnoreReverseSessionEvents( struct ForwardSession *p_forward_session , struct epoll_event *p_events , int event_index , int event_count );
 
+#define DISCONNECT	\
+	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL ); \
+	if( p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout > 0 ) \
+	{ \
+		RemoveTimeoutTreeNode2( penv , p_forward_session , p_reverse_forward_session ); \
+	} \
+	nret = RemoveIpConnectionStat( penv , & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr ) ; \
+	if( nret ) \
+		ErrorLog( __FILE__ , __LINE__ , "RemoveIpConnectionStat failed[%d] , CLIENT.1" , nret ); \
+	DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock , p_reverse_forward_session->sock ); \
+	_CLOSESOCKET( p_reverse_forward_session->sock ); \
+	SetForwardSessionUnused( penv , p_reverse_forward_session );
+
 #define DISCONNECT_PAIR	\
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL ); \
 	epoll_ctl( forward_epoll_fd , EPOLL_CTL_DEL , p_reverse_forward_session->sock , NULL ); \

@@ -26,6 +26,12 @@ int InitEnvirment( struct ServerEnv *penv )
 	}
 	SetCloseExec2( penv->accept_command_pipe.fds[0] , penv->accept_command_pipe.fds[1] );
 	
+	/* 加入父子进程命令管道到侦听端口epoll池 */
+	memset( & event , 0x00 , sizeof(event) );
+	event.data.ptr = NULL ;
+	event.events = EPOLLIN | EPOLLERR ;
+	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , penv->accept_command_pipe.fds[0] , & event );
+	
 	/* 创建侦听端口epoll池 */
 	penv->accept_epoll_fd = epoll_create( 1024 );
 	if( penv->accept_epoll_fd == -1 )
@@ -34,12 +40,6 @@ int InitEnvirment( struct ServerEnv *penv )
 		return -1;
 	}
 	SetCloseExec( penv->accept_epoll_fd );
-	
-	/* 加入父子进程命令管道到侦听端口epoll池 */
-	memset( & event , 0x00 , sizeof(event) );
-	event.data.ptr = NULL ;
-	event.events = EPOLLIN | EPOLLERR ;
-	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , penv->accept_command_pipe.fds[0] , & event );
 	
 	/* 申请父子线程命令管道数组 */
 	penv->forward_command_pipe = (struct PipeFds *)malloc( sizeof(struct PipeFds) * penv->cmd_para.forward_thread_size ) ;
@@ -117,6 +117,7 @@ void CleanEnvirment( struct ServerEnv *penv )
 		penv->old_forward_addr_array = NULL ;
 	}
 	
+	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , penv->accept_command_pipe.fds[0] , NULL );
 	close( penv->accept_command_pipe.fds[0] );
 	close( penv->accept_command_pipe.fds[1] );
 	

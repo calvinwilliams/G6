@@ -564,12 +564,6 @@ int LoadCustomProperty_ForwardRule_Server( void *p1 , void *p2 , void *p3 , char
 		return -1;
 	}
 	
-	if( p_server_addr->heartbeat > 0 )
-	{
-		p_server_addr->server_unable = 1 ;
-		p_server_addr->timestamp_to = 0 ;
-	}
-	
 	return 0;
 }
 
@@ -683,7 +677,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 			else
 				new_clients_maxcount = p_forward_rule->client_addr_size + DEFAULT_CLIENTS_INCREASE_IN_ONE_RULE ;
 			
-			new_clients_addr = realloc( p_forward_rule->client_addr_array , sizeof(struct ForwardRule) * new_clients_maxcount ) ;
+			new_clients_addr = realloc( p_forward_rule->client_addr_array , sizeof(struct ClientNetAddress) * new_clients_maxcount ) ;
 			if( new_clients_addr == NULL )
 			{
 				ErrorLog( __FILE__ , __LINE__ , "realloc failed , errno[%d]" , errno );
@@ -691,7 +685,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 			}
 			p_forward_rule->client_addr_array = new_clients_addr ;
 			p_forward_rule->client_addr_size = new_clients_maxcount ;
-			memset( p_forward_rule->client_addr_array+p_forward_rule->client_addr_count , 0x00 , sizeof(struct ForwardRule) * (p_forward_rule->client_addr_size-p_forward_rule->client_addr_count) );
+			memset( p_forward_rule->client_addr_array+p_forward_rule->client_addr_count , 0x00 , sizeof(struct ClientNetAddress) * (p_forward_rule->client_addr_size-p_forward_rule->client_addr_count) );
 		}
 		
 		p_client_addr = p_forward_rule->client_addr_array + p_forward_rule->client_addr_count ;
@@ -775,7 +769,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 			else
 				new_forwards_addr_size = p_forward_rule->forward_addr_size + DEFAULT_CLIENTS_INCREASE_IN_ONE_RULE ;
 			
-			new_forwards_addr = realloc( p_forward_rule->forward_addr_array , sizeof(struct ForwardRule) * new_forwards_addr_size ) ;
+			new_forwards_addr = realloc( p_forward_rule->forward_addr_array , sizeof(struct ForwardNetAddress) * new_forwards_addr_size ) ;
 			if( new_forwards_addr == NULL )
 			{
 				ErrorLog( __FILE__ , __LINE__ , "realloc failed , errno[%d]" , errno );
@@ -783,7 +777,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 			}
 			p_forward_rule->forward_addr_array = new_forwards_addr ;
 			p_forward_rule->forward_addr_size = new_forwards_addr_size ;
-			memset( p_forward_rule->forward_addr_array+p_forward_rule->forward_addr_count , 0x00 , sizeof(struct ForwardRule) * (p_forward_rule->forward_addr_size-p_forward_rule->forward_addr_count) );
+			memset( p_forward_rule->forward_addr_array+p_forward_rule->forward_addr_count , 0x00 , sizeof(struct ForwardNetAddress) * (p_forward_rule->forward_addr_size-p_forward_rule->forward_addr_count) );
 		}
 		
 		p_forward_addr = p_forward_rule->forward_addr_array + p_forward_rule->forward_addr_count ;
@@ -846,7 +840,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 			else
 				new_servers_addr_size = p_forward_rule->server_addr_size + DEFAULT_CLIENTS_INCREASE_IN_ONE_RULE ;
 			
-			new_servers_addr = realloc( p_forward_rule->server_addr_array , sizeof(struct ForwardRule) * new_servers_addr_size ) ;
+			new_servers_addr = realloc( p_forward_rule->server_addr_array , sizeof(struct ServerNetAddress) * new_servers_addr_size ) ;
 			if( new_servers_addr == NULL )
 			{
 				ErrorLog( __FILE__ , __LINE__ , "realloc failed , errno[%d]" , errno );
@@ -854,7 +848,7 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 			}
 			p_forward_rule->server_addr_array = new_servers_addr ;
 			p_forward_rule->server_addr_size = new_servers_addr_size ;
-			memset( p_forward_rule->server_addr_array+p_forward_rule->server_addr_count , 0x00 , sizeof(struct ForwardRule) * (p_forward_rule->server_addr_size-p_forward_rule->server_addr_count) );
+			memset( p_forward_rule->server_addr_array+p_forward_rule->server_addr_count , 0x00 , sizeof(struct ServerNetAddress) * (p_forward_rule->server_addr_size-p_forward_rule->server_addr_count) );
 		}
 		
 		p_server_addr = p_forward_rule->server_addr_array + p_forward_rule->server_addr_count ;
@@ -882,6 +876,12 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		if( p_server_addr->ip_connection_stat.max_connections_per_ip == 0 && p_forward_rule->server_ip_connection_stat.max_connections_per_ip > 0 )
 		{
 			p_server_addr->ip_connection_stat.max_connections_per_ip = p_forward_rule->server_ip_connection_stat.max_connections_per_ip ;
+		}
+		
+		if( p_server_addr->heartbeat > 0 )
+		{
+			p_server_addr->server_unable = 1 ;
+			p_server_addr->timestamp_to = 0 ;
 		}
 		
 		nret = InitIpConnectionStat( & (p_server_addr->ip_connection_stat) );

@@ -234,6 +234,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	if( p_reverse_forward_session->sock == -1 )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "socket failed , errno[%d]" , errno );
+		RemoveIpConnectionStat( penv , & (p_reverse_forward_session->p_forward_rule->server_addr_array[p_reverse_forward_session->server_index].ip_connection_stat) , p_reverse_forward_session->netaddr.sockaddr.sin_addr.s_addr );
 		return -1;
 	}
 	
@@ -258,13 +259,6 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 			event.data.ptr = p_reverse_forward_session ;
 			event.events = EPOLLOUT | EPOLLERR ;
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_reverse_forward_session->sock , & event );
-			
-			/*
-			memset( & event , 0x00 , sizeof(struct epoll_event) );
-			event.data.ptr = p_forward_session ;
-			event.events = EPOLLERR ;
-			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_reverse_forward_session->p_reverse_forward_session->sock , & event );
-			*/
 		}
 		else /* 连接失败 */
 		{
@@ -282,10 +276,6 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	}
 	else /* 连接成功 */
 	{
-		struct epoll_event	events[ 1 ] ;
-		int			event_count = 0 ;
-		int			event_index = 0 ;
-		
 		p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
 		p_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
 		
@@ -307,12 +297,12 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , NULL , 0 , 0 , 1 ) ;
 		if( nret > 0 )
 		{
-			DISCONNECT_PAIR
+			DISCONNECT
 		}
 		else if( nret < 0 )
 		{
 			ErrorLog( __FILE__ , __LINE__ , "OnForwardInput failed[%d]" , nret );
-			DISCONNECT_PAIR
+			DISCONNECT
 		}
 	}
 	
@@ -482,8 +472,9 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 			nret = TryToConnectServer( penv , p_reverse_forward_session ) ;
 			if( nret )
 			{
-				DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
+				epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 				RemoveIpConnectionStat( penv , & (p_listen_session->p_forward_rule->client_addr_array[client_index].ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr );
+				DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
 				_CLOSESOCKET( p_forward_session->sock );
 				SetForwardSessionUnused2( penv , p_forward_session , p_reverse_forward_session );
 				continue;
@@ -505,10 +496,6 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	struct ServerNetAddress	*p_servers_addr = NULL ;
 	unsigned int		forward_thread_index ;
 	int			forward_epoll_fd ;
-	
-	struct epoll_event	events[ 1 ] ;
-	int			event_count = 0 ;
-	int			event_index = 0 ;
 	
 	int			nret = 0 ;
 	
@@ -569,12 +556,12 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	nret = OnForwardInput( penv , p_reverse_forward_session , forward_epoll_fd , NULL , 0 , 0 , 1 ) ;
 	if( nret > 0 )
 	{
-		DISCONNECT_PAIR
+		DISCONNECT
 	}
 	else if( nret < 0 )
 	{
 		ErrorLog( __FILE__ , __LINE__ , "OnForwardInput failed[%d]" , nret );
-		DISCONNECT_PAIR
+		DISCONNECT
 	}
 	
 	return 0;
@@ -655,7 +642,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 					
 					for( server_addr_index = 0 , p_server_addr = p_forward_rule->server_addr_array ; server_addr_index < p_forward_rule->server_addr_count ; server_addr_index++ , p_server_addr++ )
 					{
-						io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s:%d(%d|%u|%ld) " , p_server_addr->netaddr.ip , p_server_addr->netaddr.port.port_int , p_server_addr->heartbeat , p_server_addr->server_unable , p_server_addr->timestamp_to );
+						io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s:%d(%u|%d|%ld) " , p_server_addr->netaddr.ip , p_server_addr->netaddr.port.port_int , p_server_addr->heartbeat , p_server_addr->server_unable , p_server_addr->timestamp_to );
 						send( sock , io_buffer , io_buffer_len , 0 );
 					}
 				}
@@ -742,7 +729,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 		ip = strtok( NULL , COMMAND_SEPCHAR ) ;
 		port_str = strtok( NULL , COMMAND_SEPCHAR ) ;
 		disable_timeout = strtok( NULL , COMMAND_SEPCHAR ) ;
-		if( ip == NULL || port_str == NULL || disable_timeout == NULL )
+		if( ip == NULL || port_str == NULL )
 		{
 			io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "disable (ip) (port) (disable_timeout)" );
 			return 0;
@@ -757,9 +744,12 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 				if( STRCMP( p_servers_addr->netaddr.ip , == , ip ) && p_servers_addr->netaddr.port.port_int == port_int )
 				{
 					p_servers_addr->server_unable = 1 ;
-					p_servers_addr->timestamp_to = g_time_tv.tv_sec + atoi(disable_timeout) ;
+					if( disable_timeout == NULL )
+						p_servers_addr->timestamp_to = 0 ;
+					else
+						p_servers_addr->timestamp_to = g_time_tv.tv_sec + atoi(disable_timeout) ;
 					
-					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d unable\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
+					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d unabled\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 					send( sock , io_buffer , io_buffer_len , 0 );
 				}
 			}
@@ -770,6 +760,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 		char			*ip = NULL ;
 		char			*port_str = NULL ;
 		int			port_int ;
+		char			*disable_timeout = NULL ;
 		
 		unsigned int		forward_rule_index ;
 		struct ForwardRule	*p_forward_rule = NULL ;
@@ -778,6 +769,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 		
 		ip = strtok( NULL , COMMAND_SEPCHAR ) ;
 		port_str = strtok( NULL , COMMAND_SEPCHAR ) ;
+		disable_timeout = strtok( NULL , COMMAND_SEPCHAR ) ;
 		if( ip == NULL || port_str == NULL )
 		{
 			io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "enable (ip) (port)" );
@@ -793,7 +785,10 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 				if( STRCMP( p_servers_addr->netaddr.ip , == , ip ) && p_servers_addr->netaddr.port.port_int == port_int )
 				{
 					p_servers_addr->server_unable = 0 ;
-					p_servers_addr->timestamp_to = 0 ;
+					if( disable_timeout == NULL )
+						p_servers_addr->timestamp_to = 0 ;
+					else
+						p_servers_addr->timestamp_to = g_time_tv.tv_sec + atoi(disable_timeout) ;
 					
 					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d enabled\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 					send( sock , io_buffer , io_buffer_len , 0 );
@@ -839,7 +834,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 	}
 	else
 	{
-		io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "invalid command[%s]" , cmd );
+		io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "invalid command[%s]\n" , cmd );
 		send( sock , io_buffer , io_buffer_len , 0 );
 		return 0;
 	}
@@ -924,7 +919,6 @@ void *AcceptThread( struct ServerEnv *penv )
 	g_exit_flag = 0 ;
 	while( g_exit_flag == 0 || penv->forward_session_count > 0 )
 	{
-		DebugLog( __FILE__ , __LINE__ , "epoll_wait sock[%d][...] forward_session_count[%u] ..." , penv->accept_command_pipe.fds[0] , penv->forward_session_count );
 		if( penv->cmd_para.close_log_flag == 1 )
 			CloseLogFile();
 		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , 1000 ) ;
@@ -937,7 +931,7 @@ void *AcceptThread( struct ServerEnv *penv )
 		{
 			UPDATE_TIME
 		}
-		DebugLog( __FILE__ , __LINE__ , "epoll_wait return [%d]events" , event_count );
+		DebugLog( __FILE__ , __LINE__ , "epoll_wait sock[%d][...] forward_session_count[%u] return [%d]events" , penv->accept_command_pipe.fds[0] , penv->forward_session_count , event_count );
 		
 		for( event_index = 0 , p_event = events ; event_index < event_count ; event_index++ , p_event++ )
 		{
@@ -1037,7 +1031,7 @@ void *AcceptThread( struct ServerEnv *penv )
 						epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 						DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
 						_CLOSESOCKET( p_forward_session->sock );
-						nret = ResolveConnectingError( penv , p_forward_session->p_reverse_forward_session ) ;
+						nret = ResolveConnectingError( penv , p_forward_session ) ;
 						if( nret )
 						{
 							RemoveIpConnectionStat( penv , & (p_reverse_forward_session->p_forward_rule->client_addr_array[p_reverse_forward_session->client_index].ip_connection_stat) , p_reverse_forward_session->netaddr.sockaddr.sin_addr.s_addr );
@@ -1097,7 +1091,7 @@ void *_AcceptThread( void *pv )
 	AcceptThread( (struct ServerEnv *)pv );
 	
 	UPDATE_TIME
-	InfoLog( __FILE__ , __LINE__ , "return" );
+	InfoLog( __FILE__ , __LINE__ , "exit" );
 	return NULL;
 }
 
