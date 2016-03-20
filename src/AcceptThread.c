@@ -243,6 +243,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 	
 	/* 设置套接字选项 */
 	SetNonBlocking( p_reverse_forward_session->sock );
+	SetReuseAddr( p_reverse_forward_session->sock );
 	SetNagleClosed( p_reverse_forward_session->sock );
 	SetCloseExec( p_reverse_forward_session->sock );
 	
@@ -386,6 +387,7 @@ static int OnListenAccept( struct ServerEnv *penv , struct ForwardSession *p_lis
 		
 		/* 设置socket选项 */		
 		SetNonBlocking( sock );
+		SetReuseAddr( sock );
 		SetNagleClosed( sock );
 		SetCloseExec( sock );
 		
@@ -896,9 +898,6 @@ static int OnReceiveCommand( struct ServerEnv *penv , struct ForwardSession *p_f
 
 void *AcceptThread( struct ServerEnv *penv )
 {
-	/*
-	int			timeout ;
-	*/
 	struct epoll_event	events[ WAIT_EVENTS_COUNT ] ;
 	int			event_count ;
 	int			event_index ;
@@ -917,8 +916,11 @@ void *AcceptThread( struct ServerEnv *penv )
 	SETTID
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.AcceptThread ---" );
 	
-	BindCpuAffinity( 0 );
-	InfoLog( __FILE__ , __LINE__ , "sched_setaffinity" );
+	if( penv->cmd_para.set_cpu_affinity_flag == 1 )
+	{
+		BindCpuAffinity( 0 );
+		InfoLog( __FILE__ , __LINE__ , "sched_setaffinity" );
+	}
 	
 	/* 主工作循环 */
 	g_exit_flag = 0 ;

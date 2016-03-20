@@ -275,6 +275,7 @@ struct CommandParameter
 	char				log_pathfilename[ MAXLEN_FILENAME + 1 ] ; /* --log-filename (logfilename) */
 	unsigned int			no_daemon_flag ; /* --no-daemon */
 	unsigned int			close_log_flag ; /* --close-log */
+	unsigned int			set_cpu_affinity_flag ; /* --set-cpu-affinity */
 } ;
 
 /* 服务器环境结构 */
@@ -379,6 +380,14 @@ void UpdateTimeNow( struct timeval *p_time_tv , char *p_date_and_time );
 	{ \
 		int	on = 1 ; \
 		setsockopt( _sock_ , IPPROTO_TCP , TCP_NODELAY , (void*) & on , sizeof(int) ); \
+	}
+
+#define SetNoLinger(_sock_) \
+	{ \
+		struct linger	lg; \
+		lg.l_onoff = 1 ; \
+		lg.l_linger = 0 ; \
+		setsockopt( _sock_ , SOL_SOCKET , SO_LINGER , (void*) & lg , sizeof(struct linger) ); \
 	}
 
 #define SetCloseExec(_sock_) \

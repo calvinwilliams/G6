@@ -603,21 +603,6 @@ static int LoadOneRule( struct ServerEnv *penv , FILE *fp , struct ForwardRule *
 		return -11;
 	}
 	
-	/*
-	if( p_forward_rule->client_ip_connection_stat.max_ip == 0 && penv->ip_connection_stat.max_ip > 0 )
-	{
-		p_forward_rule->client_ip_connection_stat.max_ip = penv->ip_connection_stat.max_ip ;
-	}
-	if( p_forward_rule->client_ip_connection_stat.max_connections == 0 && penv->ip_connection_stat.max_connections > 0 )
-	{
-		p_forward_rule->client_ip_connection_stat.max_connections = penv->ip_connection_stat.max_connections ;
-	}
-	if( p_forward_rule->client_ip_connection_stat.max_connections_per_ip == 0 && penv->ip_connection_stat.max_connections_per_ip > 0 )
-	{
-		p_forward_rule->client_ip_connection_stat.max_connections_per_ip = penv->ip_connection_stat.max_connections_per_ip ;
-	}
-	*/
-	
 	if( p_forward_rule->forward_timeout == 0 && penv->timeout > 0 )
 	{
 		p_forward_rule->forward_timeout = penv->timeout ;

@@ -21,36 +21,10 @@ unsigned long CalcHash( char *str )
 	return hashval;
 }
 
-#if 0
-
-/* 用IP和PORT设置sockaddr结构 */
-void SetNetAddress( struct NetAddress *p_netaddr )
-{
-	memset( & (p_netaddr->sockaddr) , 0x00 , sizeof(struct sockaddr_in) );
-	p_netaddr->sockaddr.sin_family = AF_INET ;
-	p_netaddr->sockaddr.sin_addr.s_addr = inet_addr(p_netaddr->ip) ;
-	p_netaddr->sockaddr.sin_port = htons( (unsigned short)(p_netaddr->port.port_int) );
-	return;
-}
-
-/* 从sockaddr结构析出IP和PORT */
-void GetNetAddress( struct NetAddress *p_netaddr )
-{
-	strcpy( p_netaddr->ip , inet_ntoa(p_netaddr->sockaddr.sin_addr) );
-	p_netaddr->port.port_int = (int)ntohs( p_netaddr->sockaddr.sin_port ) ;
-	return;
-}
-
-#endif
-
 /* 转换为守护进程 */
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) )
 {
 	int pid;
-	/*
-	int sig;
-	int fd;
-	*/
 	
 	pid=fork();
 	switch( pid )
@@ -65,9 +39,6 @@ int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void
 	}
 
 	setsid() ;
-	/*
-	signal( SIGHUP,SIG_IGN );
-*/
 
 	pid=fork();
 	switch( pid )
@@ -83,19 +54,7 @@ int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void
 	
 	setuid( getpid() ) ;
 	
-	/* chdir("/tmp"); */
-	
 	umask( 0 ) ;
-	
-	/*
-	for( sig=0 ; sig<30 ; sig++ )
-		signal( sig , SIG_DFL );
-	*/
-	
-	/*
-	for( fd=0 ; fd<=2 ; fd++ )
-		close( fd );
-	*/
 	
 	return ServerMain( pv );
 }
@@ -172,33 +131,17 @@ void UpdateTimeNow( struct timeval *p_time_tv , char *p_date_and_time )
 	struct tm		stime ;
 	
 #if ( defined __linux__ ) || ( defined __unix ) || ( defined _AIX )
-	/*
-	gettimeofday( & g_time_tv , NULL );
-	*/
 	p_time_tv->tv_sec = time( NULL ) ;
 	localtime_r( &(p_time_tv->tv_sec) , & stime );
 	
-	/* strftime( p_date_and_time , sizeof(g_date_and_time) , "%Y-%m-%d %H:%M:%S" , & stime ); */
 	snprintf( p_date_and_time , sizeof(g_date_and_time)-1 , "%04d-%02d-%02d %02d:%02d:%02d" , stime.tm_year+1900 , stime.tm_mon+1 , stime.tm_mday , stime.tm_hour , stime.tm_min , stime.tm_sec );
 #elif ( defined _WIN32 )
 	{
 	SYSTEMTIME	stNow ;
 	GetLocalTime( & stNow );
 	time( & (p_time_tv->tv_sec) );
-	/*
-	g_time_tv.tv_usec = stNow.wMilliseconds * 1000 ;
-	*/
-	/*
-	stime.tm_year = stNow.wYear - 1900 ;
-	stime.tm_mon = stNow.wMonth - 1 ;
-	stime.tm_mday = stNow.wDay ;
-	stime.tm_hour = stNow.wHour ;
-	stime.tm_min = stNow.wMinute ;
-	stime.tm_sec = stNow.wSecond ;
-	*/
 	}
 	
-	/* strftime( p_date_and_time , sizeof(g_date_and_time) , "%Y-%m-%d %H:%M:%S" , & stime ); */
 	snprintf( p_date_and_time , sizeof(g_date_and_time)-1 , "%04d-%02d-%02d %02d:%02d:%02d" , stNow.wYear , stNow.wMonth , stNow.wDay , stNow.wHour , stNow.wMinute , stNow.wSecond );
 #endif
 	

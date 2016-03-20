@@ -15,7 +15,7 @@ static void version()
 
 static void usage()
 {
-	printf( "USAGE : G6 -f (config_pathfilename) [ -t (forward_thread_size) ] [ -s (forward_session_size) ] [ --log-level (DEBUG|INFO|WARN|ERROR|FATAL) ] [ --log-filename (logfilename) ] [ --no-daemon ]\n" );
+	printf( "USAGE : G6 -f (config_pathfilename) [ -t (forward_thread_size) ] [ -s (forward_session_size) ] [ --log-level (DEBUG|INFO|WARN|ERROR|FATAL) ] [ --log-filename (logfilename) ] [ --no-daemon ] [ --set-cpu-affinity ]\n" );
 	return;
 }
 
@@ -117,6 +117,10 @@ int main( int argc , char *argv[] )
 		{
 			penv->cmd_para.close_log_flag = 1 ;
 		}
+		else if( strcmp( argv[n] , "--set-cpu-affinity" ) == 0 )
+		{
+			penv->cmd_para.set_cpu_affinity_flag = 1 ;
+		}
 		else
 		{
 			fprintf( stderr , "invalid opt[%s]\r\n" , argv[n] );
@@ -148,7 +152,7 @@ int main( int argc , char *argv[] )
 	
 	/* 设置公共参数 */
 	/*
-	penv->timeout = DEFAULT_TIMEOUT_SECONDS ;
+	...
 	*/
 	
 	/* 装载配置 */

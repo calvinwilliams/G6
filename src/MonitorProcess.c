@@ -72,12 +72,6 @@ static void sig_proc( struct ServerEnv *penv )
 		nret = write( g_penv->accept_request_pipe.fds[1] , "Q" , 1 ) ;
 		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q done[%d]" , nret );
 		
-		/*
-		InfoLog( __FILE__ , __LINE__ , "read accept_response_pipe ..." );
-		nret = read( g_penv->accept_response_pipe.fds[0] , & command , 1 ) ;
-		InfoLog( __FILE__ , __LINE__ , "read accept_response_pipe done[%d][%c]" , nret , command );
-		*/
-		
 		/* 创建子进程，用新程序映像覆盖代码段 */
 		pid = fork() ;
 		if( pid == -1 )
@@ -98,22 +92,12 @@ static void sig_proc( struct ServerEnv *penv )
 	}
 	else if( g_SIGTERM_flag == 1 )
 	{
-		/*
-		char		command ;
-		*/
-		
 		int		nret = 0 ;
 		
 		/* 通知所有线程关闭侦听socket */
 		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q ..." );
 		nret = write( g_penv->accept_request_pipe.fds[1] , "Q" , 1 ) ;
 		InfoLog( __FILE__ , __LINE__ , "write accept_request_pipe Q done[%d]" , nret );
-		
-		/*
-		InfoLog( __FILE__ , __LINE__ , "read accept_response_pipe ..." );
-		nret = read( g_penv->accept_response_pipe.fds[0] , & command , 1 ) ;
-		InfoLog( __FILE__ , __LINE__ , "read accept_response_pipe done[%d][%c]" , nret , command );
-		*/
 		
 		/* 设置退出标志 */
 		g_SIGTERM_flag = 0 ;
