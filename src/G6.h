@@ -335,7 +335,6 @@ struct ServerEnv
 	int				*forward_epoll_fd_array ; /* 数据收发epoll池 */
 	
 	pthread_mutex_t			ip_connection_stat_mutex ; /* IP-CONNECTION统计 临界区互斥 */
-	pthread_mutex_t			forward_session_count_mutex ; /* 通讯会话数量 临界区互斥 */
 	pthread_mutex_t			server_connection_count_mutex ; /* 服务端连接数量 临界区互斥 */
 	pthread_mutex_t			timeout_rbtree_mutex ; /* 超时红黑树 临界区互斥 */
 	pthread_mutex_t			time_cache_mutex ; /* 超时红黑树 临界区互斥 */
