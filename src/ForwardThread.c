@@ -28,7 +28,7 @@ int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_se
 	
 	/* 接收通讯数据 */
 	p_forward_session->io_buffer_offsetpos = 0 ;
-	p_forward_session->io_buffer_len = recv( p_forward_session->sock , p_forward_session->io_buffer , IO_BUFFER_SIZE , 0 ) ;
+	p_forward_session->io_buffer_len = recv( p_forward_session->sock , p_forward_session->io_buffer , DEFAULT_FORWARD_TRANSFER_BUFSIZE , 0 ) ;
 	if( p_forward_session->io_buffer_len == 0 )
 	{
 		/* 对端断开连接 */
@@ -64,7 +64,7 @@ int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_se
 	if( p_forward_session->p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_RT )
 	{
 		if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-			p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].rtt = g_time_tv.tv_sec ;
+			p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].rtt = GETSECONDSTAMP ;
 	}
 	
 	/* 发送通讯数据 */
@@ -169,7 +169,7 @@ int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_se
 	if( p_forward_session->p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_RT )
 	{
 		if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-			p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt = g_time_tv.tv_sec ;
+			p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt = GETSECONDSTAMP ;
 	}
 	
 	return 0;
@@ -228,7 +228,7 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 	if( p_forward_session->p_forward_rule->load_balance_algorithm == LOAD_BALANCE_ALGORITHM_RT )
 	{
 		if( p_forward_session->type == FORWARD_SESSION_TYPE_CLIENT )
-			p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt = g_time_tv.tv_sec ;
+			p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].wtt = GETSECONDSTAMP ;
 	}
 	
 	return 0;
@@ -254,9 +254,9 @@ void *ForwardThread( unsigned long forward_thread_index )
 	/* 设置日志输出文件 */
 	SetLogFile( penv->cmd_para.log_pathfilename );
 	SetLogLevel( penv->cmd_para.log_level );
-	UPDATE_TIME
 	SETPID
 	SETTID
+	UPDATEDATETIMECACHE
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.ForwardThread.%d ---" , forward_thread_index+1 );
 	
 	if( penv->cmd_para.set_cpu_affinity_flag == 1 )
@@ -271,13 +271,9 @@ void *ForwardThread( unsigned long forward_thread_index )
 		if( penv->cmd_para.close_log_flag == 1 )
 			CloseLogFile();
 		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , 1000 ) ;
-		if( g_exit_flag == 0 )
+		if( g_exit_flag == 1 )
 		{
-			UPDATE_TIME_FROM_CACHE
-		}
-		else
-		{
-			UPDATE_TIME
+			UPDATEDATETIMECACHE
 		}
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait sock[%d][...] forward_session_count[%u] return [%d]events" , penv->forward_command_pipe[forward_thread_index].fds[0] , penv->forward_session_count , event_count  );
 		
@@ -347,7 +343,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 					{
 						if( p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout > 0 )
 						{
-							UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
+							UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , GETSECONDSTAMP + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
 						}
 					}
 				}
@@ -363,7 +359,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 					{
 						if( p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout > 0 )
 						{
-							UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
+							UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , GETSECONDSTAMP + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
 						}
 					}
 				}
@@ -388,7 +384,7 @@ void *_ForwardThread( void *pv )
 	free( p_forward_thread_index );
 	ForwardThread( forward_thread_index );
 	
-	UPDATE_TIME
+	UPDATEDATETIMECACHE
 	InfoLog( __FILE__ , __LINE__ , "pthread_exit" );
 	pthread_exit(NULL);
 }

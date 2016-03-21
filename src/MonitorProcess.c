@@ -7,7 +7,7 @@ signed char		g_SIGTERM_flag = 0 ;
 
 static void sig_set_flag( int sig_no )
 {
-	UPDATE_TIME
+	UPDATEDATETIMECACHE
 	InfoLog( __FILE__ , __LINE__ , "recv signal[%d]" , sig_no );
 	
 	if( sig_no == SIGUSR1 )
@@ -115,9 +115,9 @@ int MonitorProcess( struct ServerEnv *penv )
 	int			nret = 0 ;
 	
 	/* 设置日志输出文件 */
-	UPDATE_TIME
 	SETPID
 	SETTID
+	UPDATEDATETIMECACHE
 	InfoLog( __FILE__ , __LINE__ , "--- G6.MonitorProcess ---" );
 	
 	/* 设置信号句柄 */
@@ -151,9 +151,9 @@ int MonitorProcess( struct ServerEnv *penv )
 		}
 		else if( penv->pid == 0 )
 		{
-			UPDATE_TIME
 			SETPID 
 			SETTID
+			UPDATEDATETIMECACHE
 			
 			InfoLog( __FILE__ , __LINE__ , "child : [%ld]fork[%ld]" , getppid() , getpid() );
 			
@@ -174,7 +174,7 @@ int MonitorProcess( struct ServerEnv *penv )
 		/* 监控子进程结束 */
 		_WAITPID :
 		pid = waitpid( -1 , & status , 0 );
-		UPDATE_TIME
+		UPDATEDATETIMECACHE
 		if( pid == -1 )
 		{
 			if( errno == EINTR )
@@ -190,18 +190,9 @@ int MonitorProcess( struct ServerEnv *penv )
 		if( pid != penv->pid )
 			goto _WAITPID;
 		
-		if( WTERMSIG(status) )
-		{
-			ErrorLog( __FILE__ , __LINE__
-				, "waitpid[%ld] WEXITSTATUS[%d] WIFSIGNALED[%d] WTERMSIG[%d]"
-				, penv->pid , WEXITSTATUS(status) , WIFSIGNALED(status) , WTERMSIG(status) );
-		}
-		else
-		{
-			InfoLog( __FILE__ , __LINE__
-				, "waitpid[%ld] WEXITSTATUS[%d] WIFSIGNALED[%d] WTERMSIG[%d]"
-				, penv->pid , WEXITSTATUS(status) , WIFSIGNALED(status) , WTERMSIG(status) );
-		}
+		ErrorLog( __FILE__ , __LINE__
+			, "waitpid[%ld] WEXITSTATUS[%d] WIFSIGNALED[%d] WTERMSIG[%d]"
+			, penv->pid , WEXITSTATUS(status) , WIFSIGNALED(status) , WTERMSIG(status) );
 		
 		if( g_exit_flag == 0 )
 			sleep(1);

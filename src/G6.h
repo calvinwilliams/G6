@@ -145,8 +145,6 @@ extern char	g_LoadBalanceAlgorithmString[7][2+1] ;
 #define FORWARD_SESSION_STATUS_CONNECTED	4 /* 连接完成 */
 #define FORWARD_SESSION_STATUS_COMMAND		5 /* 命令 */
 
-#define IO_BUFFER_SIZE				4096 /* 输入输出缓冲区大小 */
-
 #define DEFAULT_MORATORIUM_SECONDS		60 /* 缺省暂禁时间，单位：秒 */
 #define DEFAULT_TIMEOUT_SECONDS			60 /* 缺省超时时间，单位：秒 */
 
@@ -257,7 +255,7 @@ struct ForwardSession
 	unsigned int			forward_index ; /* 转发端索引 */
 	unsigned int			server_index ; /* 服务端索引 */
 	
-	char				io_buffer[ IO_BUFFER_SIZE + 1 ] ; /* 输入输出缓冲区 */
+	char				io_buffer[ DEFAULT_FORWARD_TRANSFER_BUFSIZE + 1 ] ; /* 输入输出缓冲区 */
 	int				io_buffer_len ; /* 输入输出缓冲区有效数据长度 */
 	int				io_buffer_offsetpos ; /* 输入输出缓冲区有效数据开始偏移量 */
 	
@@ -289,24 +287,8 @@ struct PipeFds
 	int				fds[ 2 ] ;
 } ;
 
-#define UPDATE_TIME \
-	{ \
-		UpdateTimeNow( & g_time_tv , g_date_and_time ); \
-	}
-
-#define UPDATE_TIME_FROM_CACHE \
-	{ \
-		pthread_mutex_lock( & (penv->time_cache_mutex) ); \
-		g_time_tv.tv_sec = penv->time_tv.tv_sec ; \
-		memcpy( g_date_and_time , penv->date_and_time , sizeof(penv->date_and_time) ); \
-		pthread_mutex_unlock( & (penv->time_cache_mutex) ); \
-	}
-
 struct ServerEnv
 {
-	struct timeval			time_tv ;
-	char				date_and_time[ sizeof(g_date_and_time) ] ;
-	
 	struct CommandParameter		cmd_para ; /* 命令行参数结构 */
 	char				**argv ;
 	
@@ -337,7 +319,6 @@ struct ServerEnv
 	int				*forward_epoll_fd_array ; /* 数据收发epoll池 */
 	
 	pthread_mutex_t			timeout_rbtree_mutex ; /* 超时红黑树 临界区互斥 */
-	pthread_mutex_t			time_cache_mutex ; /* 超时红黑树 临界区互斥 */
 } ;
 
 /********* util *********/
@@ -349,7 +330,6 @@ void GetNetAddress( struct NetAddress *p_netaddr );
 int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void *pv , int (* ControlMain)(long lControlStatus) );
 int IsMatchString(char *pcMatchString, char *pcObjectString, char cMatchMuchCharacters, char cMatchOneCharacters);
 int BindCpuAffinity( int processor_no );
-void UpdateTimeNow( struct timeval *p_time_tv , char *p_date_and_time );
 
 #define SetReuseAddr(_sock_) \
 	{ \

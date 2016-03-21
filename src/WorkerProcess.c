@@ -8,7 +8,7 @@ int WorkerProcess( struct ServerEnv *penv )
 	int			nret = 0 ;
 	
 	/* 设置日志输出文件 */
-	UPDATE_TIME
+	UPDATEDATETIMECACHE
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess ---" );
 	
 	signal( SIGTERM , SIG_IGN );
@@ -64,7 +64,7 @@ int WorkerProcess( struct ServerEnv *penv )
 	{
 		InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_join ForwardThread[%lu] ..." , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
 		pthread_join( penv->forward_thread_tid_array[forward_thread_index] , NULL );
-		UPDATE_TIME
+		UPDATEDATETIMECACHE
 		InfoLog( __FILE__ , __LINE__ , "parent_thread : [%lu] pthread_join ForwardThread[%lu] ok" , pthread_self() , penv->forward_thread_tid_array[forward_thread_index] );
 	}
 	

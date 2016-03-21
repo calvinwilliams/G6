@@ -137,9 +137,9 @@ int main( int argc , char *argv[] )
 		exit(7);
 	}
 	
-	UPDATE_TIME
 	SETPID
 	SETTID
+	UPDATEDATETIMECACHEFIRST
 	
 	InfoLog( __FILE__ , __LINE__ , "--- G6 BEGIN --- v%s build %s %s" , __G6_VERSION , __DATE__ , __TIME__ );
 	

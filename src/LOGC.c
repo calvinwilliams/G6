@@ -22,10 +22,10 @@
 TLS char		g_log_pathfilename[ MAXLEN_FILENAME + 1 ] = "" ;
 TLS int			g_log_level = LOGLEVEL_INFO ;
 TLS int			g_file_fd = -1 ;
-TLS struct timeval	g_time_tv = { 0 , 0 } ;
-TLS char		g_date_and_time[ 10 + 1 + 8 + 2 ] = "" ;
 TLS unsigned long	g_pid = 0 ;
 TLS unsigned long	g_tid = 0 ;
+struct DateTimeCache	g_date_time_cache[ LOG_DATETIMECACHE_SIZE ] = { { 0 } } ;
+int			g_date_time_cache_index = 0 ;
 
 const char log_level_itoa[][6] = { "DEBUG" , "INFO" , "WARN" , "ERROR" , "FATAL" } ;
 
@@ -53,6 +53,7 @@ void SetLogFile( char *format , ... )
 	if( g_file_fd != -1 )
 	{
 		CLOSE( g_file_fd );
+		g_file_fd = -1 ;
 	}
 	
 	va_start( valist , format );
@@ -76,6 +77,58 @@ void CloseLogFile()
 void SetLogLevel( int log_level )
 {
 	g_log_level = log_level ;
+	
+	return;
+}
+
+static void _UpdateDateTimeCache( unsigned int index )
+{
+	struct tm		stime ;
+	
+#if ( defined __linux__ ) || ( defined __unix ) || ( defined _AIX )
+	g_date_time_cache[index].second_stamp = time( NULL ) ;
+	localtime_r( &(g_date_time_cache[index].second_stamp) , & stime );
+	
+	snprintf( g_date_time_cache[index].date_and_time_str , sizeof(g_date_time_cache[index].date_and_time_str)-1 , "%04d-%02d-%02d %02d:%02d:%02d" , stime.tm_year+1900 , stime.tm_mon+1 , stime.tm_mday , stime.tm_hour , stime.tm_min , stime.tm_sec );
+#elif ( defined _WIN32 )
+	{
+	SYSTEMTIME	stNow ;
+	GetLocalTime( & stNow );
+	time( & (g_date_time_cache[index].second_stamp) );
+	}
+	
+	snprintf( g_date_time_cache[index].date_and_time_str , sizeof(g_date_time_cache[index].date_and_time_str)-1 , "%04d-%02d-%02d %02d:%02d:%02d" , stNow.wYear , stNow.wMonth , stNow.wDay , stNow.wHour , stNow.wMinute , stNow.wSecond );
+#endif
+	
+	
+	return;
+}
+
+/* 第一次更新时间缓冲区 */
+void UpdateDateTimeCacheFirst()
+{
+	_UpdateDateTimeCache( 0 );
+	
+	return;
+}
+
+/* 更新时间缓冲区 */
+void UpdateDateTimeCache()
+{
+	int	next_date_time_cache_index ;
+	/*
+	int	diff_date_time_cache_index ;
+	*/
+	
+	next_date_time_cache_index = ( g_date_time_cache_index + 1 ) % LOG_DATETIMECACHE_SIZE ;
+	
+	_UpdateDateTimeCache( next_date_time_cache_index );
+	
+	__sync_bool_compare_and_swap( & g_date_time_cache_index , g_date_time_cache_index , next_date_time_cache_index );
+	/*
+	diff_date_time_cache_index = next_date_time_cache_index - g_date_time_cache_index ;
+	__sync_fetch_and_add( & g_date_time_cache_index , diff_date_time_cache_index );
+	*/
 	
 	return;
 }
@@ -110,10 +163,13 @@ int WriteLogBaseV( int log_level , char *c_filename , long c_fileline , char *fo
 	log_buf_remain_len = sizeof(log_buffer) - 1 ;
 	
 	/*
-	gettimeofday( & g_time_tv , NULL );
-	len = SNPRINTF( log_bufptr , log_buf_remain_len , "%s.%06ld | %-5s | %lu:%lu:%s:%ld | " , g_date_and_time , g_time_tv.tv_usec , log_level_itoa[log_level] , g_pid , g_tid , p_c_filename , c_fileline ) ;
+	{
+	struct timeval	tv ;
+	gettimeofday( & tv , NULL );
+	len = SNPRINTF( log_bufptr , log_buf_remain_len , "%s.%06ld | %-5s | %lu:%lu:%s:%ld | " , g_date_time_cache[g_date_time_cache_index].date_and_time_str , tv.tv_usec , log_level_itoa[log_level] , g_pid , g_tid , p_c_filename , c_fileline ) ;
+	}
 	*/
-	len = SNPRINTF( log_bufptr , log_buf_remain_len , "%s | %-5s | %lu:%lu:%s:%ld | " , g_date_and_time , log_level_itoa[log_level] , g_pid , g_tid , p_c_filename , c_fileline ) ;
+	len = SNPRINTF( log_bufptr , log_buf_remain_len , "%s | %-5s | %lu:%lu:%s:%ld | " , g_date_time_cache[g_date_time_cache_index].date_and_time_str , log_level_itoa[log_level] , g_pid , g_tid , p_c_filename , c_fileline ) ;
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
 	len = VSNPRINTF( log_bufptr , log_buf_remain_len , format , valist );
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );

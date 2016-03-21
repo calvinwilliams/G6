@@ -1,12 +1,12 @@
 #include "G6.h"
 
 #define IF_SERVER_ENABLE(_server_addr_) \
-	if( (_server_addr_).server_unable == 1 && (_server_addr_).timestamp_to > 0 && g_time_tv.tv_sec > (_server_addr_).timestamp_to ) \
+	if( (_server_addr_).server_unable == 1 && (_server_addr_).timestamp_to > 0 && GETSECONDSTAMP > (_server_addr_).timestamp_to ) \
 	{ \
 		(_server_addr_).server_unable = 0 ; \
 		(_server_addr_).timestamp_to = (_server_addr_).heartbeat ; \
 	} \
-	else if( (_server_addr_).server_unable == 0 && (_server_addr_).timestamp_to > 0 && g_time_tv.tv_sec > (_server_addr_).timestamp_to ) \
+	else if( (_server_addr_).server_unable == 0 && (_server_addr_).timestamp_to > 0 && GETSECONDSTAMP > (_server_addr_).timestamp_to ) \
 	{ \
 		(_server_addr_).server_unable = 1 ; \
 		(_server_addr_).timestamp_to = 0 ; \
@@ -190,7 +190,7 @@ static int ResolveConnectingError( struct ServerEnv *penv , struct ForwardSessio
 	/* 设置服务端不可用 */
 	p_servers_addr = p_reverse_forward_session->p_forward_rule->server_addr_array + p_reverse_forward_session->server_index ;
 	p_servers_addr->server_unable = 1 ;
-	p_servers_addr->timestamp_to = g_time_tv.tv_sec + penv->moratorium ;
+	p_servers_addr->timestamp_to = GETSECONDSTAMP + penv->moratorium ;
 	
 	/* 非堵塞连接服务端 */
 	nret = TryToConnectServer( penv , p_reverse_forward_session ) ;
@@ -291,7 +291,7 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 		
 		if( p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout > 0 )
 		{
-			AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_forward_session , g_time_tv.tv_sec + p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout );
+			AddTimeoutTreeNode2( penv , p_reverse_forward_session , p_forward_session , GETSECONDSTAMP + p_reverse_forward_session->p_forward_rule->forward_addr_array[p_reverse_forward_session->forward_index].timeout );
 		}
 		
 		nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , NULL , 0 , 0 , 1 ) ;
@@ -550,7 +550,7 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	
 	if( p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout > 0 )
 	{
-		AddTimeoutTreeNode2( penv , p_forward_session , p_reverse_forward_session , g_time_tv.tv_sec + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
+		AddTimeoutTreeNode2( penv , p_forward_session , p_reverse_forward_session , GETSECONDSTAMP + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
 	}
 	
 	nret = OnForwardInput( penv , p_reverse_forward_session , forward_epoll_fd , NULL , 0 , 0 , 1 ) ;
@@ -578,7 +578,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 	char			*sub_cmd = NULL ;
 	
 	int			sock = p_forward_session->sock ;
-	char			io_buffer[ IO_BUFFER_SIZE + 1 ] ;
+	char			io_buffer[ DEFAULT_FORWARD_TRANSFER_BUFSIZE + 1 ] ;
 	int			io_buffer_len ;
 	
 	cmd = strtok( p_forward_session->io_buffer , COMMAND_SEPCHAR ) ;
@@ -747,7 +747,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 					if( disable_timeout == NULL )
 						p_servers_addr->timestamp_to = 0 ;
 					else
-						p_servers_addr->timestamp_to = g_time_tv.tv_sec + atoi(disable_timeout) ;
+						p_servers_addr->timestamp_to = GETSECONDSTAMP + atoi(disable_timeout) ;
 					
 					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d unabled\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 					send( sock , io_buffer , io_buffer_len , 0 );
@@ -788,7 +788,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 					if( disable_timeout == NULL )
 						p_servers_addr->timestamp_to = 0 ;
 					else
-						p_servers_addr->timestamp_to = g_time_tv.tv_sec + atoi(disable_timeout) ;
+						p_servers_addr->timestamp_to = GETSECONDSTAMP + atoi(disable_timeout) ;
 					
 					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d enabled\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 					send( sock , io_buffer , io_buffer_len , 0 );
@@ -824,7 +824,7 @@ static int ProcessCommand( struct ServerEnv *penv , struct ForwardSession *p_for
 				if( p_servers_addr->heartbeat > 0 && STRCMP( p_servers_addr->netaddr.ip , == , ip ) && p_servers_addr->netaddr.port.port_int == port_int )
 				{
 					p_servers_addr->server_unable = 0 ;
-					p_servers_addr->timestamp_to = g_time_tv.tv_sec + p_servers_addr->heartbeat ;
+					p_servers_addr->timestamp_to = GETSECONDSTAMP + p_servers_addr->heartbeat ;
 					
 					io_buffer_len = snprintf( io_buffer , sizeof(io_buffer)-1 , "%s %s %d heartbeat\n" , p_forward_rule->rule_id , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 					send( sock , io_buffer , io_buffer_len , 0 );
@@ -850,7 +850,7 @@ static int OnReceiveCommand( struct ServerEnv *penv , struct ForwardSession *p_f
 	int			nret = 0 ;
 	
 	/* 接收通讯数据 */
-	len = recv( p_forward_session->sock , p_forward_session->io_buffer+p_forward_session->io_buffer_len , IO_BUFFER_SIZE-p_forward_session->io_buffer_len , 0 ) ;
+	len = recv( p_forward_session->sock , p_forward_session->io_buffer+p_forward_session->io_buffer_len , DEFAULT_FORWARD_TRANSFER_BUFSIZE-p_forward_session->io_buffer_len , 0 ) ;
 	if( len == 0 )
 	{
 		/* 对端断开连接 */
@@ -904,9 +904,9 @@ void *AcceptThread( struct ServerEnv *penv )
 	/* 设置日志输出文件 */
 	SetLogFile( penv->cmd_para.log_pathfilename );
 	SetLogLevel( penv->cmd_para.log_level );
-	UPDATE_TIME
 	SETPID
 	SETTID
+	UPDATEDATETIMECACHE
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.AcceptThread ---" );
 	
 	if( penv->cmd_para.set_cpu_affinity_flag == 1 )
@@ -922,14 +922,9 @@ void *AcceptThread( struct ServerEnv *penv )
 		if( penv->cmd_para.close_log_flag == 1 )
 			CloseLogFile();
 		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , 1000 ) ;
-		
-		if( g_exit_flag == 0 )
+		if( g_exit_flag == 1 )
 		{
-			UPDATE_TIME_FROM_CACHE
-		}
-		else
-		{
-			UPDATE_TIME
+			UPDATEDATETIMECACHE
 		}
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait sock[%d][...] forward_session_count[%u] return [%d]events" , penv->accept_command_pipe.fds[0] , penv->forward_session_count , event_count );
 		
@@ -1090,7 +1085,7 @@ void *_AcceptThread( void *pv )
 {
 	AcceptThread( (struct ServerEnv *)pv );
 	
-	UPDATE_TIME
+	UPDATEDATETIMECACHE
 	InfoLog( __FILE__ , __LINE__ , "exit" );
 	return NULL;
 }

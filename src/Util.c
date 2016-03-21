@@ -126,26 +126,3 @@ int BindCpuAffinity( int processor_no )
 	return nret;
 }
 
-void UpdateTimeNow( struct timeval *p_time_tv , char *p_date_and_time )
-{
-	struct tm		stime ;
-	
-#if ( defined __linux__ ) || ( defined __unix ) || ( defined _AIX )
-	p_time_tv->tv_sec = time( NULL ) ;
-	localtime_r( &(p_time_tv->tv_sec) , & stime );
-	
-	snprintf( p_date_and_time , sizeof(g_date_and_time)-1 , "%04d-%02d-%02d %02d:%02d:%02d" , stime.tm_year+1900 , stime.tm_mon+1 , stime.tm_mday , stime.tm_hour , stime.tm_min , stime.tm_sec );
-#elif ( defined _WIN32 )
-	{
-	SYSTEMTIME	stNow ;
-	GetLocalTime( & stNow );
-	time( & (p_time_tv->tv_sec) );
-	}
-	
-	snprintf( p_date_and_time , sizeof(g_date_and_time)-1 , "%04d-%02d-%02d %02d:%02d:%02d" , stNow.wYear , stNow.wMonth , stNow.wDay , stNow.wHour , stNow.wMinute , stNow.wSecond );
-#endif
-	
-	
-	return;
-}
-

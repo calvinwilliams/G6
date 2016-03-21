@@ -115,7 +115,6 @@ int InitEnvirment( struct ServerEnv *penv )
 	
 	/* 创建线程互斥量 */
 	pthread_mutex_init( & (penv->timeout_rbtree_mutex) , NULL );
-	pthread_mutex_init( & (penv->time_cache_mutex) , NULL );
 	
 	return 0;
 }
@@ -161,7 +160,6 @@ void CleanEnvirment( struct ServerEnv *penv )
 	free( penv->forward_epoll_fd_array );
 	
 	pthread_mutex_destroy( & (penv->timeout_rbtree_mutex) );
-	pthread_mutex_destroy( & (penv->time_cache_mutex) );
 	
 	return;
 }
@@ -641,7 +639,7 @@ int GetLastestTimeout( struct ServerEnv *penv )
 	}
 	
 	p_forward_session = rb_entry( p_node , struct ForwardSession , timeout_rbnode );
-	timeout = p_forward_session->timeout_timestamp - g_time_tv.tv_sec ;
+	timeout = p_forward_session->timeout_timestamp - GETSECONDSTAMP ;
 	if( timeout < 0 )
 		timeout = 0 ;
 	
@@ -665,7 +663,7 @@ struct ForwardSession *GetExpireTimeoutNode( struct ServerEnv *penv )
 	}
 	
 	p_forward_session = rb_entry( p_node , struct ForwardSession , timeout_rbnode );
-	if( p_forward_session->timeout_timestamp - g_time_tv.tv_sec <= 0 )
+	if( p_forward_session->timeout_timestamp - GETSECONDSTAMP <= 0 )
 	{
 		pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 		return p_forward_session;

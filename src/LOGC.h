@@ -90,13 +90,30 @@ void CloseLogFile();
 void SetLogLevel( int log_level );
 
 extern TLS int			g_log_level ;
-extern TLS struct timeval	g_time_tv ;
-extern TLS char			g_date_and_time[ 10 + 1 + 8 + 2 ] ;
+
 extern TLS unsigned long	g_pid ;
 extern TLS unsigned long	g_tid ;
 
 #define SETPID			g_pid = PROCESSID ;
 #define SETTID			g_tid = THREADID ;
+
+#define LOG_DATETIMECACHE_SIZE	64
+
+struct DateTimeCache
+{
+	time_t			second_stamp ;
+	char			date_and_time_str[ 10 + 1 + 8 + 2 ] ;
+} ;
+extern struct DateTimeCache	g_date_time_cache[ LOG_DATETIMECACHE_SIZE ] ;
+extern int			g_date_time_cache_index ;
+
+void UpdateDateTimeCacheFirst();
+void UpdateDateTimeCache();
+
+#define UPDATEDATETIMECACHEFIRST	UpdateDateTimeCacheFirst();
+#define UPDATEDATETIMECACHE		UpdateDateTimeCache();
+#define GETSECONDSTAMP			g_date_time_cache[g_date_time_cache_index].second_stamp
+#define GETDATETIMESTR			g_date_time_cache[g_date_time_cache_index].date_and_time_str
 
 #if ( defined __STDC_VERSION__ ) && ( __STDC_VERSION__ >= 199901 )
 
