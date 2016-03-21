@@ -97,7 +97,7 @@ extern TLS unsigned long	g_tid ;
 #define SETPID			g_pid = PROCESSID ;
 #define SETTID			g_tid = THREADID ;
 
-#define LOG_DATETIMECACHE_SIZE	64
+#define LOG_DATETIMECACHE_SIZE	60
 
 struct DateTimeCache
 {

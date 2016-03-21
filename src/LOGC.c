@@ -107,7 +107,7 @@ static void _UpdateDateTimeCache( unsigned int index )
 /* 第一次更新时间缓冲区 */
 void UpdateDateTimeCacheFirst()
 {
-	_UpdateDateTimeCache( 0 );
+	_UpdateDateTimeCache( g_date_time_cache_index );
 	
 	return;
 }
@@ -115,20 +115,8 @@ void UpdateDateTimeCacheFirst()
 /* 更新时间缓冲区 */
 void UpdateDateTimeCache()
 {
-	int	next_date_time_cache_index ;
-	/*
-	int	diff_date_time_cache_index ;
-	*/
-	
-	next_date_time_cache_index = ( g_date_time_cache_index + 1 ) % LOG_DATETIMECACHE_SIZE ;
-	
-	_UpdateDateTimeCache( next_date_time_cache_index );
-	
-	__sync_bool_compare_and_swap( & g_date_time_cache_index , g_date_time_cache_index , next_date_time_cache_index );
-	/*
-	diff_date_time_cache_index = next_date_time_cache_index - g_date_time_cache_index ;
-	__sync_fetch_and_add( & g_date_time_cache_index , diff_date_time_cache_index );
-	*/
+	g_date_time_cache_index = ( g_date_time_cache_index + 1 ) % LOG_DATETIMECACHE_SIZE ;
+	_UpdateDateTimeCache( g_date_time_cache_index );
 	
 	return;
 }

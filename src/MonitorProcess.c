@@ -7,7 +7,7 @@ signed char		g_SIGTERM_flag = 0 ;
 
 static void sig_set_flag( int sig_no )
 {
-	UPDATEDATETIMECACHE
+	UPDATEDATETIMECACHEFIRST
 	InfoLog( __FILE__ , __LINE__ , "recv signal[%d]" , sig_no );
 	
 	if( sig_no == SIGUSR1 )
@@ -117,7 +117,7 @@ int MonitorProcess( struct ServerEnv *penv )
 	/* 设置日志输出文件 */
 	SETPID
 	SETTID
-	UPDATEDATETIMECACHE
+	UPDATEDATETIMECACHEFIRST
 	InfoLog( __FILE__ , __LINE__ , "--- G6.MonitorProcess ---" );
 	
 	/* 设置信号句柄 */
@@ -153,7 +153,7 @@ int MonitorProcess( struct ServerEnv *penv )
 		{
 			SETPID 
 			SETTID
-			UPDATEDATETIMECACHE
+			UPDATEDATETIMECACHEFIRST
 			
 			InfoLog( __FILE__ , __LINE__ , "child : [%ld]fork[%ld]" , getppid() , getpid() );
 			
@@ -174,7 +174,7 @@ int MonitorProcess( struct ServerEnv *penv )
 		/* 监控子进程结束 */
 		_WAITPID :
 		pid = waitpid( -1 , & status , 0 );
-		UPDATEDATETIMECACHE
+		UPDATEDATETIMECACHEFIRST
 		if( pid == -1 )
 		{
 			if( errno == EINTR )

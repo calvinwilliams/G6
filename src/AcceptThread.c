@@ -906,7 +906,6 @@ void *AcceptThread( struct ServerEnv *penv )
 	SetLogLevel( penv->cmd_para.log_level );
 	SETPID
 	SETTID
-	UPDATEDATETIMECACHE
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.AcceptThread ---" );
 	
 	if( penv->cmd_para.set_cpu_affinity_flag == 1 )
@@ -924,7 +923,7 @@ void *AcceptThread( struct ServerEnv *penv )
 		event_count = epoll_wait( penv->accept_epoll_fd , events , WAIT_EVENTS_COUNT , 1000 ) ;
 		if( g_exit_flag == 1 )
 		{
-			UPDATEDATETIMECACHE
+			UPDATEDATETIMECACHEFIRST
 		}
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait sock[%d][...] forward_session_count[%u] return [%d]events" , penv->accept_command_pipe.fds[0] , penv->forward_session_count , event_count );
 		
@@ -1085,7 +1084,7 @@ void *_AcceptThread( void *pv )
 {
 	AcceptThread( (struct ServerEnv *)pv );
 	
-	UPDATEDATETIMECACHE
+	UPDATEDATETIMECACHEFIRST
 	InfoLog( __FILE__ , __LINE__ , "exit" );
 	return NULL;
 }

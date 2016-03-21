@@ -256,7 +256,6 @@ void *ForwardThread( unsigned long forward_thread_index )
 	SetLogLevel( penv->cmd_para.log_level );
 	SETPID
 	SETTID
-	UPDATEDATETIMECACHE
 	InfoLog( __FILE__ , __LINE__ , "--- G6.WorkerProcess.ForwardThread.%d ---" , forward_thread_index+1 );
 	
 	if( penv->cmd_para.set_cpu_affinity_flag == 1 )
@@ -273,7 +272,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 		event_count = epoll_wait( forward_epoll_fd , events , WAIT_EVENTS_COUNT , 1000 ) ;
 		if( g_exit_flag == 1 )
 		{
-			UPDATEDATETIMECACHE
+			UPDATEDATETIMECACHEFIRST
 		}
 		DebugLog( __FILE__ , __LINE__ , "epoll_wait sock[%d][...] forward_session_count[%u] return [%d]events" , penv->forward_command_pipe[forward_thread_index].fds[0] , penv->forward_session_count , event_count  );
 		
@@ -384,7 +383,7 @@ void *_ForwardThread( void *pv )
 	free( p_forward_thread_index );
 	ForwardThread( forward_thread_index );
 	
-	UPDATEDATETIMECACHE
+	UPDATEDATETIMECACHEFIRST
 	InfoLog( __FILE__ , __LINE__ , "pthread_exit" );
 	pthread_exit(NULL);
 }
