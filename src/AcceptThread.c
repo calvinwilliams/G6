@@ -259,10 +259,12 @@ static int TryToConnectServer( struct ServerEnv *penv , struct ForwardSession *p
 			event.events = EPOLLOUT | EPOLLERR ;
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_reverse_forward_session->sock , & event );
 			
+			/*
 			memset( & event , 0x00 , sizeof(struct epoll_event) );
 			event.data.ptr = p_forward_session ;
 			event.events = EPOLLERR ;
 			epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , p_reverse_forward_session->p_reverse_forward_session->sock , & event );
+			*/
 		}
 		else /* ¡¨Ω” ß∞‹ */
 		{

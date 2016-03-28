@@ -15,7 +15,7 @@ static void version()
 
 static void usage()
 {
-	printf( "USAGE : G6 -f (config_pathfilename) [ -t (forward_thread_size) ] [ -s (forward_session_size) ] [ --log-level (DEBUG|INFO|WARN|ERROR|FATAL) ] [ --log-filename (logfilename) ] [ --no-daemon ] [ --set-cpu-affinity ]\n" );
+	printf( "USAGE : G6 -f (config_pathfilename) [ -t (forward_thread_size) ] [ -s (forward_session_size) ] [ --log-level (DEBUG|INFO|WARN|ERROR|FATAL) ] [ --log-filename (logfilename) ] [ --close-log ] [ --no-daemon ] [ --set-cpu-affinity ]\n" );
 	return;
 }
 
@@ -109,13 +109,13 @@ int main( int argc , char *argv[] )
 			snprintf( penv->cmd_para.log_pathfilename , sizeof(penv->cmd_para.log_pathfilename)-1 , argv[n] );
 			SetLogFile( penv->cmd_para.log_pathfilename );
 		}
-		else if( strcmp( argv[n] , "--no-daemon" ) == 0 )
-		{
-			penv->cmd_para.no_daemon_flag = 1 ;
-		}
 		else if( strcmp( argv[n] , "--close-log" ) == 0 )
 		{
 			penv->cmd_para.close_log_flag = 1 ;
+		}
+		else if( strcmp( argv[n] , "--no-daemon" ) == 0 )
+		{
+			penv->cmd_para.no_daemon_flag = 1 ;
 		}
 		else if( strcmp( argv[n] , "--set-cpu-affinity" ) == 0 )
 		{
