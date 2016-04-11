@@ -24,13 +24,11 @@ int InitEnvirment( struct ServerEnv *penv )
 		ErrorLog( __FILE__ , __LINE__ , "pipe failed , errno[%d]" , errno );
 		return -1;
 	}
-	SetCloseExec2( penv->accept_command_pipe.fds[0] , penv->accept_command_pipe.fds[1] );
-	
-	/* 加入父子进程命令管道到侦听端口epoll池 */
-	memset( & event , 0x00 , sizeof(event) );
-	event.data.ptr = NULL ;
-	event.events = EPOLLIN | EPOLLERR ;
-	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , penv->accept_command_pipe.fds[0] , & event );
+	else
+	{
+		DebugLog( __FILE__ , __LINE__ , "pipe ok[%d][%d]" , penv->accept_command_pipe.fds[0] , penv->accept_command_pipe.fds[1] );
+		SetCloseExec2( penv->accept_command_pipe.fds[0] , penv->accept_command_pipe.fds[1] );
+	}
 	
 	/* 创建侦听端口epoll池 */
 	penv->accept_epoll_fd = epoll_create( 1024 );
@@ -39,7 +37,17 @@ int InitEnvirment( struct ServerEnv *penv )
 		ErrorLog( __FILE__ , __LINE__ , "epoll_create failed , errno[%d]" , errno );
 		return -1;
 	}
-	SetCloseExec( penv->accept_epoll_fd );
+	else
+	{
+		DebugLog( __FILE__ , __LINE__ , "epoll_create ok[%d]" , penv->accept_epoll_fd );
+		SetCloseExec( penv->accept_epoll_fd );
+	}
+	
+	/* 加入父子进程命令管道到侦听端口epoll池 */
+	memset( & event , 0x00 , sizeof(event) );
+	event.data.ptr = NULL ;
+	event.events = EPOLLIN | EPOLLERR ;
+	epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_ADD , penv->accept_command_pipe.fds[0] , & event );
 	
 	/* 申请父子线程命令管道数组 */
 	penv->forward_command_pipe = (struct PipeFds *)malloc( sizeof(struct PipeFds) * penv->cmd_para.forward_thread_size ) ;
@@ -67,7 +75,11 @@ int InitEnvirment( struct ServerEnv *penv )
 			ErrorLog( __FILE__ , __LINE__ , "pipe failed , errno[%d]" , errno );
 			return -1;
 		}
-		SetCloseExec2( penv->forward_command_pipe[forward_thread_index].fds[0] , penv->forward_command_pipe[forward_thread_index].fds[1] );
+		else
+		{
+			DebugLog( __FILE__ , __LINE__ , "pipe ok[%d][%d]" , penv->forward_command_pipe[forward_thread_index].fds[0] , penv->forward_command_pipe[forward_thread_index].fds[1] );
+			SetCloseExec2( penv->forward_command_pipe[forward_thread_index].fds[0] , penv->forward_command_pipe[forward_thread_index].fds[1] );
+		}
 		
 		/* 创建数据收发epoll池 */
 		penv->forward_epoll_fd_array[forward_thread_index] = epoll_create( 1024 );
@@ -76,7 +88,11 @@ int InitEnvirment( struct ServerEnv *penv )
 			ErrorLog( __FILE__ , __LINE__ , "epoll_create failed , errno[%d]" , errno );
 			return -1;
 		}
-		SetCloseExec( penv->forward_epoll_fd_array[forward_thread_index] );
+		else
+		{
+			DebugLog( __FILE__ , __LINE__ , "epoll_create ok[%d]" , penv->forward_epoll_fd_array[forward_thread_index] );
+			SetCloseExec( penv->forward_epoll_fd_array[forward_thread_index] );
+		}
 		
 		/* 加入父子线程命令管道到数据收发epoll池 */
 		memset( & event , 0x00 , sizeof(event) );

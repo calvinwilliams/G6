@@ -1,7 +1,7 @@
 #include "G6.h"
 
-char			__G6_VERSION[] = "1.0.0" ;
-char			*__G6_VERSION_1_0_0 = __G6_VERSION ;
+char			__G6_VERSION[] = "1.0.3" ;
+char			*__G6_VERSION_1_0_3 = __G6_VERSION ;
 
 struct ServerEnv	*g_penv = NULL ;
 
