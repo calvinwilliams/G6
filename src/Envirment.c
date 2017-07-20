@@ -550,7 +550,7 @@ int AddTimeoutTreeNode( struct ServerEnv *penv , struct ForwardSession *p_forwar
 	
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 	
-        return 0;
+        return nret;
 }
 
 int AddTimeoutTreeNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 , unsigned int timeout_timestamp )
@@ -600,7 +600,7 @@ int UpdateTimeoutNode( struct ServerEnv *penv , struct ForwardSession *p_forward
 	
 	pthread_mutex_unlock( & (penv->timeout_rbtree_mutex) );
 	
-	return 0;
+	return nret;
 }
 
 int UpdateTimeoutNode2( struct ServerEnv *penv , struct ForwardSession *p_forward_session , struct ForwardSession *p_forward_session2 , unsigned int timeout_timestamp )
