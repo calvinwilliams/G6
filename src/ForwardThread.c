@@ -131,7 +131,7 @@ int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_se
 	else
 	{
 		/* 只发送了部分 */
-		InfoLog( __FILE__ , __LINE__ , "transfer #%d# [%d/%d]bytes to #%d#" , p_forward_session->netaddr.ip , p_forward_session->netaddr.port.port_int , p_forward_session->sock , len , p_forward_session->io_buffer_len , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , p_reverse_forward_session->sock );
+		InfoLog( __FILE__ , __LINE__ , "transfer2 [%s:%u]#%d# [%d/%d]bytes to [%s:%u]#%d#" , p_forward_session->netaddr.ip , p_forward_session->netaddr.port.port_int , p_forward_session->sock , len , p_forward_session->io_buffer_len , p_reverse_forward_session->netaddr.ip , p_reverse_forward_session->netaddr.port.port_int , p_reverse_forward_session->sock );
 		DebugHexLog( __FILE__ , __LINE__ , p_forward_session->io_buffer , len , NULL );
 		
 		IgnoreReverseSessionEvents( p_forward_session , p_events , event_index , event_count );
