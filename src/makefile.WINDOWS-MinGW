@@ -62,6 +62,9 @@ CLEAN_ADDITION	=
 # 最终目标列表
 all	:	$(OBJ) $(OBJ2) $(LIB) $(LIB2) $(SQL) $(NOCLEAN_OBJ) $(NOINST_OBJ) $(BIN) $(BIN2)
 
+prepro_all	:	$(PREPRO)
+
+
 # 文件系统宏
 CD		=	cd
 RM		=	del

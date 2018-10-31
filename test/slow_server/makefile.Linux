@@ -48,12 +48,15 @@ CLEAN_ADDITION	=
 
 ###### 加载mktpl模板库
 # 最终目标列表
-all	:	$(OBJ) $(OBJ2) $(LIB) $(LIB2) $(SQL) $(NOCLEAN_OBJ) $(NOINST_OBJ) $(BIN) $(BIN2)
+all	:	$(OBJ) $(OBJ2) $(LIB) $(LIB2) $(SQL) $(NOINST_OBJ) $(BIN) $(BIN2)
+
+prepro_all	:	$(PREPRO)
+
 
 # 文件系统宏
 CD		=	cd
 RM		=	rm -f
-CP		=	cp -f
+CP		=	cp -rf
 MV		=	mv -f
 MKDIR		=	mkdir -p
 
@@ -76,43 +79,58 @@ DFTHDER		=	$(csm_FILE_DFTHDER) $(cui_FILE_DFTHDER) $(dtd_FILE_DFTHDER) $(prt_FIL
 .PHONY:install
 install		:	all
 
-ifneq ($(strip $(BIN)),)
 ifneq ($(strip $(BININST)),)
 	@if [ ! -d "$(BININST)" ] ; then \
 		echo $(MKDIR) $(BININST) ; \
 		$(MKDIR) $(BININST) ; \
-	fi ; \
-	for FILE in `echo $(BIN)` ; do \
-		echo $(CP) $$FILE $(BININST)/ ; \
-		$(RM) $(BININST)/$$FILE ; \
-		$(CP) $$FILE $(BININST)/ ; \
+	fi
+ifneq ($(strip $(BIN)),)
+	@for FILE in `echo $(BIN)` ; do \
+		if [ -f $(BININST)/$$FILE ] ; then \
+			echo $(RM) $(BININST)/$$FILE ; \
+			$(RM) $(BININST)/$$FILE ; \
+		fi ; \
+		if [ -f $$FILE ] ; then \
+			echo $(CP) $$FILE $(BININST)/ ; \
+			$(CP) $$FILE $(BININST)/ ; \
+		fi ; \
 	done
 endif
 endif
-ifneq ($(strip $(BIN2)),)
 ifneq ($(strip $(BININST2)),)
 	@if [ ! -d "$(BININST2)" ] ; then \
 		echo $(MKDIR) $(BININST2) ; \
 		$(MKDIR) $(BININST2) ; \
-	fi ; \
-	for FILE in `echo $(BIN2)` ; do \
-		echo $(CP) $$FILE $(BININST2)/ ; \
-		$(RM) $(BININST2)/$$FILE ; \
-		$(CP) $$FILE $(BININST2)/ ; \
+	fi
+ifneq ($(strip $(BIN2)),)
+	@for FILE in `echo $(BIN2)` ; do \
+		if [ -f $(BININST2)/$$FILE ] ; then \
+			echo $(RM) $(BININST2)/$$FILE ; \
+			$(RM) $(BININST2)/$$FILE ; \
+		fi ; \
+		if [ -f $$FILE ] ; then \
+			echo $(CP) $$FILE $(BININST2)/ ; \
+			$(CP) $$FILE $(BININST2)/ ; \
+		fi ; \
 	done
 endif
 endif
 
-ifneq ($(strip $(DFTHDER)),)
 ifneq ($(strip $(DFTHDERINST)),)
 	@if [ ! -d "$(DFTHDERINST)" ] ; then \
 		echo $(MKDIR) $(DFTHDERINST) ; \
 		$(MKDIR) $(DFTHDERINST) ; \
-	fi ; \
-	for FILE in `echo $(DFTHDER)` ; do \
-		echo $(CP) $$FILE $(DFTHDERINST)/ ; \
-		$(RM) $(DFTHDERINST)/$$FILE ; \
-		$(CP) $$FILE $(DFTHDERINST)/ ; \
+	fi
+ifneq ($(strip $(DFTHDER)),)
+	@for FILE in `echo $(DFTHDER)` ; do \
+		if [ -f $(DFTHDERINST)/$$FILE ] ; then \
+			echo $(RM) $(DFTHDERINST)/$$FILE ; \
+			$(RM) $(DFTHDERINST)/$$FILE ; \
+		fi ; \
+		if [ -f $$FILE ] ; then \
+			echo $(CP) $$FILE $(DFTHDERINST)/ ; \
+			$(CP) $$FILE $(DFTHDERINST)/ ; \
+		fi ; \
 	done
 endif
 endif
@@ -128,16 +146,20 @@ uninstall		:
 ifneq ($(strip $(BIN)),)
 ifneq ($(strip $(BININST)),)
 	@for FILE in `echo $(BIN)` ; do \
-		echo $(RM) $(BININST)/$$FILE ; \
-		$(RM) $(BININST)/$$FILE ; \
+		if [ -f $(BININST)/$$FILE ] ; then \
+			echo $(RM) $(BININST)/$$FILE ; \
+			$(RM) $(BININST)/$$FILE ; \
+		fi ; \
 	done
 endif
 endif
 ifneq ($(strip $(BIN2)),)
 ifneq ($(strip $(BININST2)),)
 	@for FILE in `echo $(BIN2)` ; do \
-		echo $(RM) $(BININST2)/$$FILE ; \
-		$(RM) $(BININST2)/$$FILE ; \
+		if [ -f $(BININST2)/$$FILE ] ; then \
+			echo $(RM) $(BININST2)/$$FILE ; \
+			$(RM) $(BININST2)/$$FILE ; \
+		fi ; \
 	done
 endif
 endif
@@ -145,8 +167,10 @@ endif
 ifneq ($(strip $(DFTHDER)),)
 ifneq ($(strip $(DFTHDERINST)),)
 	@for FILE in `echo $(DFTHDER)` ; do \
-		echo $(RM) $(DFTHDERINST)/$$FILE ; \
-		$(RM) $(DFTHDERINST)/$$FILE ; \
+		if [ -f $(DFTHDERINST)/$$FILE ] ; then \
+			echo $(RM) $(DFTHDERINST)/$$FILE ; \
+			$(RM) $(DFTHDERINST)/$$FILE ; \
+		fi ; \
 	done
 endif
 endif

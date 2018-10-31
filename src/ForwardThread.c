@@ -293,7 +293,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 			{
 				char		command ;
 				
-				DebugLog( __FILE__ , __LINE__ , "pipe session event" );
+				DebugLog( __FILE__ , __LINE__ , "pipe session event[0x%X]" , p_event->events );
 				
 				DebugLog( __FILE__ , __LINE__ , "read forward_command_pipe ..." );
 				nret = read( penv->forward_command_pipe[forward_thread_index].fds[0] , & command , 1 ) ;
@@ -321,7 +321,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 			}
 			else
 			{
-				DebugLog( __FILE__ , __LINE__ , "forward session event" );
+				DebugLog( __FILE__ , __LINE__ , "forward session event[0x%X]" , p_event->events );
 				
 				p_forward_session = p_event->data.ptr ;
 				p_reverse_forward_session = p_forward_session->p_reverse_forward_session ;

@@ -48,7 +48,10 @@ CLEAN_ADDITION	=
 
 ###### 加载mktpl模板库
 # 最终目标列表
-all	:	$(OBJ) $(OBJ2) $(LIB) $(LIB2) $(SQL) $(NOCLEAN_OBJ) $(NOINST_OBJ) $(BIN) $(BIN2)
+all	:	$(OBJ) $(OBJ2) $(LIB) $(LIB2) $(SQL) $(NOINST_OBJ) $(BIN) $(BIN2)
+
+prepro_all	:	$(PREPRO)
+
 
 # 文件系统宏
 CD		=	cd
@@ -80,8 +83,9 @@ install		:	all
 			$(MKDIR) $(BININST) ; \
 		fi ; \
 		for FILE in `echo $(BIN)` ; do \
-			echo $(CP) $$FILE $(BININST)/ ; \
+			echo $(RM) $(BININST)/$$FILE ; \
 			$(RM) $(BININST)/$$FILE ; \
+			echo $(CP) $$FILE $(BININST)/ ; \
 			$(CP) $$FILE $(BININST)/ ; \
 		done \
 	fi
@@ -103,8 +107,9 @@ install		:	all
 			$(MKDIR) $(DFTHDERINST) ; \
 		fi ; \
 		for FILE in `echo $(DFTHDER)` ; do \
-			echo $(CP) $$FILE $(DFTHDERINST)/ ; \
+			echo $(RM) $(DFTHDERINST)/$$FILE ; \
 			$(RM) $(DFTHDERINST)/$$FILE ; \
+			echo $(CP) $$FILE $(DFTHDERINST)/ ; \
 			$(CP) $$FILE $(DFTHDERINST)/ ; \
 		done \
 	fi

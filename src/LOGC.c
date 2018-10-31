@@ -148,7 +148,7 @@ int WriteLogBaseV( int log_level , char *c_filename , long c_fileline , char *fo
 	/* memset( log_buffer , 0x00 , sizeof(log_buffer) ); */
 	log_bufptr = log_buffer ;
 	log_buflen = 0 ;
-	log_buf_remain_len = sizeof(log_buffer) - 1 ;
+	log_buf_remain_len = sizeof(log_buffer) - 1 - sizeof(NEWLINE) ;
 	
 	/*
 	{
@@ -161,6 +161,7 @@ int WriteLogBaseV( int log_level , char *c_filename , long c_fileline , char *fo
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
 	len = VSNPRINTF( log_bufptr , log_buf_remain_len , format , valist );
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
+	log_buf_remain_len += sizeof(NEWLINE) ;
 	len = SNPRINTF( log_bufptr , log_buf_remain_len , NEWLINE ) ;
 	OFFSET_BUFPTR( log_buffer , log_bufptr , len , log_buflen , log_buf_remain_len );
 	

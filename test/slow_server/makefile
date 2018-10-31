@@ -33,7 +33,7 @@ CLEAN_ADDITION	=
 #@ make_uninstall
 #@ make_uninstall_BININST
 #@ make_uninstall_DFTHDERINST
-include $(MKTPLDIR)/makeobj_$(MKTPLOS).inc
+include $(MKTPL2_HOME)/makeobj_$(MKTPL2_OS).inc
 
 ###### 目标文件依赖关系
 slow_client		:	slow_client.c

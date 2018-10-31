@@ -1182,7 +1182,7 @@ int LoadConfig( struct ServerEnv *penv )
 	{
 		InfoLog( __FILE__ , __LINE__ , "  rule_id[%s] load_balance_algorithm[%s] >>>"
 			, p_forward_rule->rule_id , g_LoadBalanceAlgorithmString[p_forward_rule->load_balance_algorithm] );
-		InfoLog( __FILE__ , __LINE__ , "  client_addr_count[%ld/%ld] forward_addr_count[%ld/%ld] server_addr_count[%ld/%ld]"
+		InfoLog( __FILE__ , __LINE__ , "  client_addr_count[%d/%d] forward_addr_count[%d/%d] server_addr_count[%d/%d]"
 			, p_forward_rule->client_addr_count , p_forward_rule->client_addr_size
 			, p_forward_rule->forward_addr_count , p_forward_rule->forward_addr_size
 			, p_forward_rule->server_addr_count , p_forward_rule->server_addr_size );
