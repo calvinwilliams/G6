@@ -27,6 +27,12 @@ int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_se
 	struct epoll_event	event ;
 	
 	/* 接收通讯数据 */
+	if( p_forward_session->io_buffer_len > 0 )
+	{
+		WarnLog( __FILE__ , __LINE__ , "[%d]bytes remains on #%d# EPOLLIN event" , p_forward_session->io_buffer_len , p_forward_session->sock );
+		return 0;
+	}
+	
 	p_forward_session->io_buffer_offsetpos = 0 ;
 	p_forward_session->io_buffer_len = recv( p_forward_session->sock , p_forward_session->io_buffer , DEFAULT_FORWARD_TRANSFER_BUFSIZE , 0 ) ;
 	if( p_forward_session->io_buffer_len == 0 )
@@ -52,12 +58,17 @@ int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_se
 				epoll_ctl( forward_epoll_fd , EPOLL_CTL_ADD , p_forward_session->sock , & event );
 			}
 			
+			DebugLog( __FILE__ , __LINE__ , "recv #%d# next , errno[%d]" , p_forward_session->sock , errno );
 			return 0;
 		}
 		
 		/* 通讯接收出错 */
 		ErrorLog( __FILE__ , __LINE__ , "recv #%d# failed , errno[%d]" , p_forward_session->sock , errno );
 		return -1;
+	}
+	else
+	{
+		DebugLog( __FILE__ , __LINE__ , "recv #%d# ok , [%d]bytes" , p_forward_session->sock , p_forward_session->io_buffer_len );
 	}
 	
 	/* 登记最近读时间戳 */
@@ -100,11 +111,13 @@ int OnForwardInput( struct ServerEnv *penv , struct ForwardSession *p_forward_se
 				event.events = EPOLLOUT | EPOLLERR ;
 				epoll_ctl( forward_epoll_fd , EPOLL_CTL_MOD , p_reverse_forward_session->sock , & event );
 			}
+			
+			DebugLog( __FILE__ , __LINE__ , "send #%d# next , errno[%d]" , p_reverse_forward_session->sock , errno );
 		}
 		else
 		{
 			/* 通讯发送出错 */
-			ErrorLog( __FILE__ , __LINE__ , "send #%d# failed , errno[%d]" , p_forward_session->sock , errno );
+			ErrorLog( __FILE__ , __LINE__ , "send #%d# failed , errno[%d]" , p_reverse_forward_session->sock , errno );
 			return -1;
 		}
 	}
@@ -188,6 +201,7 @@ static int OnForwardOutput( struct ServerEnv *penv , struct ForwardSession *p_fo
 		if( _ERRNO == _EWOULDBLOCK )
 		{
 			/* 通讯发送缓冲区满 */
+			DebugLog( __FILE__ , __LINE__ , "send #%d# next , errno[%d]" , p_forward_session->sock , errno );
 		}
 		else
 		{
@@ -328,7 +342,7 @@ void *ForwardThread( unsigned long forward_thread_index )
 				
 				if( p_event->events & EPOLLIN ) /* 输入事件 */
 				{
-					nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count , 1 ) ;
+					nret = OnForwardInput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count , 0 ) ;
 					if( nret > 0 )
 					{
 						DISCONNECT_PAIR
@@ -340,13 +354,15 @@ void *ForwardThread( unsigned long forward_thread_index )
 					}
 					else
 					{
+						InfoLog( __FILE__ , __LINE__ , "OnForwardInput ok" );
+						
 						if( p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout > 0 )
 						{
 							UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , GETSECONDSTAMP + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
 						}
 					}
 				}
-				else if( p_event->events & EPOLLOUT ) /* 输出事件 */
+				if( p_event->events & EPOLLOUT ) /* 输出事件 */
 				{
 					nret = OnForwardOutput( penv , p_forward_session , forward_epoll_fd , events , event_index , event_count ) ;
 					if( nret )
@@ -356,15 +372,17 @@ void *ForwardThread( unsigned long forward_thread_index )
 					}
 					else
 					{
+						InfoLog( __FILE__ , __LINE__ , "OnForwardOutput ok" );
+						
 						if( p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout > 0 )
 						{
 							UpdateTimeoutNode2( penv , p_forward_session , p_forward_session->p_reverse_forward_session , GETSECONDSTAMP + p_forward_session->p_forward_rule->forward_addr_array[p_forward_session->forward_index].timeout );
 						}
 					}
 				}
-				else if( p_event->events ) /* 错误事件 */
+				if( p_event->events & EPOLLERR ) /* 错误事件 */
 				{
-					ErrorLog( __FILE__ , __LINE__ , "forward session #%d#EPOLLERR" , p_forward_session->sock );
+					ErrorLog( __FILE__ , __LINE__ , "forward session #%d# EPOLLERR" , p_forward_session->sock );
 					DISCONNECT_PAIR
 					continue;
 				}
