@@ -77,7 +77,11 @@ static void sig_proc( struct ServerEnv *penv )
 		}
 		else if( pid == 0 )
 		{
-			execvp( "G6" , g_penv->argv );
+			nret = execvp( "G6" , g_penv->argv ) ;
+			if( nret == -1 )
+			{
+				ErrorLog( __FILE__ , __LINE__ , "execvp failed[%d] , errno[%d]" , nret , errno );
+			}
 			
 			exit(9);
 		}
