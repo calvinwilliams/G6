@@ -194,9 +194,18 @@ int MonitorProcess( struct ServerEnv *penv )
 		if( pid != penv->pid )
 			goto _WAITPID;
 		
-		ErrorLog( __FILE__ , __LINE__
-			, "waitpid[%ld] WEXITSTATUS[%d] WIFSIGNALED[%d] WTERMSIG[%d]"
-			, penv->pid , WEXITSTATUS(status) , WIFSIGNALED(status) , WTERMSIG(status) );
+		if( WIFSIGNALED(status) || WTERMSIG(status) )
+		{
+			ErrorLog( __FILE__ , __LINE__
+				, "waitpid[%ld] WEXITSTATUS[%d] WIFSIGNALED[%d] WTERMSIG[%d]"
+				, penv->pid , WEXITSTATUS(status) , WIFSIGNALED(status) , WTERMSIG(status) );
+		}
+		else
+		{
+			InfoLog( __FILE__ , __LINE__
+				, "waitpid[%ld] WEXITSTATUS[%d] WIFSIGNALED[%d] WTERMSIG[%d]"
+				, penv->pid , WEXITSTATUS(status) , WIFSIGNALED(status) , WTERMSIG(status) );
+		}
 		
 		if( g_exit_flag == 0 )
 			sleep(1);

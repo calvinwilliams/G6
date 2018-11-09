@@ -52,7 +52,7 @@ int BindDaemonServer( char *pcServerName , int (* ServerMain)( void *pv ) , void
 			break;
 	}
 	
-	setuid( getpid() ) ;
+	/* setuid( getpid() ) ; */
 	
 	umask( 0 ) ;
 	

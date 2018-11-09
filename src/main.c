@@ -1,7 +1,7 @@
 #include "G6.h"
 
-char			__G6_VERSION[] = "1.0.5" ;
-char			*__G6_VERSION_1_0_5 = __G6_VERSION ;
+char			__G6_VERSION[] = "1.0.6" ;
+char			*__G6_VERSION_1_0_6 = __G6_VERSION ;
 
 struct ServerEnv	*g_penv = NULL ;
 
@@ -147,7 +147,8 @@ int main( int argc , char *argv[] )
 	nret = InitEnvirment( penv ) ;
 	if( nret )
 	{
-		printf( "InitEnvirment failed[%d]\n" , nret );
+		if( getenv(G6_LISTEN_SOCKFDS) == NULL )
+			printf( "InitEnvirment failed[%d]\n" , nret );
 		return -nret;
 	}
 	
@@ -160,7 +161,8 @@ int main( int argc , char *argv[] )
 	nret = LoadConfig( penv ) ;
 	if( nret )
 	{
-		printf( "LoadConfig failed[%d]\n" , nret );
+		if( getenv(G6_LISTEN_SOCKFDS) == NULL )
+			printf( "LoadConfig failed[%d]\n" , nret );
 		return -nret;
 	}
 	
@@ -168,7 +170,8 @@ int main( int argc , char *argv[] )
 	nret = AddListeners( penv ) ;
 	if( nret )
 	{
-		printf( "AddListeners failed[%d]\n" , nret );
+		if( getenv(G6_LISTEN_SOCKFDS) == NULL )
+			printf( "AddListeners failed[%d]\n" , nret );
 		return -nret;
 	}
 	
