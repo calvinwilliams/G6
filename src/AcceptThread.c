@@ -500,13 +500,14 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	int			nret = 0 ;
 	
 	/* 检查非堵塞连接结果 */
+	p_servers_addr = p_forward_session->p_forward_rule->server_addr_array + p_forward_session->server_index ;
 #if ( defined __linux ) || ( defined __unix )
 	addr_len = sizeof(int) ;
 	code = getsockopt( p_forward_session->sock , SOL_SOCKET , SO_ERROR , & error , & addr_len ) ;
 	if( code < 0 || error )
 #elif ( defined _WIN32 )
 	addr_len = sizeof(struct sockaddr_in) ;
-	nret = connect( p_forward_session->sock , ( struct sockaddr *) & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->balance_algorithm.MS.server_index]->netaddr) , addr_len ) ;
+	nret = connect( p_forward_session->sock , ( struct sockaddr *) p_servers_addr , addr_len ) ;
 	if( nret == -1 && _ERRNO == _EISCONN )
 	{
 		;
@@ -514,7 +515,7 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	else
 #endif
         {
-		ErrorLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] failed , errno[%d]" , p_forward_session->sock , p_forward_session->p_reverse_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int , errno );
+		ErrorLog( __FILE__ , __LINE__ , "#%d#-#%d# connect [%s:%d] failed , errno[%d]" , p_forward_session->p_reverse_forward_session->sock , p_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int , errno );
 		RemoveIpConnectionStat( penv , & (p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].ip_connection_stat) , p_forward_session->netaddr.sockaddr.sin_addr.s_addr );
 		epoll_ctl( penv->accept_epoll_fd , EPOLL_CTL_DEL , p_forward_session->sock , NULL );
 		DebugLog( __FILE__ , __LINE__ , "close #%d#" , p_forward_session->sock );
@@ -537,7 +538,6 @@ static int OnConnectingServer( struct ServerEnv *penv , struct ForwardSession *p
 	p_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
 	p_forward_session->p_reverse_forward_session->status = FORWARD_SESSION_STATUS_CONNECTED ;
 	
-	p_servers_addr = p_forward_session->p_forward_rule->server_addr_array + p_forward_session->server_index ;
 	DebugLog( __FILE__ , __LINE__ , "#%d#-#%d# connect2 [%s:%d] ok" , p_forward_session->p_reverse_forward_session->sock , p_forward_session->sock , p_servers_addr->netaddr.ip , p_servers_addr->netaddr.port.port_int );
 	
 	p_forward_session->p_forward_rule->server_addr_array[p_forward_session->server_index].server_unable = 0 ;
